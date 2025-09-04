@@ -10,7 +10,7 @@ const API_CONFIG = {
         }
         
         // Production - Your actual Render backend URL
-        return 'https://parapharmacie-gaher.onrender.com';
+        return 'https://parapharmacie-gaher.onrender.com/api';
     })(),
     
     // Request configuration
@@ -57,7 +57,7 @@ const API_CONFIG = {
 // Helper function to build API URLs
 function buildApiUrl(endpoint) {
     const url = API_CONFIG.BASE_URL + endpoint;
-    console.log(`🌐 API URL: ${url}`);
+    console.log('API URL:', url);
     return url;
 }
 
@@ -93,13 +93,13 @@ async function apiCall(endpoint, options = {}) {
     // Retry logic for Render cold starts
     for (let attempt = 1; attempt <= API_CONFIG.RETRY_ATTEMPTS; attempt++) {
         try {
-            console.log(`🔄 API Call Attempt ${attempt}: ${finalOptions.method} ${url}`);
+            console.log(`API Call Attempt ${attempt}: ${finalOptions.method} ${url}`);
             
             // Create abort controller for timeout
             const controller = new AbortController();
             const timeoutId = setTimeout(() => {
                 controller.abort();
-                console.log('⏱️ Request timeout triggered');
+                console.log('Request timeout triggered');
             }, API_CONFIG.TIMEOUT);
             
             const response = await fetch(url, {
@@ -109,7 +109,7 @@ async function apiCall(endpoint, options = {}) {
             
             clearTimeout(timeoutId);
             
-            console.log(`📡 Response: ${response.status} ${response.statusText}`);
+            console.log(`Response: ${response.status} ${response.statusText}`);
             
             // Handle different content types
             const contentType = response.headers.get('content-type');
@@ -119,7 +119,7 @@ async function apiCall(endpoint, options = {}) {
                 data = await response.json();
             } else {
                 const text = await response.text();
-                console.log('📄 Non-JSON response:', text);
+                console.log('Non-JSON response:', text);
                 try {
                     data = JSON.parse(text);
                 } catch {
@@ -128,7 +128,7 @@ async function apiCall(endpoint, options = {}) {
             }
             
             if (!response.ok) {
-                console.error(`❌ HTTP Error ${response.status}:`, data);
+                console.error(`HTTP Error ${response.status}:`, data);
                 
                 // Don't retry on client errors (4xx)
                 if (response.status >= 400 && response.status < 500) {
@@ -137,7 +137,7 @@ async function apiCall(endpoint, options = {}) {
                 
                 // Retry on server errors (5xx) if we have attempts left
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
+                    console.log(`Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
                     continue;
                 }
@@ -145,16 +145,16 @@ async function apiCall(endpoint, options = {}) {
                 throw new Error(data.message || `Erreur serveur: ${response.status}`);
             }
             
-            console.log('✅ API Success');
+            console.log('API Success');
             return data;
             
         } catch (error) {
-            console.error(`💥 API Call Error (Attempt ${attempt}):`, error.message);
+            console.error(`API Call Error (Attempt ${attempt}):`, error.message);
             
             // Handle different error types
             if (error.name === 'AbortError') {
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`⏱️ Timeout - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
+                    console.log(`Timeout - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
                     continue;
                 } else {
@@ -162,7 +162,7 @@ async function apiCall(endpoint, options = {}) {
                 }
             } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🌐 Network error - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
+                    console.log(`Network error - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
                     continue;
                 } else {
@@ -178,7 +178,7 @@ async function apiCall(endpoint, options = {}) {
             }
             
             // Wait before retrying
-            console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
+            console.log(`Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
             await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
         }
     }
@@ -187,28 +187,28 @@ async function apiCall(endpoint, options = {}) {
 // Test backend connection with detailed logging
 async function testBackendConnection() {
     try {
-        console.log('🔍 Testing backend connection...');
-        console.log('🎯 Backend URL:', API_CONFIG.BASE_URL);
-        console.log('⚙️ Environment:', window.location.hostname === 'localhost' ? 'Development' : 'Production');
+        console.log('Testing backend connection...');
+        console.log('Backend URL:', API_CONFIG.BASE_URL);
+        console.log('Environment:', window.location.hostname === 'localhost' ? 'Development' : 'Production');
         
         const startTime = Date.now();
         const response = await apiCall('/health');
         const responseTime = Date.now() - startTime;
         
-        console.log(`✅ Backend connection successful in ${responseTime}ms:`, response);
+        console.log(`Backend connection successful in ${responseTime}ms:`, response);
         
         // Show connection status in UI if app is available
         if (window.app && typeof window.app.showToast === 'function') {
-            window.app.showToast(`✅ Connexion établie (${responseTime}ms)`, 'success');
+            window.app.showToast(`Connexion établie (${responseTime}ms)`, 'success');
         }
         
         return { success: true, responseTime, data: response };
     } catch (error) {
-        console.warn('⚠️ Backend connection failed:', error.message);
+        console.warn('Backend connection failed:', error.message);
         
         // Show offline mode message
         if (window.app && typeof window.app.showToast === 'function') {
-            window.app.showToast('⚠️ Mode hors ligne - Fonctionnalités limitées', 'warning');
+            window.app.showToast('Mode hors ligne - Fonctionnalités limitées', 'warning');
         }
         
         return { success: false, error: error.message };
@@ -248,20 +248,21 @@ async function monitorConnection() {
         // Schedule retry if we haven't exceeded max retries
         if (connectionStatus.retryAttempts <= connectionStatus.maxRetries) {
             const retryDelay = Math.min(connectionStatus.retryAttempts * 5000, 30000); // Max 30 seconds
-            console.log(`🔄 Scheduling reconnection attempt ${connectionStatus.retryAttempts}/${connectionStatus.maxRetries} in ${retryDelay}ms`);
+            console.log(`Scheduling reconnection attempt ${connectionStatus.retryAttempts}/${connectionStatus.maxRetries} in ${retryDelay}ms`);
             setTimeout(monitorConnection, retryDelay);
         } else {
-            console.log('🚫 Max reconnection attempts reached');
+            console.log('Max reconnection attempts reached');
         }
     }
 }
 
 // Initialize connection monitoring when page loads
 window.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Initializing Shifa Parapharmacie Frontend...');
-    console.log('🌐 API Base URL:', API_CONFIG.BASE_URL);
-    console.log('⏱️ Timeout:', API_CONFIG.TIMEOUT + 'ms');
-    console.log('🔄 Retry attempts:', API_CONFIG.RETRY_ATTEMPTS);
+    console.log('Initializing Shifa Parapharmacie Frontend...');
+    console.log('API Base URL:', API_CONFIG.BASE_URL);
+    console.log('Frontend URL:', window.location.origin);
+    console.log('Timeout:', API_CONFIG.TIMEOUT + 'ms');
+    console.log('Retry attempts:', API_CONFIG.RETRY_ATTEMPTS);
     
     // Test connection immediately
     setTimeout(monitorConnection, 1000);
@@ -279,9 +280,9 @@ document.addEventListener('connectionStatusChanged', (event) => {
     const { online, responseTime, error } = event.detail;
     
     if (online) {
-        console.log(`🟢 Connection Status: ONLINE (${responseTime}ms)`);
+        console.log(`Connection Status: ONLINE (${responseTime}ms)`);
     } else {
-        console.log(`🔴 Connection Status: OFFLINE (${error})`);
+        console.log(`Connection Status: OFFLINE (${error})`);
     }
 });
 
@@ -300,9 +301,10 @@ function getConnectionStatus() {
 }
 
 // Debug information
-console.log('🏥 Shifa Parapharmacie - Configuration Loaded');
-console.log('🎯 Target Backend:', API_CONFIG.BASE_URL);
-console.log('🌍 Environment:', isDevelopment() ? 'Development' : 'Production');
+console.log('Shifa Parapharmacie - Configuration Loaded');
+console.log('Target Backend:', API_CONFIG.BASE_URL);
+console.log('Current Frontend:', window.location.origin);
+console.log('Environment:', isDevelopment() ? 'Development' : 'Production');
 
 // Export for global access
 window.API_CONFIG = API_CONFIG;
