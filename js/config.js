@@ -9,7 +9,7 @@ const API_CONFIG = {
             return 'http://localhost:5000/api';
         }
         
-        // Production - Your actual Render backend URL
+        // Production - Your actual Render backend URL with /api
         return 'https://parapharmacie-gaher.onrender.com/api';
     })(),
     
@@ -57,7 +57,7 @@ const API_CONFIG = {
 // Helper function to build API URLs
 function buildApiUrl(endpoint) {
     const url = API_CONFIG.BASE_URL + endpoint;
-    console.log('API URL:', url);
+    console.log('Building API URL:', url);
     return url;
 }
 
@@ -188,7 +188,8 @@ async function apiCall(endpoint, options = {}) {
 async function testBackendConnection() {
     try {
         console.log('Testing backend connection...');
-        console.log('Backend URL:', API_CONFIG.BASE_URL);
+        console.log('Base URL:', API_CONFIG.BASE_URL);
+        console.log('Health endpoint:', buildApiUrl('/health'));
         console.log('Environment:', window.location.hostname === 'localhost' ? 'Development' : 'Production');
         
         const startTime = Date.now();
