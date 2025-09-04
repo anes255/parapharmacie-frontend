@@ -1,0 +1,25 @@
+{
+  "name": "pharmacie-gaher-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Pharmacie Gaher e-commerce",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve -s . -l 3000",
+    "dev": "live-server --port=3000",
+    "build": "echo 'Frontend ready for deployment'",
+    "preview": "serve -s ."
+  },
+  "devDependencies": {
+    "live-server": "^1.2.0",
+    "serve": "^10.0.2"
+  },
+  "keywords": [
+    "pharmacy",
+    "frontend",
+    "html",
+    "css",
+    "javascript"
+  ],
+  "author": "Pharmacie Gaher",
+  "license": "ISC"
+}
