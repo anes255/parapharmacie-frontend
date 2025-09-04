@@ -12,7 +12,7 @@ const API_BASE_URL = window.location.hostname === 'localhost'
 
 // Helper function to make API calls
 async function apiCall(endpoint, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = `${window.API_CONFIG.BASE_URL}${endpoint}`;
     
     const defaultOptions = {
         headers: {
@@ -44,7 +44,6 @@ async function apiCall(endpoint, options = {}) {
     
     return response.json();
 }
-
 // Enhanced Admin Page Loader with Backend Integration
 PharmacieGaherApp.prototype.loadAdminPage = async function() {
     if (!this.currentUser || this.currentUser.role !== 'admin') {
@@ -1614,5 +1613,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Default products initialized with all categories including Sport');
     }
 });
+
 
 console.log('✅ Complete Admin.js loaded with full product management, order system, and image handling');
