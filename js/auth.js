@@ -658,8 +658,16 @@ function showProfileSection(section) {
     }
 }
 
+// Fixed loadUserOrders function for auth.js
+// Replace the existing loadUserOrders function with this improved version
+
 async function loadUserOrders() {
     const ordersContainer = document.getElementById('userOrders');
+    
+    if (!ordersContainer) {
+        console.error('Orders container not found');
+        return;
+    }
     
     ordersContainer.innerHTML = `
         <div class="text-center py-8">
@@ -669,70 +677,289 @@ async function loadUserOrders() {
     `;
     
     try {
-        const response = await fetch(buildApiUrl('/orders/user/all'), {
-            headers: {
-                'x-auth-token': localStorage.getItem('token')
+        let orders = [];
+        
+        // Method 1: Try to get orders from API if user is authenticated
+        if (app.currentUser && localStorage.getItem('token')) {
+            try {
+                console.log('Fetching orders from API for user:', app.currentUser.email);
+                const response = await fetch(buildApiUrl('/orders/user/all'), {
+                    headers: {
+                        'x-auth-token': localStorage.getItem('token'),
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    orders = await response.json();
+                    console.log('Orders fetched from API:', orders.length);
+                } else {
+                    console.log('API request failed:', response.status, response.statusText);
+                }
+            } catch (apiError) {
+                console.log('API unavailable, trying localStorage:', apiError.message);
             }
+        }
+        
+        // Method 2: Fallback to localStorage orders if API failed or no user
+        if (orders.length === 0) {
+            console.log('Checking localStorage for orders...');
+            
+            // Get orders from localStorage (both admin and user orders)
+            const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            const lastOrder = localStorage.getItem('lastOrder');
+            
+            console.log('Admin orders found:', adminOrders.length);
+            console.log('Last order exists:', !!lastOrder);
+            
+            // Filter orders for current user
+            if (app.currentUser) {
+                const userEmail = app.currentUser.email.toLowerCase();
+                console.log('Filtering orders for user email:', userEmail);
+                
+                // Filter admin orders by user email
+                const userAdminOrders = adminOrders.filter(order => {
+                    if (order.client && order.client.email) {
+                        return order.client.email.toLowerCase() === userEmail;
+                    }
+                    return false;
+                });
+                
+                orders = [...userAdminOrders];
+                console.log('Filtered admin orders for user:', orders.length);
+                
+                // Add last order if it belongs to current user
+                if (lastOrder) {
+                    try {
+                        const parsedLastOrder = JSON.parse(lastOrder);
+                        if (parsedLastOrder.client && 
+                            parsedLastOrder.client.email.toLowerCase() === userEmail) {
+                            
+                            // Check if this order is already in the list
+                            const existsInList = orders.some(order => 
+                                order.numeroCommande === parsedLastOrder.numeroCommande
+                            );
+                            
+                            if (!existsInList) {
+                                orders.push(parsedLastOrder);
+                                console.log('Added last order to user orders');
+                            }
+                        }
+                    } catch (parseError) {
+                        console.error('Error parsing last order:', parseError);
+                    }
+                }
+            } else {
+                // No user logged in, show all orders from localStorage (fallback)
+                orders = adminOrders;
+                console.log('No user logged in, showing all orders:', orders.length);
+            }
+        }
+        
+        // Sort orders by date, newest first
+        orders.sort((a, b) => {
+            const dateA = new Date(a.dateCommande || a.createdAt || 0);
+            const dateB = new Date(b.dateCommande || b.createdAt || 0);
+            return dateB - dateA;
         });
         
-        if (response.ok) {
-            const orders = await response.json();
-            
-            if (orders.length === 0) {
-                ordersContainer.innerHTML = `
-                    <div class="text-center py-8">
-                        <i class="fas fa-box text-4xl text-emerald-200 mb-4"></i>
-                        <p class="text-emerald-600">Aucune commande trouvÃ©e</p>
-                        <button onclick="app.showPage('products')" class="mt-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all">
-                            Commencer mes achats
-                        </button>
+        console.log('Final orders count:', orders.length);
+        
+        // Display orders
+        if (orders.length === 0) {
+            ordersContainer.innerHTML = `
+                <div class="text-center py-16">
+                    <div class="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-shopping-bag text-emerald-400 text-3xl"></i>
                     </div>
-                `;
-            } else {
-                ordersContainer.innerHTML = orders.map(order => `
-                    <div class="bg-white/60 border border-emerald-200 rounded-xl p-6 mb-4 hover:shadow-lg transition-all">
-                        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
-                            <div>
-                                <h4 class="font-bold text-emerald-800">Commande #${order.numeroCommande}</h4>
-                                <p class="text-sm text-emerald-600">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</p>
-                            </div>
-                            <div class="flex items-center space-x-4">
-                                <span class="status-badge status-${order.statut}">${getOrderStatusLabel(order.statut)}</span>
-                                <span class="font-bold text-emerald-700">${order.total} DA</span>
-                            </div>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                            <div>
-                                <span class="font-medium text-emerald-700">Articles:</span>
-                                <span class="text-emerald-600">${order.articles.length} produit${order.articles.length > 1 ? 's' : ''}</span>
-                            </div>
-                            <div>
-                                <span class="font-medium text-emerald-700">Paiement:</span>
-                                <span class="text-emerald-600">${order.modePaiement}</span>
-                            </div>
-                            <div>
-                                <span class="font-medium text-emerald-700">Livraison:</span>
-                                <span class="text-emerald-600">${order.fraisLivraison === 0 ? 'Gratuite' : order.fraisLivraison + ' DA'}</span>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-            }
+                    <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande trouvée</h3>
+                    <p class="text-emerald-600 mb-6">Vous n'avez pas encore passé de commande</p>
+                    <button onclick="app.showPage('products')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
+                        <i class="fas fa-shopping-bag mr-2"></i>Commencer mes achats
+                    </button>
+                </div>
+            `;
         } else {
-            throw new Error('Erreur lors du chargement des commandes');
+            ordersContainer.innerHTML = `
+                <div class="space-y-6">
+                    ${orders.map(order => createOrderCard(order)).join('')}
+                </div>
+            `;
         }
         
     } catch (error) {
-        console.error('Erreur chargement commandes:', error);
+        console.error('Error loading user orders:', error);
         ordersContainer.innerHTML = `
-            <div class="text-center py-8">
-                <i class="fas fa-exclamation-triangle text-4xl text-red-300 mb-4"></i>
-                <p class="text-red-600">Erreur lors du chargement des commandes</p>
+            <div class="text-center py-16">
+                <div class="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-exclamation-triangle text-red-400 text-3xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-red-800 mb-4">Erreur de chargement</h3>
+                <p class="text-red-600 mb-6">Impossible de charger vos commandes</p>
+                <button onclick="loadUserOrders()" class="bg-red-600 text-white px-6 py-3 rounded-xl hover:bg-red-700 transition-all">
+                    <i class="fas fa-retry mr-2"></i>Réessayer
+                </button>
             </div>
         `;
     }
 }
+
+// Helper function to create order card
+function createOrderCard(order) {
+    const orderDate = new Date(order.dateCommande || order.createdAt || Date.now());
+    const formattedDate = orderDate.toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    const formattedTime = orderDate.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    const statusColors = {
+        'en-attente': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        'confirmée': 'bg-green-100 text-green-800 border-green-200',
+        'préparée': 'bg-blue-100 text-blue-800 border-blue-200',
+        'expédiée': 'bg-purple-100 text-purple-800 border-purple-200',
+        'livrée': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+        'annulée': 'bg-red-100 text-red-800 border-red-200'
+    };
+    
+    const statusLabels = {
+        'en-attente': 'En attente',
+        'confirmée': 'Confirmée',
+        'préparée': 'Préparée',
+        'expédiée': 'Expédiée',
+        'livrée': 'Livrée',
+        'annulée': 'Annulée'
+    };
+    
+    const statusClass = statusColors[order.statut] || statusColors['en-attente'];
+    const statusLabel = statusLabels[order.statut] || order.statut;
+    
+    return `
+        <div class="bg-white/80 backdrop-blur-sm border border-emerald-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                <div>
+                    <div class="flex items-center space-x-3 mb-2">
+                        <h4 class="text-xl font-bold text-emerald-800">Commande #${order.numeroCommande || 'N/A'}</h4>
+                        <span class="px-3 py-1 rounded-full text-sm font-semibold border ${statusClass}">
+                            ${statusLabel}
+                        </span>
+                    </div>
+                    <p class="text-emerald-600">${formattedDate} à ${formattedTime}</p>
+                </div>
+                <div class="text-right mt-4 md:mt-0">
+                    <p class="text-2xl font-bold text-emerald-700">${order.total || 0} DA</p>
+                    <p class="text-sm text-emerald-500">
+                        ${(order.articles || []).length} article${(order.articles || []).length > 1 ? 's' : ''}
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Articles de la commande -->
+            <div class="border-t border-emerald-100 pt-4">
+                <h5 class="font-semibold text-emerald-700 mb-3">Articles commandés</h5>
+                <div class="space-y-2">
+                    ${(order.articles || []).map(article => `
+                        <div class="flex items-center justify-between py-2 px-3 bg-emerald-50/50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                ${article.image ? `
+                                    <img src="${article.image}" alt="${article.nom}" 
+                                         class="w-10 h-10 object-cover rounded-lg border border-emerald-200">
+                                ` : `
+                                    <div class="w-10 h-10 bg-emerald-200 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-pills text-emerald-600"></i>
+                                    </div>
+                                `}
+                                <div>
+                                    <p class="font-medium text-emerald-800 text-sm">${article.nom || 'Produit'}</p>
+                                    <p class="text-xs text-emerald-600">Quantité: ${article.quantite || 1}</p>
+                                </div>
+                            </div>
+                            <p class="font-semibold text-emerald-700">${(article.prix || 0) * (article.quantite || 1)} DA</p>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- Récapitulatif des coûts -->
+            <div class="border-t border-emerald-100 pt-4 mt-4">
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-emerald-600">Sous-total:</span>
+                        <span class="text-emerald-800">${order.sousTotal || 0} DA</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-emerald-600">Frais de livraison:</span>
+                        <span class="text-emerald-800">${order.fraisLivraison || 0} DA</span>
+                    </div>
+                    <div class="flex justify-between font-semibold text-base border-t border-emerald-100 pt-2">
+                        <span class="text-emerald-800">Total:</span>
+                        <span class="text-emerald-600">${order.total || 0} DA</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Informations de livraison -->
+            ${order.client ? `
+                <div class="border-t border-emerald-100 pt-4 mt-4">
+                    <h5 class="font-semibold text-emerald-700 mb-2">Adresse de livraison</h5>
+                    <p class="text-sm text-emerald-600">
+                        ${order.client.adresse}, ${order.client.wilaya}
+                    </p>
+                </div>
+            ` : ''}
+            
+            <!-- Commentaires -->
+            ${order.commentaires ? `
+                <div class="border-t border-emerald-100 pt-4 mt-4">
+                    <h5 class="font-semibold text-emerald-700 mb-2">Commentaires</h5>
+                    <p class="text-sm text-emerald-600 italic">"${order.commentaires}"</p>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+// Make sure this function is globally available
+window.loadUserOrders = loadUserOrders;
+
+// Enhanced showProfileSection function to properly load orders
+function showProfileSection(section) {
+    // Hide all sections
+    document.querySelectorAll('.profile-section').forEach(section => {
+        section.classList.add('hidden');
+    });
+    
+    // Reset all navigation buttons
+    document.querySelectorAll('.profile-nav-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-emerald-100', 'text-emerald-700', 'border-emerald-200');
+        btn.classList.add('hover:bg-emerald-50', 'text-emerald-600', 'border-transparent', 'hover:border-emerald-200');
+    });
+    
+    // Activate the corresponding button
+    event.target.classList.add('active', 'bg-emerald-100', 'text-emerald-700', 'border-emerald-200');
+    event.target.classList.remove('hover:bg-emerald-50', 'text-emerald-600', 'border-transparent', 'hover:border-emerald-200');
+    
+    // Show the corresponding section
+    const targetSection = document.getElementById('profile' + section.charAt(0).toUpperCase() + section.slice(1));
+    if (targetSection) {
+        targetSection.classList.remove('hidden');
+    }
+    
+    // Load orders when orders section is selected
+    if (section === 'orders') {
+        console.log('Loading user orders...');
+        setTimeout(() => {
+            loadUserOrders();
+        }, 100); // Small delay to ensure DOM is ready
+    }
+}
+
+// Make sure this function is also globally available
+window.showProfileSection = showProfileSection;
 
 function getOrderStatusLabel(status) {
     const statusLabels = {
@@ -855,4 +1082,5 @@ PharmacieGaherApp.prototype.handleAuthError = function(error, context = '') {
     } else {
         this.showToast(error.message || 'Une erreur est survenue', 'error');
     }
+
 };
