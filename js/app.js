@@ -188,7 +188,7 @@ class PharmacieGaherApp {
                             Shifa
                         </h1>
                         <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-green-100">
-                            Parapharmacie Gaher
+                            Parapharmacie
                         </h2>
                         <p class="text-xl md:text-2xl mb-12 opacity-90 text-green-50">
                             Votre bien-être, notre mission naturelle
@@ -953,4 +953,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 console.log('✅ Updated app.js loaded with all 10 categories (Vitalité, Sport, Visage, Cheveux, Solaire, Intime, Soins, Bébé, Homme, Dentaire) on homepage');
+
 
