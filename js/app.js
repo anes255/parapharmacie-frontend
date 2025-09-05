@@ -1,4 +1,203 @@
 // Clean PharmacieGaherApp - Updated with 10 categories (Vitalité first)
+// Character Encoding Fix Script
+// Run this in your browser console or add to your app.js to fix encoding issues
+
+const encodingFixes = {
+    // Common French character fixes
+    'Ã©': 'é',
+    'Ã¨': 'è', 
+    'Ã ': 'à',
+    'Ã´': 'ô',
+    'Ã¢': 'â',
+    'Ãª': 'ê',
+    'Ã®': 'î',
+    'Ã¯': 'ï',
+    'Ã§': 'ç',
+    'Ã¹': 'ù',
+    'Ã»': 'û',
+    'ÃŠ': 'Ê',
+    'Ã‰': 'É',
+    'Ã€': 'À',
+    'Ã‡': 'Ç',
+    
+    // Special characters
+    'â€™': "'",
+    'â€œ': '"',
+    'â€': '"',
+    'â€¦': '...',
+    'â€"': '—',
+    'â€'': '–',
+    
+    // Other common issues
+    'Ã¢Å"': '✓',
+    'Ã¢ÂÅ': '×',
+    'Ã¢Â': '•',
+    
+    // Currency and symbols
+    'â‚¬': '€',
+    'Â£': '£',
+    'Â©': '©',
+    'Â®': '®',
+    'Â°': '°',
+    
+    // Specific fixes for your content
+    'VitalitÃ©': 'Vitalité',
+    'BÃ©bÃ©': 'Bébé',
+    'crÃ©Ã©': 'créé',
+    'prÃ©fÃ©rence': 'préférence',
+    'dÃ©licate': 'délicate',
+    'trÃ¨s': 'très',
+    'gÃ©nÃ©ral': 'général',
+    'spÃ©cifique': 'spécifique',
+    'pharmaciegaher@gmail.com': 'pharmaciegaher@gmail.com',
+    'AlgÃ©rie': 'Algérie',
+    'TÃ©lÃ©phone': 'Téléphone',
+    'prÃ©nom': 'prénom',
+    'adresse': 'adresse',
+    'crÃ©er': 'créer',
+    'gÃ©rer': 'gérer',
+    'gÃ©nÃ©rer': 'générer',
+    'dÃ©finir': 'définir',
+    'sÃ©lectionnez': 'sélectionnez',
+    'catÃ©gorie': 'catégorie',
+    'prÃ©cautions': 'précautions',
+    'rÃ©ussie': 'réussie',
+    'supprimÃ©': 'supprimé',
+    'modifiÃ©': 'modifié',
+    'confirmÃ©e': 'confirmée',
+    'prÃ©parÃ©e': 'préparée',
+    'expÃ©diÃ©e': 'expédiée',
+    'livrÃ©e': 'livrée',
+    'annulÃ©e': 'annulée'
+};
+
+// Function to fix encoding in text
+function fixEncoding(text) {
+    if (typeof text !== 'string') return text;
+    
+    let fixed = text;
+    for (const [wrong, correct] of Object.entries(encodingFixes)) {
+        fixed = fixed.replace(new RegExp(wrong, 'g'), correct);
+    }
+    return fixed;
+}
+
+// Function to fix encoding in DOM elements
+function fixEncodingInDOM() {
+    console.log('🔧 Fixing character encoding in DOM...');
+    
+    // Get all text nodes in the document
+    const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+    
+    const textNodes = [];
+    let node;
+    
+    while (node = walker.nextNode()) {
+        if (node.nodeValue && node.nodeValue.trim()) {
+            textNodes.push(node);
+        }
+    }
+    
+    // Fix encoding in text nodes
+    textNodes.forEach(textNode => {
+        const originalText = textNode.nodeValue;
+        const fixedText = fixEncoding(originalText);
+        
+        if (originalText !== fixedText) {
+            textNode.nodeValue = fixedText;
+        }
+    });
+    
+    // Fix encoding in input values and placeholders
+    document.querySelectorAll('input, textarea, select').forEach(input => {
+        if (input.value) {
+            input.value = fixEncoding(input.value);
+        }
+        if (input.placeholder) {
+            input.placeholder = fixEncoding(input.placeholder);
+        }
+    });
+    
+    // Fix encoding in title and alt attributes
+    document.querySelectorAll('[title], [alt]').forEach(element => {
+        if (element.title) {
+            element.title = fixEncoding(element.title);
+        }
+        if (element.alt) {
+            element.alt = fixEncoding(element.alt);
+        }
+    });
+    
+    console.log('✅ Character encoding fixed in DOM');
+}
+
+// Function to fix encoding when loading new content
+function fixEncodingInContent(content) {
+    if (typeof content === 'string') {
+        return fixEncoding(content);
+    }
+    return content;
+}
+
+// Override innerHTML setter to auto-fix encoding
+const originalInnerHTML = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+Object.defineProperty(Element.prototype, 'innerHTML', {
+    set: function(value) {
+        const fixedValue = fixEncoding(value);
+        originalInnerHTML.set.call(this, fixedValue);
+    },
+    get: originalInnerHTML.get,
+    configurable: true
+});
+
+// Override textContent setter to auto-fix encoding  
+const originalTextContent = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+Object.defineProperty(Node.prototype, 'textContent', {
+    set: function(value) {
+        if (typeof value === 'string') {
+            const fixedValue = fixEncoding(value);
+            originalTextContent.set.call(this, fixedValue);
+        } else {
+            originalTextContent.set.call(this, value);
+        }
+    },
+    get: originalTextContent.get,
+    configurable: true
+});
+
+// Fix encoding immediately when script loads
+document.addEventListener('DOMContentLoaded', () => {
+    fixEncodingInDOM();
+});
+
+// Fix encoding after any dynamic content updates
+const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+            setTimeout(fixEncodingInDOM, 100);
+        }
+    });
+});
+
+observer.observe(document.body, {
+    childList: true,
+    subtree: true
+});
+
+// Export functions for manual use
+window.fixEncoding = fixEncoding;
+window.fixEncodingInDOM = fixEncodingInDOM;
+window.fixEncodingInContent = fixEncodingInContent;
+
+console.log('🔤 Character encoding fix system initialized');
+
+// Auto-fix encoding every 5 seconds (optional)
+setInterval(fixEncodingInDOM, 5000);
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -918,5 +1117,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.app = app;
     console.log('App initialized and made globally available');
 });
+
 
 console.log('✅ Updated app.js loaded with all 10 categories (Vitalité, Sport, Visage, Cheveux, Solaire, Intime, Soins, Bébé, Homme, Dentaire) on homepage');
