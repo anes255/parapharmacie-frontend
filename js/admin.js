@@ -267,36 +267,47 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
     }
 };
 
-// Enhanced method to get all products from backend first, then localStorage
+// FIXED: Enhanced method to get all products - Don't overwrite localStorage with empty backend responses
 PharmacieGaherApp.prototype.getAllProducts = async function() {
     let allProducts = [];
     
+    // First, get existing products from localStorage
+    const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+    allProducts = localProducts;
+    console.log('📁 Local products loaded:', allProducts.length);
+    
     try {
-        // Try to get products from backend first
+        // Try to get products from backend
         console.log('🌐 Fetching products from backend...');
         const response = await apiCall('/admin/products');
-        if (response && response.products) {
-            allProducts = response.products;
-            console.log('✅ Backend products loaded:', allProducts.length);
-            
-            // Update localStorage with backend data
-            localStorage.setItem('demoProducts', JSON.stringify(allProducts));
+        
+        if (response && response.products && Array.isArray(response.products)) {
+            // Only update if backend has products OR if we have no local products
+            if (response.products.length > 0 || allProducts.length === 0) {
+                allProducts = response.products;
+                console.log('✅ Backend products loaded:', allProducts.length);
+                
+                // Update localStorage with backend data only if it's not empty
+                if (response.products.length > 0) {
+                    localStorage.setItem('demoProducts', JSON.stringify(allProducts));
+                    console.log('💾 Updated localStorage with backend data');
+                } else {
+                    console.log('⚠️ Backend returned empty products, keeping localStorage');
+                }
+            } else {
+                console.log('⚠️ Backend returned empty, using local products');
+            }
+        } else {
+            console.log('⚠️ Invalid backend response, using local products');
         }
     } catch (error) {
-        console.log('⚠️ Backend unavailable, using localStorage');
-    }
-    
-    // If no products from backend, use localStorage
-    if (allProducts.length === 0) {
-        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        allProducts = localProducts;
-        console.log('📁 Local products loaded:', allProducts.length);
+        console.log('⚠️ Backend unavailable, using localStorage:', error.message);
     }
     
     return allProducts;
 };
 
-// Product Row Renderer (same as before)
+// Product Row Renderer
 PharmacieGaherApp.prototype.renderProductRow = function(product) {
     const getCategoryColor = (category) => {
         const colors = {
@@ -411,7 +422,7 @@ function saveProduct() {
     buttonText.classList.add('hidden');
     spinner.classList.remove('hidden');
     
-    // FIXED: Better ID generation for new products
+    // Generate ID for new products
     const productId = isEditing ? currentEditingProduct._id : `product_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // Prepare product data
@@ -457,29 +468,40 @@ function saveProduct() {
     
     console.log('📦 Product data prepared:', productData);
     
-    // FIXED: Save to backend first, then localStorage, with proper refresh
+    // Save to localStorage first (as primary storage while backend has issues)
+    saveProductToLocalStorage(productData, isEditing);
+    
+    // Try to save to backend (but don't block on failure)
     saveProductToBackend(productData, isEditing)
-        .then((backendSuccess) => {
-            console.log('🌐 Backend save result:', backendSuccess);
-            
-            // Always save to localStorage as backup/cache
-            saveProductToLocalStorage(productData, isEditing);
-            
-            // Show success message
+        .then((result) => {
+            if (result.success) {
+                console.log('✅ Backend save successful');
+                app.showToast(
+                    isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 
+                    'success'
+                );
+            } else {
+                console.warn('⚠️ Backend save failed, but localStorage updated');
+                app.showToast(
+                    (isEditing ? 'Produit modifié' : 'Produit ajouté') + ' (sauvegarde locale)', 
+                    'warning'
+                );
+            }
+        })
+        .catch((error) => {
+            console.warn('⚠️ Backend save error:', error);
             app.showToast(
-                isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 
-                'success'
+                (isEditing ? 'Produit modifié' : 'Produit ajouté') + ' (sauvegarde locale)', 
+                'warning'
             );
-            
-            // Close modal
+        })
+        .finally(() => {
+            // Close modal and refresh
             closeProductModal();
             
-            // FIXED: Proper refresh mechanism
+            // Refresh views
             setTimeout(() => {
                 console.log('🔄 Refreshing views...');
-                
-                // Clear localStorage to force fresh data fetch
-                localStorage.removeItem('demoProducts');
                 
                 // Refresh admin view
                 if (adminCurrentSection === 'products') {
@@ -490,7 +512,7 @@ function saveProduct() {
                     app.loadAdminDashboard();
                 }
                 
-                // FIXED: Properly trigger main page refresh
+                // Trigger main page refresh
                 if (typeof window.refreshMainPageProducts === 'function') {
                     window.refreshMainPageProducts();
                 }
@@ -500,14 +522,8 @@ function saveProduct() {
                     detail: { productId: productData._id, isNew: !isEditing } 
                 }));
                 
-            }, 500); // Small delay to ensure backend sync
+            }, 500);
             
-        })
-        .catch((error) => {
-            console.error('❌ Error saving product:', error);
-            app.showToast('Erreur lors de la sauvegarde: ' + error.message, 'error');
-        })
-        .finally(() => {
             // Reset button state
             button.disabled = false;
             buttonText.classList.remove('hidden');
@@ -533,16 +549,15 @@ async function saveProductToBackend(productData, isEditing) {
         });
         
         console.log('✅ Backend save successful:', response);
-        return true;
+        return { success: true, data: response };
         
     } catch (error) {
         console.error('❌ Backend save failed:', error.message);
-        // Don't throw error, allow local save to proceed
-        return false;
+        return { success: false, error: error.message };
     }
 }
 
-// localStorage save function
+// FIXED: Enhanced localStorage save function
 function saveProductToLocalStorage(productData, isEditing) {
     try {
         let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
@@ -551,27 +566,43 @@ function saveProductToLocalStorage(productData, isEditing) {
             const index = localProducts.findIndex(p => p._id === productData._id);
             if (index !== -1) {
                 localProducts[index] = productData;
+                console.log('💾 Updated existing product in localStorage');
             } else {
                 localProducts.push(productData);
+                console.log('💾 Added new product to localStorage');
             }
         } else {
             localProducts.push(productData);
+            console.log('💾 Added new product to localStorage');
         }
         
         localStorage.setItem('demoProducts', JSON.stringify(localProducts));
         console.log('💾 Saved to localStorage. Total products:', localProducts.length);
         
+        return true;
+        
     } catch (error) {
         console.error('❌ localStorage save failed:', error);
+        return false;
     }
 }
 
-// Enhanced product operations with backend integration
+// FIXED: Enhanced toggleFeatured function
 async function toggleFeatured(productId, newStatus) {
     try {
         console.log('🌟 Toggling featured status:', productId, newStatus);
         
-        // Try backend first
+        // Update localStorage first
+        let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        const productIndex = localProducts.findIndex(p => p._id === productId);
+        
+        if (productIndex !== -1) {
+            localProducts[productIndex].enVedette = newStatus;
+            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+            console.log('💾 Updated featured status in localStorage');
+        }
+        
+        // Try backend update (but don't block on failure)
         try {
             await apiCall(`/admin/products/${productId}`, {
                 method: 'PUT',
@@ -581,20 +612,11 @@ async function toggleFeatured(productId, newStatus) {
                 body: JSON.stringify({ enVedette: newStatus })
             });
             console.log('✅ Backend featured update successful');
+            app.showToast(`Produit ${newStatus ? 'ajouté aux' : 'retiré des'} coups de coeur`, 'success');
         } catch (error) {
-            console.warn('⚠️ Backend update failed, updating locally');
+            console.warn('⚠️ Backend update failed, but localStorage updated');
+            app.showToast(`Produit ${newStatus ? 'ajouté aux' : 'retiré des'} coups de coeur (local)`, 'warning');
         }
-        
-        // Update localStorage
-        let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        const productIndex = localProducts.findIndex(p => p._id === productId);
-        
-        if (productIndex !== -1) {
-            localProducts[productIndex].enVedette = newStatus;
-            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
-        }
-        
-        app.showToast(`Produit ${newStatus ? 'ajouté aux' : 'retiré des'} coups de coeur`, 'success');
         
         // Refresh views
         if (adminCurrentSection === 'products') {
@@ -612,27 +634,33 @@ async function toggleFeatured(productId, newStatus) {
     }
 }
 
+// FIXED: Enhanced deleteProduct function
 async function deleteProduct(productId) {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
         try {
             console.log('🗑️ Deleting product:', productId);
             
-            // Try backend first
+            // Delete from localStorage first
+            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            const originalLength = localProducts.length;
+            localProducts = localProducts.filter(p => p._id !== productId);
+            
+            if (localProducts.length < originalLength) {
+                localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+                console.log('💾 Deleted from localStorage');
+            }
+            
+            // Try backend delete (but don't block on failure)
             try {
                 await apiCall(`/admin/products/${productId}`, {
                     method: 'DELETE'
                 });
                 console.log('✅ Backend delete successful');
+                app.showToast('Produit supprimé avec succès', 'success');
             } catch (error) {
-                console.warn('⚠️ Backend delete failed, deleting locally');
+                console.warn('⚠️ Backend delete failed, but localStorage updated');
+                app.showToast('Produit supprimé (local)', 'warning');
             }
-            
-            // Delete from localStorage
-            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            localProducts = localProducts.filter(p => p._id !== productId);
-            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
-            
-            app.showToast('Produit supprimé avec succès', 'success');
             
             // Refresh views
             if (adminCurrentSection === 'products') {
@@ -668,7 +696,6 @@ window.refreshMainPageProducts = function() {
     }
 };
 
-// REMAINING FUNCTIONS UNCHANGED...
 // Orders Management (keeping existing functionality)
 PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
@@ -955,22 +982,45 @@ async function refreshProductCache() {
     app.showToast('Cache actualisé', 'success');
 }
 
+// FIXED: Enhanced syncWithBackend function
 async function syncWithBackend() {
     try {
         console.log('🔄 Syncing with backend...');
+        
+        // Get local products first
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        
+        // Try to get backend products
         const response = await apiCall('/admin/products');
-        if (response && response.products) {
-            localStorage.setItem('demoProducts', JSON.stringify(response.products));
-            app.showToast(`Synchronisation réussie: ${response.products.length} produits`, 'success');
-            
-            // Refresh current view
-            if (adminCurrentSection === 'products') {
-                app.loadAdminProducts();
+        
+        if (response && response.products && Array.isArray(response.products)) {
+            if (response.products.length > 0) {
+                // Backend has products, use them
+                localStorage.setItem('demoProducts', JSON.stringify(response.products));
+                app.showToast(`Synchronisation réussie: ${response.products.length} produits`, 'success');
+            } else if (localProducts.length > 0) {
+                // Backend is empty but we have local products, ask user what to do
+                if (confirm(`Le serveur n'a aucun produit mais vous avez ${localProducts.length} produit(s) local(aux). Voulez-vous garder vos produits locaux ?`)) {
+                    app.showToast('Produits locaux conservés', 'info');
+                } else {
+                    localStorage.setItem('demoProducts', JSON.stringify([]));
+                    app.showToast('Produits locaux supprimés', 'warning');
+                }
+            } else {
+                app.showToast('Aucun produit trouvé sur le serveur', 'info');
             }
-            
-            // Trigger main page refresh
-            document.dispatchEvent(new CustomEvent('productsUpdated'));
+        } else {
+            throw new Error('Réponse invalide du serveur');
         }
+        
+        // Refresh current view
+        if (adminCurrentSection === 'products') {
+            app.loadAdminProducts();
+        }
+        
+        // Trigger main page refresh
+        document.dispatchEvent(new CustomEvent('productsUpdated'));
+        
     } catch (error) {
         app.showToast('Erreur de synchronisation: ' + error.message, 'error');
     }
@@ -1456,4 +1506,4 @@ window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 window.forceRefreshProducts = forceRefreshProducts;
 
-console.log('✅ FIXED Backend-Integrated Admin.js loaded - Products will sync across all devices');
+console.log('✅ FIXED Complete Admin.js loaded - Products will persist in localStorage even when backend fails');
