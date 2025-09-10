@@ -1,336 +1,488 @@
-const express = require('express');
-const Product = require('../models/Product');
-
-const router = express.Router();
-
-// Obtenir tous les produits avec filtres et pagination
-router.get('/', async (req, res) => {
+// Fixed Products Page Management
+PharmacieGaherApp.prototype.loadProductsPage = async function(params = {}) {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 12;
-        const skip = (page - 1) * limit;
+        console.log('Loading products page with params:', params);
         
-        let query = { actif: true };
+        const mainContent = document.getElementById('mainContent');
         
-        // Filtres
-        if (req.query.categorie) {
-            query.categorie = req.query.categorie;
-        }
+        // Show loading state
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="text-center py-16">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+                    <p class="text-emerald-600 mt-4">Chargement des produits...</p>
+                </div>
+            </div>
+        `;
         
-        if (req.query.search) {
-            query.$or = [
-                { nom: { $regex: req.query.search, $options: 'i' } },
-                { description: { $regex: req.query.search, $options: 'i' } },
-                { marque: { $regex: req.query.search, $options: 'i' } }
-            ];
-        }
+        // Load products with filters
+        let products = [];
         
-        if (req.query.priceMin || req.query.priceMax) {
-            query.prix = {};
-            if (req.query.priceMin) query.prix.$gte = parseFloat(req.query.priceMin);
-            if (req.query.priceMax) query.prix.$lte = parseFloat(req.query.priceMax);
-        }
-        
-        if (req.query.enPromotion === 'true') {
-            query.enPromotion = true;
-        }
-        
-        if (req.query.enVedette === 'true') {
-            query.enVedette = true;
-        }
-        
-        // Tri
-        let sort = {};
-        switch (req.query.sort) {
-            case 'price_asc':
-                sort.prix = 1;
-                break;
-            case 'price_desc':
-                sort.prix = -1;
-                break;
-            case 'name_asc':
-                sort.nom = 1;
-                break;
-            case 'name_desc':
-                sort.nom = -1;
-                break;
-            case 'newest':
-                sort.dateAjout = -1;
-                break;
-            default:
-                sort.dateAjout = -1;
-        }
-        
-        const products = await Product.find(query)
-            .sort(sort)
-            .skip(skip)
-            .limit(limit);
-            
-        const total = await Product.countDocuments(query);
-        const totalPages = Math.ceil(total / limit);
-        
-        res.json({
-            products,
-            pagination: {
-                currentPage: page,
-                totalPages,
-                totalProducts: total,
-                hasNextPage: page < totalPages,
-                hasPrevPage: page > 1
-            }
-        });
-        
-    } catch (error) {
-        console.error('Erreur rÃ©cupÃ©ration produits:', error);
-        res.status(500).json({ message: 'Erreur serveur' });
-    }
-});
-
-// Obtenir un produit par ID
-router.get('/:id', async (req, res) => {
-    try {
-        const product = await Product.findById(req.params.id);
-        
-        if (!product) {
-            return res.status(404).json({ message: 'Produit non trouvÃ©' });
-        }
-        
-        res.json(product);
-        
-    } catch (error) {
-        console.error('Erreur rÃ©cupÃ©ration produit:', error);
-        res.status(500).json({ message: 'Erreur serveur' });
-    }
-});
-
-// Obtenir les catÃ©gories
-router.get('/categories/all', async (req, res) => {
-    try {
-        const categories = await Product.distinct('categorie');
-        
-        const categoriesInfo = [
-            { nom: 'Cheveux', description: 'Soins capillaires' },
-            { nom: 'Intime', description: 'HygiÃ¨ne intime' },
-            { nom: 'Solaire', description: 'Protection solaire' },
-            { nom: 'Maman', description: 'Soins pour mamans' },
-            { nom: 'BÃ©bÃ©', description: 'Soins pour bÃ©bÃ©s' },
-            { nom: 'Visage', description: 'Soins du visage' },
-            { nom: 'Minceur', description: 'Produits minceur' },
-            { nom: 'Homme', description: 'Soins pour hommes' },
-            { nom: 'Soins', description: 'Soins gÃ©nÃ©raux' },
-            { nom: 'Dentaire', description: 'HygiÃ¨ne dentaire' },
-            { nom: 'VitalitÃ©', description: 'Vitamines et supplÃ©ments alimentaires' }
-        ];
-        
-        res.json(categoriesInfo);
-        
-    } catch (error) {
-        console.error('Erreur rÃ©cupÃ©ration catÃ©gories:', error);
-        res.status(500).json({ message: 'Erreur serveur' });
-    }
-});
-
-// Obtenir les produits en vedette
-router.get('/featured/all', async (req, res) => {
-    try {
-        const products = await Product.find({ 
-            enVedette: true, 
-            actif: true 
-        })
-        .limit(8)
-        .sort({ dateAjout: -1 });
-        
-        res.json(products);
-        
-    } catch (error) {
-        console.error('Erreur produits vedette:', error);
-        res.status(500).json({ message: 'Erreur serveur' });
-    }
-});
-
-// Obtenir les produits en promotion
-router.get('/promotions/all', async (req, res) => {
-    try {
-        const products = await Product.find({ 
-            enPromotion: true, 
-            actif: true 
-        })
-        .limit(8)
-        .sort({ dateAjout: -1 });
-        
-        res.json(products);
-        
-    } catch (error) {
-        console.error('Erreur produits promotion:', error);
-        res.status(500).json({ message: 'Erreur serveur' });
-    }
-
-});
-// FIXED: Enhanced method to get all products from backend first, then localStorage
-PharmacieGaherApp.prototype.getAllProducts = async function() {
-    let allProducts = [];
-    
-    try {
-        // Try to get products from backend first
-        console.log('🌐 Fetching products from backend...');
-        const response = await apiCall('/products'); // Use regular products endpoint, not admin
-        if (response && response.products) {
-            allProducts = response.products;
-            console.log('✅ Backend products loaded:', allProducts.length);
-            
-            // Update localStorage with backend data
-            localStorage.setItem('demoProducts', JSON.stringify(allProducts));
-        }
-    } catch (error) {
-        console.log('⚠️ Backend unavailable, using localStorage');
-    }
-    
-    // If no products from backend, use localStorage
-    if (allProducts.length === 0) {
-        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        allProducts = localProducts;
-        console.log('📁 Local products loaded:', allProducts.length);
-    }
-    
-    return allProducts;
-};
-
-// FIXED: Enhanced loadDemoProducts to force refresh from backend
-PharmacieGaherApp.prototype.loadDemoProducts = async function(params = {}) {
-    // First try to get fresh data from backend
-    let allProducts = [];
-    
-    try {
-        const response = await apiCall('/products?limit=100'); // Get more products
-        if (response && response.products) {
-            allProducts = response.products;
-            // Update localStorage with fresh backend data
-            localStorage.setItem('demoProducts', JSON.stringify(allProducts));
-            console.log('✅ Fresh products loaded from backend:', allProducts.length);
-        }
-    } catch (error) {
-        console.log('⚠️ Backend unavailable, using localStorage cache');
-        // Fallback to localStorage
-        allProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    }
-    
-    // Apply filters
-    let filteredProducts = allProducts.filter(product => {
-        if (params.categorie && product.categorie !== params.categorie) return false;
-        if (params.search && !product.nom.toLowerCase().includes(params.search.toLowerCase())) return false;
-        if (params.priceMin && product.prix < parseFloat(params.priceMin)) return false;
-        if (params.priceMax && product.prix > parseFloat(params.priceMax)) return false;
-        if (params.enPromotion && !product.enPromotion) return false;
-        if (params.enVedette && !product.enVedette) return false;
-        return true;
-    });
-    
-    // Apply sorting
-    if (params.sort === 'price_asc') {
-        filteredProducts.sort((a, b) => a.prix - b.prix);
-    } else if (params.sort === 'price_desc') {
-        filteredProducts.sort((a, b) => b.prix - a.prix);
-    } else if (params.sort === 'name_asc') {
-        filteredProducts.sort((a, b) => a.nom.localeCompare(b.nom));
-    } else if (params.sort === 'name_desc') {
-        filteredProducts.sort((a, b) => b.nom.localeCompare(a.nom));
-    }
-    
-    this.displayProducts(filteredProducts, null, true);
-};
-
-// FIXED: Enhanced loadFeaturedProducts method for home page
-PharmacieGaherApp.prototype.loadFeaturedProducts = async function() {
-    console.log('🌟 Loading featured products...');
-    
-    try {
-        let featuredProducts = [];
-        
-        // Try backend first
         try {
-            const response = await apiCall('/products/featured/all');
-            if (response && response.length > 0) {
-                featuredProducts = response;
-                console.log('✅ Featured products from backend:', featuredProducts.length);
+            console.log('Fetching products from API...');
+            const response = await apiCall('/products');
+            
+            if (response && response.products) {
+                products = response.products;
+                console.log(`Loaded ${products.length} products from API`);
             }
         } catch (error) {
-            console.log('⚠️ Backend featured products unavailable');
+            console.warn('Failed to load from API, using cached products');
+            products = this.allProducts;
         }
         
-        // Fallback to localStorage
-        if (featuredProducts.length === 0) {
-            const allProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            featuredProducts = allProducts.filter(p => p.enVedette && p.actif !== false).slice(0, 8);
-            console.log('📁 Featured products from localStorage:', featuredProducts.length);
-        }
-        
-        // Update featured products section if it exists
-        const featuredContainer = document.getElementById('featuredProducts');
-        if (featuredContainer) {
-            if (featuredProducts.length === 0) {
-                featuredContainer.innerHTML = `
-                    <div class="col-span-full text-center py-16">
-                        <i class="fas fa-star text-6xl text-emerald-200 mb-6"></i>
-                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit en vedette</h3>
-                        <p class="text-emerald-600">Les produits mis en vedette apparaîtront ici</p>
-                    </div>
-                `;
-            } else {
-                featuredContainer.innerHTML = featuredProducts.map(product => this.createProductCard(product)).join('');
+        // Apply filters
+        let filteredProducts = products.filter(product => {
+            // Only show active products
+            if (product.actif === false) return false;
+            
+            // Category filter
+            if (params.categorie && product.categorie !== params.categorie) return false;
+            
+            // Search filter
+            if (params.search) {
+                const searchTerm = params.search.toLowerCase();
+                const searchable = `${product.nom} ${product.description} ${product.marque}`.toLowerCase();
+                if (!searchable.includes(searchTerm)) return false;
             }
+            
+            // Price filters
+            if (params.priceMin && product.prix < parseFloat(params.priceMin)) return false;
+            if (params.priceMax && product.prix > parseFloat(params.priceMax)) return false;
+            
+            // Feature filters
+            if (params.enPromotion && !product.enPromotion) return false;
+            if (params.enVedette && !product.enVedette) return false;
+            
+            return true;
+        });
+        
+        // Apply sorting
+        if (params.sort === 'price_asc') {
+            filteredProducts.sort((a, b) => a.prix - b.prix);
+        } else if (params.sort === 'price_desc') {
+            filteredProducts.sort((a, b) => b.prix - a.prix);
+        } else if (params.sort === 'name_asc') {
+            filteredProducts.sort((a, b) => a.nom.localeCompare(b.nom));
+        } else if (params.sort === 'name_desc') {
+            filteredProducts.sort((a, b) => b.nom.localeCompare(a.nom));
+        } else {
+            // Default: newest first
+            filteredProducts.sort((a, b) => new Date(b.dateAjout) - new Date(a.dateAjout));
         }
         
-        return featuredProducts;
+        // Render products page
+        this.renderProductsPage(filteredProducts, params);
         
     } catch (error) {
-        console.error('Error loading featured products:', error);
-        return [];
+        console.error('Error loading products page:', error);
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="text-center py-16">
+                    <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-6"></i>
+                    <h3 class="text-2xl font-bold text-red-800 mb-4">Erreur de chargement</h3>
+                    <p class="text-red-600 mb-8">Impossible de charger les produits</p>
+                    <button onclick="app.showPage('products')" class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600">
+                        Réessayer
+                    </button>
+                </div>
+            </div>
+        `;
     }
 };
 
-// FIXED: Add global product refresh function
-window.refreshAllProducts = function() {
-    console.log('🔄 Refreshing all products across the site...');
+PharmacieGaherApp.prototype.renderProductsPage = function(products, params = {}) {
+    const mainContent = document.getElementById('mainContent');
     
-    // Clear localStorage to force fresh fetch
-    localStorage.removeItem('demoProducts');
+    const categoryTitle = params.categorie ? ` - ${params.categorie}` : '';
+    const searchTitle = params.search ? ` - Recherche: "${params.search}"` : '';
     
-    if (window.app) {
-        // Refresh based on current page
-        if (window.app.currentPage === 'products') {
-            console.log('🔄 Refreshing products page...');
-            window.app.runProductsLoad({});
-        } else if (window.app.currentPage === 'home') {
-            console.log('🔄 Refreshing home page featured products...');
-            window.app.loadFeaturedProducts();
+    mainContent.innerHTML = `
+        <div class="container mx-auto px-4 py-8">
+            <!-- Header -->
+            <div class="text-center mb-12">
+                <h1 class="text-4xl font-bold text-emerald-800 mb-4">Nos Produits${categoryTitle}${searchTitle}</h1>
+                <p class="text-xl text-emerald-600">${products.length} produit(s) trouvé(s)</p>
+            </div>
+            
+            <!-- Filters -->
+            <div class="bg-white rounded-2xl shadow-lg p-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    <!-- Category Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Catégorie</label>
+                        <select id="categoryFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="">Toutes</option>
+                            <option value="Vitalité" ${params.categorie === 'Vitalité' ? 'selected' : ''}>Vitalité</option>
+                            <option value="Sport" ${params.categorie === 'Sport' ? 'selected' : ''}>Sport</option>
+                            <option value="Visage" ${params.categorie === 'Visage' ? 'selected' : ''}>Visage</option>
+                            <option value="Cheveux" ${params.categorie === 'Cheveux' ? 'selected' : ''}>Cheveux</option>
+                            <option value="Solaire" ${params.categorie === 'Solaire' ? 'selected' : ''}>Solaire</option>
+                            <option value="Intime" ${params.categorie === 'Intime' ? 'selected' : ''}>Intime</option>
+                            <option value="Soins" ${params.categorie === 'Soins' ? 'selected' : ''}>Soins</option>
+                            <option value="Bébé" ${params.categorie === 'Bébé' ? 'selected' : ''}>Bébé</option>
+                            <option value="Homme" ${params.categorie === 'Homme' ? 'selected' : ''}>Homme</option>
+                            <option value="Dentaire" ${params.categorie === 'Dentaire' ? 'selected' : ''}>Dentaire</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Search -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Rechercher</label>
+                        <input type="text" id="productSearch" value="${params.search || ''}" 
+                               placeholder="Nom du produit..."
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                    </div>
+                    
+                    <!-- Price Range -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Prix min</label>
+                        <input type="number" id="priceMin" value="${params.priceMin || ''}" 
+                               placeholder="0" min="0"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Prix max</label>
+                        <input type="number" id="priceMax" value="${params.priceMax || ''}" 
+                               placeholder="999999" min="0"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                    </div>
+                    
+                    <!-- Sort -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Trier par</label>
+                        <select id="sortSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="newest" ${params.sort === 'newest' ? 'selected' : ''}>Plus récent</option>
+                            <option value="price_asc" ${params.sort === 'price_asc' ? 'selected' : ''}>Prix croissant</option>
+                            <option value="price_desc" ${params.sort === 'price_desc' ? 'selected' : ''}>Prix décroissant</option>
+                            <option value="name_asc" ${params.sort === 'name_asc' ? 'selected' : ''}>Nom A-Z</option>
+                            <option value="name_desc" ${params.sort === 'name_desc' ? 'selected' : ''}>Nom Z-A</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Filter Actions -->
+                    <div class="flex flex-col justify-end space-y-2">
+                        <button onclick="applyProductFilters()" 
+                                class="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-all">
+                            <i class="fas fa-filter mr-2"></i>Filtrer
+                        </button>
+                        <button onclick="clearProductFilters()" 
+                                class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-all">
+                            <i class="fas fa-times mr-2"></i>Effacer
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Quick Filters -->
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="promotionFilter" ${params.enPromotion ? 'checked' : ''} 
+                               class="rounded text-emerald-600 mr-2">
+                        <span class="text-sm font-medium text-gray-700">En promotion</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="featuredFilter" ${params.enVedette ? 'checked' : ''} 
+                               class="rounded text-emerald-600 mr-2">
+                        <span class="text-sm font-medium text-gray-700">En vedette</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Products Grid -->
+            <div id="productsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                ${products.length === 0 ? this.renderNoProducts(params) : products.map(product => this.createProductCard(product)).join('')}
+            </div>
+        </div>
+    `;
+    
+    // Add event listeners for filters
+    this.setupProductFilters();
+};
+
+PharmacieGaherApp.prototype.renderNoProducts = function(params) {
+    let message = 'Aucun produit trouvé';
+    let suggestion = 'Essayez de modifier vos filtres';
+    
+    if (params.search) {
+        message = `Aucun produit trouvé pour "${params.search}"`;
+        suggestion = 'Vérifiez l\'orthographe ou essayez des mots-clés différents';
+    } else if (params.categorie) {
+        message = `Aucun produit dans la catégorie "${params.categorie}"`;
+        suggestion = 'Cette catégorie sera bientôt approvisionnée';
+    }
+    
+    return `
+        <div class="col-span-full text-center py-16">
+            <i class="fas fa-search text-6xl text-emerald-200 mb-6"></i>
+            <h3 class="text-2xl font-bold text-emerald-800 mb-4">${message}</h3>
+            <p class="text-emerald-600 mb-8">${suggestion}</p>
+            <button onclick="clearProductFilters()" 
+                    class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 transition-all">
+                <i class="fas fa-times mr-2"></i>Effacer les filtres
+            </button>
+        </div>
+    `;
+};
+
+PharmacieGaherApp.prototype.setupProductFilters = function() {
+    // Category filter
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', () => {
+            applyProductFilters();
+        });
+    }
+    
+    // Search with debounce
+    const productSearch = document.getElementById('productSearch');
+    if (productSearch) {
+        let searchTimeout;
+        productSearch.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                applyProductFilters();
+            }, 500);
+        });
+    }
+    
+    // Sort filter
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) {
+        sortSelect.addEventListener('change', () => {
+            applyProductFilters();
+        });
+    }
+    
+    // Checkbox filters
+    ['promotionFilter', 'featuredFilter'].forEach(id => {
+        const filter = document.getElementById(id);
+        if (filter) {
+            filter.addEventListener('change', () => {
+                applyProductFilters();
+            });
         }
+    });
+};
+
+// Product detail page
+PharmacieGaherApp.prototype.loadProductPage = async function(productId) {
+    try {
+        console.log('Loading product page for:', productId);
+        
+        const mainContent = document.getElementById('mainContent');
+        
+        // Show loading
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="text-center py-16">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+                    <p class="text-emerald-600 mt-4">Chargement du produit...</p>
+                </div>
+            </div>
+        `;
+        
+        // Find product
+        let product = this.allProducts.find(p => p._id === productId);
+        
+        if (!product) {
+            try {
+                product = await apiCall(`/products/${productId}`);
+            } catch (error) {
+                this.showProductNotFound();
+                return;
+            }
+        }
+        
+        if (!product) {
+            this.showProductNotFound();
+            return;
+        }
+        
+        this.renderProductDetail(product);
+        
+    } catch (error) {
+        console.error('Error loading product page:', error);
+        this.showProductNotFound();
     }
 };
 
-// FIXED: Add event listener for products updated
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('📱 Setting up product update listeners...');
+PharmacieGaherApp.prototype.showProductNotFound = function() {
+    const mainContent = document.getElementById('mainContent');
+    mainContent.innerHTML = `
+        <div class="container mx-auto px-4 py-8">
+            <div class="text-center py-16">
+                <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-6"></i>
+                <h3 class="text-2xl font-bold text-red-800 mb-4">Produit non trouvé</h3>
+                <p class="text-red-600 mb-8">Le produit que vous recherchez n'existe pas ou n'est plus disponible</p>
+                <button onclick="app.showPage('products')" class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600">
+                    Retour aux produits
+                </button>
+            </div>
+        </div>
+    `;
+};
+
+PharmacieGaherApp.prototype.renderProductDetail = function(product) {
+    const mainContent = document.getElementById('mainContent');
     
-    // Listen for products updated events
-    document.addEventListener('productsUpdated', function(event) {
-        console.log('📢 Products updated event received:', event.detail);
-        
-        // Small delay to ensure backend sync
-        setTimeout(() => {
-            if (typeof window.refreshAllProducts === 'function') {
-                window.refreshAllProducts();
-            }
-        }, 1000);
+    const isOutOfStock = product.stock === 0;
+    const hasPromotion = product.enPromotion && product.prixOriginal;
+    
+    // Generate image URL
+    let imageUrl;
+    if (product.image && (product.image.startsWith('http') || product.image.startsWith('data:image'))) {
+        imageUrl = product.image;
+    } else {
+        const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+        imageUrl = `https://via.placeholder.com/600x600/10b981/ffffff?text=${encodeURIComponent(initials)}`;
+    }
+    
+    mainContent.innerHTML = `
+        <div class="container mx-auto px-4 py-8">
+            <!-- Breadcrumb -->
+            <nav class="mb-8">
+                <ol class="flex items-center space-x-2 text-sm">
+                    <li><a href="#" onclick="showPage('home')" class="text-emerald-600 hover:text-emerald-700">Accueil</a></li>
+                    <li><span class="text-gray-500">/</span></li>
+                    <li><a href="#" onclick="showPage('products')" class="text-emerald-600 hover:text-emerald-700">Produits</a></li>
+                    <li><span class="text-gray-500">/</span></li>
+                    <li><a href="#" onclick="filterByCategory('${product.categorie}')" class="text-emerald-600 hover:text-emerald-700">${product.categorie}</a></li>
+                    <li><span class="text-gray-500">/</span></li>
+                    <li><span class="text-gray-900">${product.nom}</span></li>
+                </ol>
+            </nav>
+            
+            <!-- Product Detail -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <!-- Product Image -->
+                <div class="space-y-4">
+                    <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl overflow-hidden relative">
+                        ${hasPromotion ? `<div class="absolute top-4 left-4 z-10 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
+                        ${isOutOfStock ? `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+                            <span class="text-white font-bold text-2xl">Rupture de stock</span>
+                        </div>` : ''}
+                        <img src="${imageUrl}" alt="${product.nom}" 
+                             class="w-full h-full object-cover"
+                             onerror="this.src='https://via.placeholder.com/600x600/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
+                    </div>
+                </div>
+                
+                <!-- Product Info -->
+                <div class="space-y-6">
+                    <div>
+                        <h1 class="text-3xl font-bold text-emerald-800 mb-2">${product.nom}</h1>
+                        <p class="text-emerald-600">${product.marque || ''}</p>
+                        <span class="inline-block bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium mt-2">${product.categorie}</span>
+                    </div>
+                    
+                    <!-- Price -->
+                    <div class="space-y-2">
+                        ${hasPromotion ? `
+                            <div class="flex items-center space-x-3">
+                                <span class="text-3xl font-bold text-red-600">${product.prix} DA</span>
+                                <span class="text-xl text-gray-400 line-through">${product.prixOriginal} DA</span>
+                            </div>
+                            <p class="text-green-600 font-medium">Économisez ${product.prixOriginal - product.prix} DA</p>
+                        ` : `
+                            <div class="text-3xl font-bold text-emerald-700">${product.prix} DA</div>
+                        `}
+                    </div>
+                    
+                    <!-- Description -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Description</h3>
+                        <p class="text-gray-600 leading-relaxed">${product.description || 'Description non disponible'}</p>
+                    </div>
+                    
+                    <!-- Additional Info -->
+                    ${product.ingredients ? `
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Ingrédients</h3>
+                            <p class="text-gray-600">${product.ingredients}</p>
+                        </div>
+                    ` : ''}
+                    
+                    ${product.modeEmploi ? `
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Mode d'emploi</h3>
+                            <p class="text-gray-600">${product.modeEmploi}</p>
+                        </div>
+                    ` : ''}
+                    
+                    ${product.precautions ? `
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Précautions</h3>
+                            <p class="text-gray-600">${product.precautions}</p>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- Stock Info -->
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center">
+                            <span class="text-gray-600 mr-2">Stock:</span>
+                            <span class="font-medium ${product.stock > 10 ? 'text-green-600' : product.stock > 0 ? 'text-yellow-600' : 'text-red-600'}">
+                                ${product.stock > 0 ? `${product.stock} unités` : 'Rupture de stock'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Add to Cart -->
+                    ${!isOutOfStock ? `
+                        <div class="space-y-4">
+                            <div class="flex items-center space-x-4">
+                                <label class="text-gray-700 font-medium">Quantité:</label>
+                                <div class="flex items-center border border-gray-300 rounded-lg">
+                                    <button onclick="decreaseQuantity()" class="px-3 py-2 text-gray-600 hover:bg-gray-100">-</button>
+                                    <input type="number" id="productQuantity" value="1" min="1" max="${product.stock}" 
+                                           class="w-16 text-center border-0 focus:ring-0">
+                                    <button onclick="increaseQuantity()" class="px-3 py-2 text-gray-600 hover:bg-gray-100">+</button>
+                                </div>
+                            </div>
+                            
+                            <button onclick="addProductToCart('${product._id}')" 
+                                    class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg">
+                                <i class="fas fa-cart-plus mr-2"></i>Ajouter au panier
+                            </button>
+                        </div>
+                    ` : `
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <p class="text-red-800 font-medium">Ce produit est actuellement en rupture de stock</p>
+                        </div>
+                    `}
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+// Global filter functions
+function applyProductFilters() {
+    const params = {
+        categorie: document.getElementById('categoryFilter')?.value || '',
+        search: document.getElementById('productSearch')?.value || '',
+        priceMin: document.getElementById('priceMin')?.value || '',
+        priceMax: document.getElementById('priceMax')?.value || '',
+        sort: document.getElementById('sortSelect')?.value || 'newest',
+        enPromotion: document.getElementById('promotionFilter')?.checked || false,
+        enVedette: document.getElementById('featuredFilter')?.checked || false
+    };
+    
+    // Remove empty params
+    Object.keys(params).forEach(key => {
+        if (!params[key] || params[key] === false) {
+            delete params[key];
+        }
     });
     
-    console.log('✅ Product update listeners set up');
-});
+    if (window.app) {
+        window.app.showPage('products', params);
+    }
+}
 
-// Enhanced clearFilters function
-function clearFilters() {
-    console.log('🧹 Clearing all filters...');
-    
-    ['categoryFilter', 'priceMin', 'priceMax', 'productSearch'].forEach(id => {
+function clearProductFilters() {
+    ['categoryFilter', 'productSearch', 'priceMin', 'priceMax'].forEach(id => {
         const element = document.getElementById(id);
         if (element) element.value = '';
     });
@@ -344,32 +496,46 @@ function clearFilters() {
     });
     
     if (window.app) {
-        // Force refresh from backend
-        localStorage.removeItem('demoProducts');
-        window.app.runProductsLoad({});
+        window.app.showPage('products');
     }
 }
 
-// FIXED: Enhanced forceRefreshProducts for global use
-function forceRefreshProducts() {
-    console.log('🔄 Force refreshing products globally...');
-    
-    // Clear localStorage cache
-    localStorage.removeItem('demoProducts');
-    
-    // Refresh current view
-    if (window.app) {
-        if (window.app.currentPage === 'products') {
-            window.app.runProductsLoad({});
-        } else if (window.app.currentPage === 'home') {
-            window.app.loadFeaturedProducts();
+// Product detail page functions
+function increaseQuantity() {
+    const input = document.getElementById('productQuantity');
+    if (input) {
+        const current = parseInt(input.value);
+        const max = parseInt(input.max);
+        if (current < max) {
+            input.value = current + 1;
         }
     }
-    
-    // Show success message
-    if (window.app && window.app.showToast) {
-        window.app.showToast('Produits actualisés depuis le serveur', 'success');
+}
+
+function decreaseQuantity() {
+    const input = document.getElementById('productQuantity');
+    if (input) {
+        const current = parseInt(input.value);
+        if (current > 1) {
+            input.value = current - 1;
+        }
     }
 }
 
-module.exports = router;
+function addProductToCart(productId) {
+    const quantityInput = document.getElementById('productQuantity');
+    const quantity = quantityInput ? parseInt(quantityInput.value) : 1;
+    
+    if (window.app) {
+        window.app.addToCart(productId, quantity);
+    }
+}
+
+// Export functions
+window.applyProductFilters = applyProductFilters;
+window.clearProductFilters = clearProductFilters;
+window.increaseQuantity = increaseQuantity;
+window.decreaseQuantity = decreaseQuantity;
+window.addProductToCart = addProductToCart;
+
+console.log('✅ Products.js loaded successfully');
