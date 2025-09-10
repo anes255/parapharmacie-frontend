@@ -4,8 +4,8 @@ const API_CONFIG = {
     BASE_URL: (() => {
         const hostname = window.location.hostname;
         
-        // Always use production backend URL (without /api suffix)
-        return 'https://mamanalgerienne-backend.onrender.com';
+        // Always use production backend URL
+        return 'https://parapharmacie-gaher.onrender.com/api';
         
         // Comment out the localhost logic to always use production
         /*
