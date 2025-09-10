@@ -394,7 +394,7 @@ function forceRefreshProducts() {
     }
 }
 
-// FIXED: Enhanced saveProduct function with Backend Integration
+// FIXED: Enhanced saveProduct function
 function saveProduct() {
     console.log('💾 Starting product save...');
     
@@ -422,6 +422,132 @@ function saveProduct() {
     buttonText.classList.add('hidden');
     spinner.classList.remove('hidden');
     
+    // Prepare product data - FIXED: Don't include _id for new products
+    const productData = {
+        nom: nom,
+        description: description,
+        marque: document.getElementById('productMarque').value.trim() || '',
+        prix: parseInt(prix),
+        stock: parseInt(stock),
+        categorie: categorie,
+        actif: document.getElementById('productActif').checked,
+        enVedette: document.getElementById('productEnVedette').checked,
+        enPromotion: document.getElementById('productEnPromotion').checked
+    };
+    
+    // ONLY add _id if editing existing product
+    if (isEditing && currentEditingProduct._id) {
+        productData._id = currentEditingProduct._id;
+    }
+    
+    // Handle optional fields
+    const prixOriginal = document.getElementById('productPrixOriginal').value;
+    if (prixOriginal && prixOriginal !== '') {
+        productData.prixOriginal = parseInt(prixOriginal);
+        
+        // Calculate discount percentage
+        if (productData.enPromotion && productData.prixOriginal > productData.prix) {
+            productData.pourcentagePromotion = Math.round((productData.prixOriginal - productData.prix) / productData.prixOriginal * 100);
+        }
+    }
+    
+    const ingredients = document.getElementById('productIngredients').value.trim();
+    if (ingredients) productData.ingredients = ingredients;
+    
+    const modeEmploi = document.getElementById('productModeEmploi').value.trim();
+    if (modeEmploi) productData.modeEmploi = modeEmploi;
+    
+    const precautions = document.getElementById('productPrecautions').value.trim();
+    if (precautions) productData.precautions = precautions;
+    
+    // Handle image
+    const imageUrl = document.getElementById('productImageUrl').value;
+    if (imageUrl) {
+        productData.image = imageUrl;
+    }
+    
+    console.log('📦 Product data prepared:', productData);
+    
+    // Try to save to backend first
+    saveProductToBackend(productData, isEditing)
+        .then((result) => {
+            if (result.success) {
+                console.log('✅ Backend save successful');
+                
+                // Use the product returned from backend (which has the MongoDB _id)
+                const savedProduct = result.data.product;
+                
+                // Update localStorage with the backend product (including proper _id)
+                saveProductToLocalStorage(savedProduct, isEditing);
+                
+                app.showToast(
+                    isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 
+                    'success'
+                );
+            } else {
+                console.warn('⚠️ Backend save failed:', result.error);
+                
+                // Generate temporary ID for localStorage only
+                if (!isEditing) {
+                    productData._id = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                }
+                
+                saveProductToLocalStorage(productData, isEditing);
+                app.showToast(
+                    (isEditing ? 'Produit modifié' : 'Produit ajouté') + ' (sauvegarde locale)', 
+                    'warning'
+                );
+            }
+        })
+        .catch((error) => {
+            console.warn('⚠️ Backend save error:', error);
+            
+            // Generate temporary ID for localStorage only
+            if (!isEditing) {
+                productData._id = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            }
+            
+            saveProductToLocalStorage(productData, isEditing);
+            app.showToast(
+                (isEditing ? 'Produit modifié' : 'Produit ajouté') + ' (sauvegarde locale)', 
+                'warning'
+            );
+        })
+        .finally(() => {
+            // Close modal and refresh
+            closeProductModal();
+            
+            // Refresh views
+            setTimeout(() => {
+                console.log('🔄 Refreshing views...');
+                
+                // Refresh admin view
+                if (adminCurrentSection === 'products') {
+                    app.loadAdminProducts();
+                } else if (adminCurrentSection === 'featured' && productData.enVedette) {
+                    app.loadAdminFeatured();
+                } else if (adminCurrentSection === 'dashboard') {
+                    app.loadAdminDashboard();
+                }
+                
+                // Trigger main page refresh
+                if (typeof window.refreshMainPageProducts === 'function') {
+                    window.refreshMainPageProducts();
+                }
+                
+                // Dispatch event for any listeners
+                document.dispatchEvent(new CustomEvent('productsUpdated', { 
+                    detail: { productId: productData._id, isNew: !isEditing } 
+                }));
+                
+            }, 500);
+            
+            // Reset button state
+            button.disabled = false;
+            buttonText.classList.remove('hidden');
+            spinner.classList.add('hidden');
+        });
+}
     // Generate ID for new products
     const productId = isEditing ? currentEditingProduct._id : `product_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -1507,3 +1633,4 @@ window.previewImage = previewImage;
 window.forceRefreshProducts = forceRefreshProducts;
 
 console.log('✅ FIXED Complete Admin.js loaded - Products will persist in localStorage even when backend fails');
+
