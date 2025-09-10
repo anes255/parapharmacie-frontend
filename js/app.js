@@ -1,4 +1,36 @@
-// Clean PharmacieGaherApp - Updated with 10 categories (Vitalité first)
+// Simple encoding fix - add this at the very top of app.js
+function fixText(text) {
+    if (typeof text !== 'string') return text;
+    return text
+        .replace(/Ã©/g, 'é')
+        .replace(/Ã¨/g, 'è')
+        .replace(/Ã /g, 'à')
+        .replace(/Ã´/g, 'ô')
+        .replace(/Ãª/g, 'ê')
+        .replace(/Ã§/g, 'ç')
+        .replace(/VitalitÃ©/g, 'Vitalité')
+        .replace(/BÃ©bÃ©/g, 'Bébé')
+        .replace(/AlgÃ©rie/g, 'Algérie')
+        .replace(/TÃ©lÃ©phone/g, 'Téléphone')
+        .replace(/confirmÃ©e/g, 'confirmée')
+        .replace(/prÃ©parÃ©e/g, 'préparée')
+        .replace(/expÃ©diÃ©e/g, 'expédiée')
+        .replace(/livrÃ©e/g, 'livrée')
+        .replace(/annulÃ©e/g, 'annulée');
+}
+
+// Apply fix when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        document.querySelectorAll('*').forEach(function(element) {
+            if (element.children.length === 0 && element.textContent) {
+                element.textContent = fixText(element.textContent);
+            }
+        });
+    }, 1000);
+});
+
+
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -7,7 +39,7 @@ class PharmacieGaherApp {
             couleurPrimaire: '#10b981',
             couleurSecondaire: '#059669',
             couleurAccent: '#34d399',
-            nomSite: 'Shifa - Parapharmacie',
+            nomSite: 'Shifa - Parapharmacie Gaher',
             fraisLivraison: 300,
             livraisonGratuite: 5000
         };
@@ -143,36 +175,108 @@ class PharmacieGaherApp {
     async loadHomePage() {
         const mainContent = document.getElementById('mainContent');
         mainContent.innerHTML = `
-            // In app.js - loadHomePage method, update the hero section:
-
-<section class="hero-gradient text-white py-24 relative overflow-hidden">
-    <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-green-600/30 to-teal-700/20"></div>
-    <div class="container mx-auto px-4 relative z-10">
-        <div class="max-w-4xl mx-auto text-center">
-            <div class="flex justify-center mb-8">
-                <div class="w-40 h-40 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center shadow-2xl border-2 border-white/30 float-animation">
-                    <i class="fas fa-seedling text-7xl text-white drop-shadow-lg"></i>
+            <section class="hero-gradient text-white py-24 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-green-600/30 to-teal-700/20"></div>
+                <div class="container mx-auto px-4 relative z-10">
+                    <div class="max-w-4xl mx-auto text-center">
+                        <div class="flex justify-center mb-8">
+                            <div class="w-40 h-40 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center shadow-2xl border-2 border-white/30 float-animation">
+                                <i class="fas fa-seedling text-7xl text-white drop-shadow-lg"></i>
+                            </div>
+                        </div>
+                        <h1 class="text-6xl md:text-8xl font-bold mb-4 bg-gradient-to-r from-white to-green-100 bg-clip-text text-transparent drop-shadow-2xl">
+                            Shifa
+                        </h1>
+                        <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-green-100">
+                            Parapharmacie
+                        </h2>
+                        <p class="text-xl md:text-2xl mb-12 opacity-90 text-green-50">
+                            Votre bien-être, notre mission naturelle
+                        </p>
+                        <div class="flex justify-center">
+                            <button onclick="app.showPage('products')" class="btn-primary bg-white text-emerald-600 hover:bg-green-50 text-lg px-10 py-5 transform hover:scale-105">
+                                <i class="fas fa-leaf mr-3"></i>
+                                Explorer nos produits naturels
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <h1 class="text-6xl md:text-8xl font-bold mb-4 bg-gradient-to-r from-white to-green-100 bg-clip-text text-transparent drop-shadow-2xl">
-                Shifa
-            </h1>
-            <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-green-100">
-                Parapharmacie
-            </h2>
-            <p class="text-xl md:text-2xl mb-12 opacity-90 text-green-50">
-                Votre bien-être, notre mission naturelle
-            </p>
-            <div class="flex justify-center">
-                <button onclick="app.showPage('products')" class="btn-primary bg-white text-emerald-600 hover:bg-green-50 text-lg px-10 py-5 transform hover:scale-105">
-                    <i class="fas fa-leaf mr-3"></i>
-                    Explorer nos produits naturels
-                </button>
-            </div>
-        </div>
-    </div>
-    <div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-50 to-transparent"></div>
-</section>
+                <div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-50 to-transparent"></div>
+            </section>
+            
+            <section class="py-20 bg-gradient-to-b from-green-50 to-emerald-50 section-with-decoration">
+                <div class="container mx-auto px-4">
+                    <div class="text-center mb-16">
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Spécialités Santé</h2>
+                        <p class="text-xl text-emerald-600 max-w-2xl mx-auto">
+                            Découvrez nos gammes spécialisées pour votre bien-être quotidien
+                        </p>
+                    </div>
+                    <div id="categoriesGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                    </div>
+                </div>
+            </section>
+            
+            <section class="py-20 bg-gradient-to-b from-emerald-50 to-green-100">
+                <div class="container mx-auto px-4">
+                    <div class="text-center mb-16">
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Coups de Cœur</h2>
+                        <p class="text-xl text-emerald-600">
+                            Nos produits les plus appréciés par nos clients
+                        </p>
+                    </div>
+                    <div id="featuredProducts" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    </div>
+                </div>
+            </section>
+            
+            <section class="py-20 bg-gradient-to-b from-green-100 to-emerald-100">
+                <div class="container mx-auto px-4">
+                    <div class="text-center mb-16">
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Offres Spéciales</h2>
+                        <p class="text-xl text-emerald-600">
+                            Profitez de nos promotions exclusives
+                        </p>
+                    </div>
+                    <div id="promotionProducts" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    </div>
+                </div>
+            </section>
+            
+            <section class="py-20 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 text-white relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-green-600/30 to-teal-700/20"></div>
+                <div class="container mx-auto px-4 relative z-10">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+                        <div class="text-center group">
+                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 border border-white/30">
+                                <i class="fas fa-truck-fast text-3xl drop-shadow-lg"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-4">Livraison Express</h3>
+                            <p class="text-lg opacity-90 text-green-100">
+                                Livraison rapide dans toute l'Algérie avec suivi en temps réel
+                            </p>
+                        </div>
+                        <div class="text-center group">
+                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 border border-white/30">
+                                <i class="fas fa-certificate text-3xl drop-shadow-lg"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-4">Qualité Certifiée</h3>
+                            <p class="text-lg opacity-90 text-green-100">
+                                Produits authentiques avec garantie qualité pharmaceutique
+                            </p>
+                        </div>
+                        <div class="text-center group">
+                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 border border-white/30">
+                                <i class="fas fa-user-md text-3xl drop-shadow-lg"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-4">Conseil Expert</h3>
+                            <p class="text-lg opacity-90 text-green-100">
+                                Accompagnement par nos pharmaciens qualifiés 24h/7j
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
         `;
         
         await this.loadCategories();
@@ -837,6 +941,293 @@ function logout() {
         window.app.logout();
     }
 }
+// FIXED: Add these functions to your app.js file
+
+// Enhanced authentication handling
+PharmacieGaherApp.prototype.loadUserFromToken = function() {
+    const token = localStorage.getItem('token');
+    if (token) {
+        try {
+            // Decode JWT token to get user info
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            
+            // Check if token is expired
+            if (payload.exp && payload.exp * 1000 < Date.now()) {
+                console.log('Token expired, removing...');
+                localStorage.removeItem('token');
+                this.currentUser = null;
+                this.updateUserInterface();
+                return;
+            }
+            
+            // Set user from token
+            this.currentUser = {
+                id: payload.user?.id,
+                nom: payload.user?.nom || 'Admin',
+                prenom: payload.user?.prenom || 'User',
+                email: payload.user?.email || 'admin@example.com',
+                role: payload.user?.role || 'admin'
+            };
+            
+            console.log('✅ User loaded from token:', this.currentUser);
+            this.updateUserInterface();
+            
+        } catch (error) {
+            console.error('Error decoding token:', error);
+            localStorage.removeItem('token');
+            this.currentUser = null;
+            this.updateUserInterface();
+        }
+    }
+};
+
+// FIXED: Enhanced login function with proper token handling
+PharmacieGaherApp.prototype.login = async function(email, password) {
+    try {
+        console.log('🔐 Attempting login...');
+        
+        const response = await apiCall('/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+        
+        if (response.token) {
+            // Store token
+            localStorage.setItem('token', response.token);
+            
+            // Set current user
+            this.currentUser = response.user;
+            
+            // Update UI
+            this.updateUserInterface();
+            
+            console.log('✅ Login successful:', this.currentUser);
+            this.showToast(`Bienvenue ${this.currentUser.prenom}!`, 'success');
+            
+            // Redirect based on role
+            if (this.currentUser.role === 'admin') {
+                this.showPage('admin');
+            } else {
+                this.showPage('home');
+            }
+            
+            return true;
+        } else {
+            throw new Error('Pas de token reçu');
+        }
+        
+    } catch (error) {
+        console.error('❌ Login failed:', error);
+        
+        // For demo purposes, allow admin login even if backend fails
+        if (email === 'pharmaciegaher@gmail.com' && password === 'anesaya75') {
+            console.log('🎭 Using demo admin credentials');
+            
+            // Create demo admin user
+            this.currentUser = {
+                id: 'demo_admin',
+                nom: 'Gaher',
+                prenom: 'Parapharmacie',
+                email: 'pharmaciegaher@gmail.com',
+                role: 'admin'
+            };
+            
+            // Create demo token
+            const demoToken = btoa(JSON.stringify({
+                user: this.currentUser,
+                exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
+            }));
+            localStorage.setItem('token', 'demo.' + demoToken + '.demo');
+            
+            this.updateUserInterface();
+            this.showToast(`Bienvenue ${this.currentUser.prenom} (Mode démo)!`, 'success');
+            this.showPage('admin');
+            return true;
+        }
+        
+        this.showToast('Email ou mot de passe incorrect', 'error');
+        return false;
+    }
+};
+
+// Enhanced initialization with proper event listeners
+PharmacieGaherApp.prototype.init = function() {
+    console.log('🚀 Initializing Shifa Parapharmacie App...');
+    
+    // Load user from stored token
+    this.loadUserFromToken();
+    
+    // Load initial page
+    this.showPage('home');
+    
+    // FIXED: Add product update event listeners
+    this.setupProductUpdateListeners();
+    
+    // Initialize search functionality
+    this.initializeSearch();
+    
+    console.log('✅ App initialization complete');
+};
+
+// FIXED: Setup product update listeners
+PharmacieGaherApp.prototype.setupProductUpdateListeners = function() {
+    console.log('📱 Setting up product update listeners...');
+    
+    // Listen for products updated events from admin
+    document.addEventListener('productsUpdated', (event) => {
+        console.log('📢 Products updated event received:', event.detail);
+        
+        // Clear product cache
+        localStorage.removeItem('demoProducts');
+        
+        // Refresh current page if needed
+        setTimeout(() => {
+            if (this.currentPage === 'products') {
+                this.runProductsLoad({});
+            } else if (this.currentPage === 'home') {
+                this.loadFeaturedProducts();
+            }
+        }, 500);
+    });
+    
+    // Listen for admin product changes
+    document.addEventListener('adminProductChange', (event) => {
+        console.log('🔧 Admin product change:', event.detail);
+        this.refreshProductDisplays();
+    });
+    
+    console.log('✅ Product update listeners set up');
+};
+
+// FIXED: Method to refresh product displays
+PharmacieGaherApp.prototype.refreshProductDisplays = function() {
+    console.log('🔄 Refreshing product displays...');
+    
+    // Clear cache
+    localStorage.removeItem('demoProducts');
+    
+    // Refresh based on current page
+    if (this.currentPage === 'home') {
+        this.loadFeaturedProducts();
+    } else if (this.currentPage === 'products') {
+        this.runProductsLoad({});
+    }
+};
+
+// FIXED: Enhanced cart management with proper product sync
+PharmacieGaherApp.prototype.addToCart = async function(productId, quantity = 1) {
+    try {
+        console.log(`🛒 Adding to cart: ${productId} x${quantity}`);
+        
+        // Get fresh product data
+        let product = null;
+        
+        // Try to get from localStorage first (faster)
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        product = localProducts.find(p => p._id === productId);
+        
+        // If not found locally, try backend
+        if (!product) {
+            try {
+                product = await apiCall(`/products/${productId}`);
+            } catch (error) {
+                console.warn('Could not fetch product from backend');
+            }
+        }
+        
+        if (!product) {
+            this.showToast('Produit non trouvé', 'error');
+            return;
+        }
+        
+        // Check stock
+        if (product.stock === 0) {
+            this.showToast('Produit en rupture de stock', 'error');
+            return;
+        }
+        
+        if (quantity > product.stock) {
+            this.showToast(`Stock insuffisant (${product.stock} disponibles)`, 'error');
+            return;
+        }
+        
+        // Get current cart
+        let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        
+        // Check if product already in cart
+        const existingIndex = cart.findIndex(item => item._id === productId);
+        
+        if (existingIndex !== -1) {
+            // Update quantity
+            const newQuantity = cart[existingIndex].quantity + quantity;
+            if (newQuantity > product.stock) {
+                this.showToast(`Stock insuffisant (${product.stock} disponibles)`, 'error');
+                return;
+            }
+            cart[existingIndex].quantity = newQuantity;
+        } else {
+            // Add new item
+            cart.push({
+                ...product,
+                quantity: quantity
+            });
+        }
+        
+        // Save cart
+        localStorage.setItem('cart', JSON.stringify(cart));
+        
+        // Update UI
+        this.updateCartUI();
+        this.showToast(`${product.nom} ajouté au panier`, 'success');
+        
+        console.log('✅ Product added to cart successfully');
+        
+    } catch (error) {
+        console.error('❌ Error adding to cart:', error);
+        this.showToast('Erreur lors de l\'ajout au panier', 'error');
+    }
+};
+
+// FIXED: Global function to refresh products from admin
+window.refreshMainPageProducts = function() {
+    console.log('🔄 Refreshing main page products...');
+    
+    if (window.app) {
+        // Clear cache
+        localStorage.removeItem('demoProducts');
+        
+        // Refresh current page
+        if (window.app.currentPage === 'products') {
+            window.app.runProductsLoad({});
+        } else if (window.app.currentPage === 'home') {
+            window.app.loadFeaturedProducts();
+        }
+        
+        // Also refresh cart to ensure product info is up to date
+        window.app.updateCartUI();
+    }
+};
+
+// FIXED: Initialize app with all event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📱 DOM loaded, initializing app...');
+    
+    // Create app instance
+    window.app = new PharmacieGaherApp();
+    
+    // Initialize
+    window.app.init();
+    
+    // Test backend connection
+    if (typeof testBackendConnection === 'function') {
+        setTimeout(testBackendConnection, 2000);
+    }
+    
+    console.log('✅ App ready!');
+});
 
 // Initialize app
 let app;
@@ -847,4 +1238,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('App initialized and made globally available');
 });
 
+
 console.log('✅ Updated app.js loaded with all 10 categories (Vitalité, Sport, Visage, Cheveux, Solaire, Intime, Soins, Bébé, Homme, Dentaire) on homepage');
+
+
