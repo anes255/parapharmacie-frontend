@@ -306,26 +306,190 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
     }
 };
 
-// Initialize default products with all categories including Sport
+// REMOVE the automatic product initialization from admin.js
+// Replace this function in your admin.js:
+
 PharmacieGaherApp.prototype.initializeDefaultProducts = function() {
-    const existingProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+    // DON'T auto-create products anymore
+    console.log('⚠️ Product auto-initialization disabled');
     
-    if (existingProducts.length === 0) {
-        const defaultProducts = [
-            { _id: '1', nom: 'Multivitamines VitalForce', prix: 2800, categorie: 'Vitalité', marque: 'Shifa', stock: 50, enVedette: true, actif: true, description: 'Complexe de vitamines et minéraux pour votre bien-être quotidien' },
-            { _id: '2', nom: 'Shampoing Anti-Chute L\'Oréal', prix: 2500, categorie: 'Cheveux', marque: 'L\'Oréal', stock: 25, actif: true, description: 'Shampoing fortifiant pour cheveux fragiles' },
-            { _id: '3', nom: 'Crème Hydratante Visage Avène', prix: 3200, categorie: 'Visage', marque: 'Avène', stock: 30, enVedette: true, actif: true, description: 'Crème hydratante apaisante pour tous types de peau' },
-            { _id: '4', nom: 'Lait Nettoyant Bébé Mustela', prix: 1800, categorie: 'Bébé', marque: 'Mustela', stock: 20, actif: true, description: 'Lait nettoyant doux pour la peau délicate de bébé' },
-            { _id: '5', nom: 'Crème Solaire SPF 50+ La Roche Posay', prix: 4500, categorie: 'Solaire', marque: 'La Roche Posay', stock: 15, enVedette: true, actif: true, description: 'Protection solaire très haute pour toute la famille' },
-            { _id: '6', nom: 'Dentifrice Sensodyne Protection Complète', prix: 950, categorie: 'Dentaire', marque: 'Sensodyne', stock: 40, actif: true, description: 'Dentifrice pour dents sensibles avec protection renforcée' },
-            { _id: '7', nom: 'Gel Nettoyant Intime Saforelle', prix: 1600, categorie: 'Intime', marque: 'Saforelle', stock: 22, actif: true, description: 'Gel doux pour l\'hygiène intime quotidienne' },
-            { _id: '8', nom: 'Gel Douche Homme Vichy', prix: 1400, categorie: 'Homme', marque: 'Vichy', stock: 18, actif: true, description: 'Gel douche hydratant pour la peau masculine' },
-            { _id: '9', nom: 'Protéine Whey Sport Nutrition', prix: 3500, categorie: 'Sport', marque: 'SportMax', stock: 25, enVedette: true, actif: true, description: 'Protéine en poudre pour sportifs et amateurs de fitness' }
-        ];
-        localStorage.setItem('demoProducts', JSON.stringify(defaultProducts));
-        console.log('Default products initialized with all categories');
+    // Only initialize if user explicitly requests it or if it's first time setup
+    const hasExplicitInit = localStorage.getItem('explicitProductInit');
+    if (!hasExplicitInit) {
+        console.log('📝 No explicit product initialization requested');
+        return;
+    }
+    
+    // If you really need default products, do it manually in admin panel
+};
+
+// Updated admin products loading - ALWAYS use API, not localStorage
+PharmacieGaherApp.prototype.loadAdminProducts = async function() {
+    try {
+        console.log('🔄 Loading admin products from API...');
+        
+        // ALWAYS try API first for admin
+        let products = [];
+        
+        try {
+            const data = await apiCall('/admin/products');
+            if (data && data.products) {
+                products = data.products;
+                console.log('✅ API products loaded in admin:', products.length);
+                
+                // Update localStorage to match API
+                localStorage.setItem('demoProducts', JSON.stringify(products));
+            }
+        } catch (error) {
+            console.log('⚠️ API unavailable, checking localStorage');
+            // Only use localStorage as absolute last resort
+            products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        }
+        
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6 mb-6">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-emerald-800">Gestion des produits</h2>
+                        <p class="text-emerald-600">${products.length} produits au total</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button onclick="openAddProductModal()" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-plus mr-2"></i>Nouveau produit
+                        </button>
+                        <button onclick="forceRefreshProducts()" class="bg-blue-500 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-600 transition-all">
+                            <i class="fas fa-sync mr-2"></i>Actualiser
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 overflow-hidden">
+                ${products.length === 0 ? `
+                    <div class="p-16 text-center">
+                        <i class="fas fa-pills text-6xl text-emerald-200 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit</h3>
+                        <p class="text-emerald-600 mb-8">Commencez par ajouter votre premier produit</p>
+                        <button onclick="openAddProductModal()" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-plus mr-2"></i>Ajouter un produit
+                        </button>
+                    </div>
+                ` : `
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-emerald-50 border-b border-emerald-200">
+                                <tr>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Image</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Produit</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Prix</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Stock</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Statut</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${products.map(product => this.renderProductRow(product)).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error loading products:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <p class="text-red-800">Erreur de chargement des produits</p>
+                <button onclick="app.loadAdminProducts()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg">
+                    Réessayer
+                </button>
+            </div>
+        `;
     }
 };
+
+// Add this function to force refresh both admin and main page
+function forceRefreshProducts() {
+    console.log('🔄 Force refreshing products...');
+    
+    // Clear localStorage cache
+    localStorage.removeItem('demoProducts');
+    
+    // Reload admin products
+    if (window.app && window.app.loadAdminProducts) {
+        window.app.loadAdminProducts();
+    }
+    
+    // Show success message
+    if (window.app && window.app.showToast) {
+        window.app.showToast('Produits actualisés', 'success');
+    }
+}
+
+// Updated save product function - sync with API and clear cache
+async function saveProduct() {
+    const form = document.getElementById('productForm');
+    const isEditing = !!currentEditingProduct;
+    
+    // ... your existing validation code ...
+    
+    try {
+        // ... your existing product data preparation ...
+        
+        console.log('Product data to save:', productData);
+        
+        // Save to API first
+        try {
+            const endpoint = isEditing ? `/admin/products/${productData._id}` : '/admin/products';
+            const method = isEditing ? 'PUT' : 'POST';
+            
+            const response = await apiCall(endpoint, {
+                method: method,
+                body: JSON.stringify(productData)
+            });
+            
+            console.log('✅ Product saved to API successfully');
+            
+            // Clear localStorage cache to force reload from API
+            localStorage.removeItem('demoProducts');
+            
+        } catch (apiError) {
+            console.log('⚠️ API save failed, saving locally only:', apiError);
+            
+            // Fallback to localStorage only if API fails
+            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            
+            if (isEditing) {
+                const index = localProducts.findIndex(p => p._id === productData._id);
+                if (index !== -1) {
+                    localProducts[index] = productData;
+                } else {
+                    localProducts.push(productData);
+                }
+            } else {
+                localProducts.push(productData);
+            }
+            
+            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+        }
+        
+        app.showToast(isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 'success');
+        closeProductModal();
+        
+        // Refresh admin section
+        if (adminCurrentSection === 'products') {
+            app.loadAdminProducts();
+        }
+        
+    } catch (error) {
+        console.error('Error saving product:', error);
+        app.showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
+    }
+}
+
+// Export the global function
+window.forceRefreshProducts = forceRefreshProducts;
 
 // Product Row Renderer
 PharmacieGaherApp.prototype.renderProductRow = function(product) {
@@ -1616,3 +1780,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 console.log('✅ Complete Admin.js loaded with full product management, order system, and image handling');
+
