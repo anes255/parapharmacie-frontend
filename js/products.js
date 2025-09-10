@@ -142,18 +142,18 @@ PharmacieGaherApp.prototype.loadProductsPage = async function(params = {}) {
     await this.runProductsLoad(params);
 };
 
-// Système de chargement des produits amélioré
+// Fixed product loading - ALWAYS try API first
 PharmacieGaherApp.prototype.runProductsLoad = async function(params = {}) {
     try {
-        // Essayer l'API en premier
+        console.log('🔄 Loading products from API first...');
         await this.loadProductsFromBackend(params);
     } catch (error) {
-        console.log('API indisponible, chargement des produits de démonstration');
+        console.log('⚠️ API failed, using localStorage as fallback');
         await this.loadDemoProducts(params);
     }
 };
 
-// Chargement depuis l'API
+// Fixed API loading with better error handling
 PharmacieGaherApp.prototype.loadProductsFromBackend = async function(params = {}) {
     const urlParams = new URLSearchParams();
     if (params.categorie) urlParams.append('categorie', params.categorie);
@@ -166,27 +166,37 @@ PharmacieGaherApp.prototype.loadProductsFromBackend = async function(params = {}
     if (params.page) urlParams.append('page', params.page);
     
     try {
+        console.log('🌐 Fetching from API:', `https://parapharmacie-gaher.onrender.com/api/products?${urlParams.toString()}`);
         const data = await apiCall(`/products?${urlParams.toString()}`);
-        // Mettre à jour l'interface
-        this.displayProducts(data.products || [], data.pagination);
+        
+        if (data && data.products) {
+            console.log('✅ API products loaded:', data.products.length);
+            // Update localStorage with fresh API data
+            localStorage.setItem('demoProducts', JSON.stringify(data.products));
+            this.displayProducts(data.products || [], data.pagination);
+        } else {
+            throw new Error('No products data from API');
+        }
     } catch (error) {
-        // Fallback to demo products
-        await this.loadDemoProducts(params);
+        console.error('❌ API call failed:', error);
+        throw error; // Re-throw to trigger fallback
     }
 };
 
-// Chargement des produits de démonstration avec toutes les catégories
+// Fixed demo products - don't auto-initialize
 PharmacieGaherApp.prototype.loadDemoProducts = async function(params = {}) {
-    // Get all products from localStorage (which includes both existing and new categories)
+    console.log('📦 Loading from localStorage...');
+    
+    // Get products from localStorage (don't auto-create if empty)
     let allProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
     
-    // If no products in localStorage, use the default ones from admin initialization
     if (allProducts.length === 0) {
-        // This will be empty array, products should be initialized by admin.js
-        console.log('No products found in localStorage');
+        console.log('📭 No products in localStorage');
+        this.displayProducts([], null, true);
+        return;
     }
     
-    // Appliquer les filtres
+    // Apply filters
     let filteredProducts = allProducts.filter(product => {
         if (params.categorie && product.categorie !== params.categorie) return false;
         if (params.search && !product.nom.toLowerCase().includes(params.search.toLowerCase())) return false;
@@ -197,7 +207,7 @@ PharmacieGaherApp.prototype.loadDemoProducts = async function(params = {}) {
         return true;
     });
     
-    // Appliquer le tri
+    // Apply sorting
     if (params.sort === 'price_asc') {
         filteredProducts.sort((a, b) => a.prix - b.prix);
     } else if (params.sort === 'price_desc') {
@@ -208,6 +218,7 @@ PharmacieGaherApp.prototype.loadDemoProducts = async function(params = {}) {
         filteredProducts.sort((a, b) => b.nom.localeCompare(a.nom));
     }
     
+    console.log('📦 Filtered products:', filteredProducts.length);
     this.displayProducts(filteredProducts, null, true);
 };
 
@@ -826,4 +837,5 @@ function loadProductPage(page) {
 window.applyFilters = applyFilters;
 window.clearFilters = clearFilters;
 window.toggleView = toggleView;
+
 window.loadProductPage = loadProductPage;
