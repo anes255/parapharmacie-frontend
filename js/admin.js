@@ -1,4 +1,4 @@
-// Complete Admin Panel with Backend Integration - PRODUCTION VERSION
+// Complete Admin Panel with Backend Integration - FIXED VERSION
 
 // Global variables
 let adminCurrentSection = 'dashboard';
@@ -383,7 +383,7 @@ function forceRefreshProducts() {
     }
 }
 
-// Enhanced saveProduct function with Backend Integration
+// FIXED: Enhanced saveProduct function with Backend Integration
 function saveProduct() {
     console.log('💾 Starting product save...');
     
@@ -411,9 +411,12 @@ function saveProduct() {
     buttonText.classList.add('hidden');
     spinner.classList.remove('hidden');
     
+    // FIXED: Better ID generation for new products
+    const productId = isEditing ? currentEditingProduct._id : `product_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     // Prepare product data
     const productData = {
-        _id: isEditing ? currentEditingProduct._id : Date.now().toString(),
+        _id: productId,
         nom: nom,
         description: description,
         marque: document.getElementById('productMarque').value.trim() || '',
@@ -454,7 +457,7 @@ function saveProduct() {
     
     console.log('📦 Product data prepared:', productData);
     
-    // Save to backend first, then localStorage
+    // FIXED: Save to backend first, then localStorage, with proper refresh
     saveProductToBackend(productData, isEditing)
         .then((backendSuccess) => {
             console.log('🌐 Backend save result:', backendSuccess);
@@ -471,11 +474,14 @@ function saveProduct() {
             // Close modal
             closeProductModal();
             
-            // Refresh admin view and trigger main page update
+            // FIXED: Proper refresh mechanism
             setTimeout(() => {
                 console.log('🔄 Refreshing views...');
                 
-                // Refresh admin
+                // Clear localStorage to force fresh data fetch
+                localStorage.removeItem('demoProducts');
+                
+                // Refresh admin view
                 if (adminCurrentSection === 'products') {
                     app.loadAdminProducts();
                 } else if (adminCurrentSection === 'featured' && productData.enVedette) {
@@ -484,10 +490,17 @@ function saveProduct() {
                     app.loadAdminDashboard();
                 }
                 
-                // Trigger main page refresh
-                document.dispatchEvent(new CustomEvent('productsUpdated'));
+                // FIXED: Properly trigger main page refresh
+                if (typeof window.refreshMainPageProducts === 'function') {
+                    window.refreshMainPageProducts();
+                }
                 
-            }, 100);
+                // Dispatch event for any listeners
+                document.dispatchEvent(new CustomEvent('productsUpdated', { 
+                    detail: { productId: productData._id, isNew: !isEditing } 
+                }));
+                
+            }, 500); // Small delay to ensure backend sync
             
         })
         .catch((error) => {
@@ -502,16 +515,20 @@ function saveProduct() {
         });
 }
 
-// Backend save function
+// FIXED: Backend save function with proper error handling
 async function saveProductToBackend(productData, isEditing) {
     try {
         const endpoint = isEditing ? `/admin/products/${productData._id}` : '/admin/products';
         const method = isEditing ? 'PUT' : 'POST';
         
         console.log(`🌐 Saving to backend: ${method} ${endpoint}`);
+        console.log('📤 Product data:', productData);
         
         const response = await apiCall(endpoint, {
             method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(productData)
         });
         
@@ -519,7 +536,8 @@ async function saveProductToBackend(productData, isEditing) {
         return true;
         
     } catch (error) {
-        console.warn('⚠️ Backend save failed:', error.message);
+        console.error('❌ Backend save failed:', error.message);
+        // Don't throw error, allow local save to proceed
         return false;
     }
 }
@@ -557,6 +575,9 @@ async function toggleFeatured(productId, newStatus) {
         try {
             await apiCall(`/admin/products/${productId}`, {
                 method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify({ enVedette: newStatus })
             });
             console.log('✅ Backend featured update successful');
@@ -630,6 +651,24 @@ async function deleteProduct(productId) {
     }
 }
 
+// FIXED: Add global function to refresh main page products
+window.refreshMainPageProducts = function() {
+    console.log('🔄 Refreshing main page products...');
+    
+    // If we're on the products page, reload it
+    if (window.app && window.app.currentPage === 'products') {
+        window.app.runProductsLoad({});
+    }
+    
+    // If we're on the home page and there are featured products, reload them
+    if (window.app && window.app.currentPage === 'home') {
+        if (typeof window.app.loadFeaturedProducts === 'function') {
+            window.app.loadFeaturedProducts();
+        }
+    }
+};
+
+// REMAINING FUNCTIONS UNCHANGED...
 // Orders Management (keeping existing functionality)
 PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
@@ -1417,4 +1456,4 @@ window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 window.forceRefreshProducts = forceRefreshProducts;
 
-console.log('✅ Backend-Integrated Admin.js loaded - Products will sync across all devices');
+console.log('✅ FIXED Backend-Integrated Admin.js loaded - Products will sync across all devices');
