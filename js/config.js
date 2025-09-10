@@ -1,22 +1,16 @@
 // Complete Configuration for Shifa Parapharmacie Frontend-Backend Connection
 const API_CONFIG = {
-    // Backend URL configuration - FIXED
+    // Backend URL configuration - FIXED: Added /api prefix
     BASE_URL: (() => {
         const hostname = window.location.hostname;
         
-        // Always use production backend URL - CORRECT URL
-        return 'https://parapharmacie-gaher.onrender.com/api';
-        
-        // Comment out the localhost logic to always use production
-        /*
         // Local development
         if (hostname === 'localhost' || hostname === '127.0.0.1') {
             return 'http://localhost:5000/api';
         }
         
-        // Production - Your actual Render backend URL
-        return 'https://mamanalgerienne-backend.onrender.com/api';
-        */
+        // Production - Your actual Render backend URL with /api prefix
+        return 'https://parapharmacie-gaher.onrender.com/api';
     })(),
     
     // Request configuration
@@ -306,7 +300,7 @@ function getConnectionStatus() {
 }
 
 // Debug information
-console.log('🥽 Shifa Parapharmacie - Configuration Loaded');
+console.log('🏥 Shifa Parapharmacie - Configuration Loaded');
 console.log('🎯 Target Backend:', API_CONFIG.BASE_URL);
 console.log('🌐 Environment:', isDevelopment() ? 'Development' : 'Production');
 
