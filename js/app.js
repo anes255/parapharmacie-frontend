@@ -1,4 +1,4 @@
-// Fixed app.js - Clean PharmacieGaherApp with working buttons
+// Complete Fixed PharmacieGaherApp - app.js
 
 class PharmacieGaherApp {
     constructor() {
@@ -254,7 +254,6 @@ class PharmacieGaherApp {
     }
     
     async loadCategories() {
-        // Show all 10 categories with Vitalité first
         const mainPageCategories = [
             { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
             { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
@@ -285,9 +284,7 @@ class PharmacieGaherApp {
     }
     
     async loadFeaturedProducts() {
-        // Get products from localStorage that include ALL categories
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        // Filter for featured products from all categories
         const filteredProducts = localProducts.filter(p => p.enVedette && p.actif !== false);
         
         const container = document.getElementById('featuredProducts');
@@ -312,9 +309,7 @@ class PharmacieGaherApp {
     }
     
     async loadPromotionProducts() {
-        // Get products from localStorage that include ALL categories  
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        // Filter for promotion products from all categories
         const promotionProducts = localProducts.filter(p => p.enPromotion && p.actif !== false);
         
         const container = document.getElementById('promotionProducts');
@@ -431,7 +426,6 @@ class PharmacieGaherApp {
         }
     }
     
-    // FIXED: Products page loading function
     async loadProductsPage(params = {}) {
         const mainContent = document.getElementById('mainContent');
         
@@ -453,7 +447,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // FIXED: Product detail page
     async loadProductPage(productId) {
         const mainContent = document.getElementById('mainContent');
         
@@ -471,7 +464,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // FIXED: Login page
     async loadLoginPage() {
         const mainContent = document.getElementById('mainContent');
         
@@ -515,7 +507,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // FIXED: Register page
     async loadRegisterPage() {
         const mainContent = document.getElementById('mainContent');
         
@@ -570,7 +561,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // FIXED: Checkout page
     async loadCheckoutPage() {
         const mainContent = document.getElementById('mainContent');
         
@@ -602,7 +592,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // Placeholder functions for missing pages
     async loadProfilePage() {
         const mainContent = document.getElementById('mainContent');
         mainContent.innerHTML = `
@@ -630,12 +619,171 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ADD TO CART FUNCTIONALITY - FIXED
+    async loadContactPage() {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
+                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div class="space-y-8">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnées</h2>
+                            
+                            <div class="space-y-6">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-map-marker-alt text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Adresse</h3>
+                                        <p class="text-gray-600">Tipaza, Algérie</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-phone text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Téléphone</h3>
+                                        <p class="text-gray-600">+213 123 456 789</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-envelope text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Email</h3>
+                                        <a href="mailto:pharmaciegaher@gmail.com" class="text-primary hover:text-secondary">
+                                            pharmaciegaher@gmail.com
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-lg p-8">
+                        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Envoyez-nous un message</h2>
+                        
+                        <form id="contactForm" onsubmit="handleContactForm(event)" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="contactName" class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
+                                    <input type="text" id="contactName" name="name" required class="form-input" placeholder="Votre nom complet">
+                                </div>
+                                <div>
+                                    <label for="contactEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                                    <input type="email" id="contactEmail" name="email" required class="form-input" placeholder="votre@email.com">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label for="contactMessage" class="block text-sm font-medium text-gray-700 mb-2">Message *</label>
+                                <textarea id="contactMessage" name="message" rows="5" required class="form-input resize-none" placeholder="Votre message..."></textarea>
+                            </div>
+                            
+                            <button type="submit" class="w-full btn-primary py-3" id="contactSubmitBtn">
+                                <span id="contactSubmitText">Envoyer le message</span>
+                                <i id="contactSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    async loadAdminPage() {
+        if (!this.currentUser || this.currentUser.role !== 'admin') {
+            this.showToast('Accès refusé - Droits administrateur requis', 'error');
+            this.showPage('home');
+            return;
+        }
+
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <!-- Admin Header -->
+                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                        <div>
+                            <h1 class="text-4xl font-bold text-emerald-800 mb-2">Panel d'Administration</h1>
+                            <p class="text-emerald-600 text-lg">Gestion complète de Shifa - Parapharmacie</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-sm text-emerald-500">Connecté en tant que</p>
+                                <p class="font-bold text-emerald-800 text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
+                                <p class="text-sm text-emerald-600">${this.currentUser.email}</p>
+                            </div>
+                            <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/30">
+                                <i class="fas fa-user-shield text-white text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Admin Content -->
+                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                    <h2 class="text-2xl font-bold text-emerald-800 mb-6">Administration temporaire</h2>
+                    <div class="text-center py-16">
+                        <i class="fas fa-tools text-6xl text-emerald-200 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Panel d'administration</h3>
+                        <p class="text-emerald-600 mb-8">
+                            Le panel d'administration complet sera disponible une fois que les problèmes de backend seront résolus.
+                        </p>
+                        <p class="text-emerald-600 mb-8">
+                            Pour l'instant, vous pouvez utiliser le panel d'administration en remplaçant votre fichier admin.js 
+                            avec la version corrigée fournie.
+                        </p>
+                        
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mt-8">
+                            <h4 class="text-lg font-semibold text-blue-800 mb-4">Actions disponibles</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="bg-white p-4 rounded-lg border">
+                                    <h5 class="font-semibold text-gray-800 mb-2">Gestion des produits</h5>
+                                    <p class="text-gray-600 text-sm">Ajouter, modifier et gérer vos produits</p>
+                                    <button onclick="alert('Remplacez votre admin.js avec la version corrigée')" 
+                                            class="mt-2 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm">
+                                        Accéder
+                                    </button>
+                                </div>
+                                <div class="bg-white p-4 rounded-lg border">
+                                    <h5 class="font-semibold text-gray-800 mb-2">Gestion des commandes</h5>
+                                    <p class="text-gray-600 text-sm">Voir et gérer les commandes</p>
+                                    <button onclick="alert('Remplacez votre admin.js avec la version corrigée')" 
+                                            class="mt-2 bg-blue-500 text-white px-4 py-2 rounded-lg text-sm">
+                                        Accéder
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-8">
+                            <button onclick="app.showPage('home')" 
+                                    class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 transition-all">
+                                Retour à l'accueil
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
     async addToCart(productId, quantity = 1) {
         try {
             console.log('Adding to cart:', productId, quantity);
             
-            // Get all products from localStorage (includes all categories)
             const allProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             const product = allProducts.find(p => p._id === productId);
             
@@ -653,7 +801,6 @@ class PharmacieGaherApp {
                 return;
             }
             
-            // Generate image URL
             const getCategoryColor = (category) => {
                 const colors = {
                     'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
@@ -676,7 +823,6 @@ class PharmacieGaherApp {
                 imageUrl = `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
             }
             
-            // Check if product already in cart
             const existingIndex = this.cart.findIndex(item => item.id === productId);
             
             if (existingIndex > -1) {
@@ -849,88 +995,6 @@ class PharmacieGaherApp {
         this.showPage('home');
     }
     
-    async loadContactPage() {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
-                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
-                </div>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    <div class="space-y-8">
-                        <div>
-                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnées</h2>
-                            
-                            <div class="space-y-6">
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-map-marker-alt text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Adresse</h3>
-                                        <p class="text-gray-600">Tipaza, Algérie</p>
-                                    </div>
-                                </div>
-                                
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-phone text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Téléphone</h3>
-                                        <p class="text-gray-600">+213 123 456 789</p>
-                                    </div>
-                                </div>
-                                
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-envelope text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Email</h3>
-                                        <a href="mailto:pharmaciegaher@gmail.com" class="text-primary hover:text-secondary">
-                                            pharmaciegaher@gmail.com
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-lg shadow-lg p-8">
-                        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Envoyez-nous un message</h2>
-                        
-                        <form id="contactForm" onsubmit="handleContactForm(event)" class="space-y-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="contactName" class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
-                                    <input type="text" id="contactName" name="name" required class="form-input" placeholder="Votre nom complet">
-                                </div>
-                                <div>
-                                    <label for="contactEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                                    <input type="email" id="contactEmail" name="email" required class="form-input" placeholder="votre@email.com">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label for="contactMessage" class="block text-sm font-medium text-gray-700 mb-2">Message *</label>
-                                <textarea id="contactMessage" name="message" rows="5" required class="form-input resize-none" placeholder="Votre message..."></textarea>
-                            </div>
-                            
-                            <button type="submit" class="w-full btn-primary py-3" id="contactSubmitBtn">
-                                <span id="contactSubmitText">Envoyer le message</span>
-                                <i id="contactSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
     showLoading() {
         const spinner = document.getElementById('loadingSpinner');
         if (spinner) {
@@ -987,7 +1051,7 @@ class PharmacieGaherApp {
     }
 }
 
-// FIXED: Global functions that work properly
+// Global functions that work properly
 function addToCartFromCard(productId, quantity = 1) {
     console.log('Add to cart from card called:', productId);
     if (window.app && typeof window.app.addToCart === 'function') {
@@ -1065,7 +1129,6 @@ function handleContactForm(event) {
 function handleLogin(event) {
     event.preventDefault();
     
-    // Simple demo login
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     
@@ -1099,11 +1162,11 @@ function logout() {
     }
 }
 
-// FIXED: Single initialization
+// Single initialization
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing app...');
     window.app = new PharmacieGaherApp();
     console.log('App initialized and made globally available');
 });
 
-console.log('✅ Fixed app.js loaded - All buttons should work properly');
+console.log('Complete app.js loaded - All functionality should work properly');
