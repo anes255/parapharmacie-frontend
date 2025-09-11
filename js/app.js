@@ -1,4 +1,4 @@
-// Clean PharmacieGaherApp - Updated with 10 categories (Vitalité first)
+// Clean PharmacieGaherApp - Updated with 10 categories (VitalitÃ© first)
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -44,7 +44,7 @@ class PharmacieGaherApp {
                     localStorage.removeItem('token');
                 }
             } catch (error) {
-                console.error('Erreur vérification auth:', error);
+                console.error('Erreur vÃ©rification auth:', error);
                 localStorage.removeItem('token');
             }
         }
@@ -122,7 +122,7 @@ class PharmacieGaherApp {
                     break;
                 case 'admin':
                     if (!this.currentUser || this.currentUser.role !== 'admin') {
-                        this.showToast('Accès refusé', 'error');
+                        this.showToast('AccÃ¨s refusÃ©', 'error');
                         await this.showPage('home');
                         return;
                     }
@@ -138,6 +138,91 @@ class PharmacieGaherApp {
             this.hideLoading();
             this.showToast('Erreur de chargement de la page', 'error');
         }
+    }
+    
+    // Basic admin page loader - will be enhanced by admin.js
+    async loadAdminPage() {
+        if (!this.currentUser || this.currentUser.role !== 'admin') {
+            this.showToast('AccÃ¨s refusÃ© - Droits administrateur requis', 'error');
+            this.showPage('home');
+            return;
+        }
+
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <!-- Admin Header -->
+                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                        <div>
+                            <h1 class="text-4xl font-bold text-emerald-800 mb-2">Panel d'Administration</h1>
+                            <p class="text-emerald-600 text-lg">Gestion complÃ¨te de Shifa - Parapharmacie </p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-sm text-emerald-500">ConnectÃ© en tant que</p>
+                                <p class="font-bold text-emerald-800 text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
+                                <p class="text-sm text-emerald-600">${this.currentUser.email}</p>
+                            </div>
+                            <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/30">
+                                <i class="fas fa-user-shield text-white text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Loading Admin Content -->
+                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8 text-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+                    <p class="text-emerald-600">Chargement du panel d'administration...</p>
+                </div>
+            </div>
+        `;
+        
+        // Wait for admin.js to load and then call the enhanced admin loader
+        setTimeout(() => {
+            if (typeof window.loadAdminDashboard === 'function') {
+                window.loadAdminDashboard();
+            } else {
+                this.loadBasicAdminDashboard();
+            }
+        }, 100);
+    }
+    
+    // Basic dashboard if admin.js is not loaded
+    loadBasicAdminDashboard() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
+                    <h1 class="text-4xl font-bold text-emerald-800 mb-2">Panel d'Administration</h1>
+                    <p class="text-emerald-600 text-lg">Gestion complÃ¨te de Shifa - Parapharmacie</p>
+                </div>
+                
+                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                    <h2 class="text-2xl font-bold text-emerald-800 mb-6">Tableau de bord</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-2">Produits</h3>
+                            <p class="text-3xl font-bold text-blue-600">${JSON.parse(localStorage.getItem('demoProducts') || '[]').length}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold text-green-800 mb-2">Commandes</h3>
+                            <p class="text-3xl font-bold text-green-600">${JSON.parse(localStorage.getItem('adminOrders') || '[]').length}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-2">Panel complet</h3>
+                            <p class="text-sm text-purple-600">Rechargez la page pour accÃ©der aux fonctionnalitÃ©s complÃ¨tes</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold text-yellow-800 mb-2">Statut</h3>
+                            <p class="text-sm text-yellow-600">Mode basique</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
     
     async loadHomePage() {
@@ -159,7 +244,7 @@ class PharmacieGaherApp {
                             Parapharmacie
                         </h2>
                         <p class="text-xl md:text-2xl mb-12 opacity-90 text-green-50">
-                            Votre bien-être, notre mission naturelle
+                            Votre bien-Ãªtre, notre mission naturelle
                         </p>
                         <div class="flex justify-center">
                             <button onclick="app.showPage('products')" class="btn-primary bg-white text-emerald-600 hover:bg-green-50 text-lg px-10 py-5 transform hover:scale-105">
@@ -171,91 +256,42 @@ class PharmacieGaherApp {
                 </div>
                 <div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-50 to-transparent"></div>
             </section>
-
+            
             <!-- Categories Section -->
-            <section class="py-20 bg-gradient-to-br from-green-50 to-emerald-100 relative">
+            <section class="py-16 bg-gradient-to-br from-green-50 to-emerald-100">
                 <div class="container mx-auto px-4">
-                    <div class="text-center mb-16">
-                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Spécialités</h2>
-                        <p class="text-xl text-emerald-600 max-w-2xl mx-auto">
-                            Découvrez notre large gamme de produits pour votre santé et votre beauté
-                        </p>
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos CatÃ©gories</h2>
+                        <p class="text-xl text-emerald-600">DÃ©couvrez notre large gamme de produits</p>
                     </div>
-                    
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6" id="categoriesGrid">
+                    <div id="categoriesGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-6">
                         <!-- Categories will be loaded here -->
                     </div>
                 </div>
             </section>
-
-            <!-- Featured Products -->
-            <section class="py-20 bg-white relative">
+            
+            <!-- Featured Products Section -->
+            <section class="py-16 bg-white">
                 <div class="container mx-auto px-4">
-                    <div class="text-center mb-16">
-                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Coups de Cœur</h2>
-                        <p class="text-xl text-emerald-600">Produits sélectionnés avec soin pour votre bien-être</p>
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Coups de Coeur</h2>
+                        <p class="text-xl text-emerald-600">SÃ©lection spÃ©ciale de nos meilleurs produits</p>
                     </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8" id="featuredProducts">
-                        <div class="col-span-full text-center py-8">
-                            <i class="fas fa-spinner fa-spin text-4xl text-emerald-400 mb-4"></i>
-                            <p class="text-emerald-600">Chargement des produits en vedette...</p>
-                        </div>
+                    <div id="featuredProducts" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <!-- Featured products will be loaded here -->
                     </div>
                 </div>
             </section>
-
-            <!-- Promotions -->
-            <section class="py-20 bg-gradient-to-br from-red-50 to-pink-100 relative">
+            
+            <!-- Promotions Section -->
+            <section class="py-16 bg-gradient-to-br from-red-50 to-pink-100">
                 <div class="container mx-auto px-4">
-                    <div class="text-center mb-16">
-                        <h2 class="text-4xl font-bold text-red-800 mb-4">Promotions Exceptionnelles</h2>
-                        <p class="text-xl text-red-600">Profitez de nos offres spéciales du moment</p>
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl font-bold text-red-800 mb-4">Promotions</h2>
+                        <p class="text-xl text-red-600">Profitez de nos offres exceptionnelles</p>
                     </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8" id="promotionProducts">
-                        <div class="col-span-full text-center py-8">
-                            <i class="fas fa-spinner fa-spin text-4xl text-red-400 mb-4"></i>
-                            <p class="text-red-600">Chargement des promotions...</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Services Section -->
-            <section class="py-20 bg-emerald-800 text-white relative">
-                <div class="container mx-auto px-4">
-                    <div class="text-center mb-16">
-                        <h2 class="text-4xl font-bold mb-4">Pourquoi nous choisir ?</h2>
-                        <p class="text-xl text-emerald-200 max-w-2xl mx-auto">
-                            Des services de qualité pour votre satisfaction
-                        </p>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div class="text-center">
-                            <div class="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                                <i class="fas fa-shipping-fast text-3xl text-emerald-200"></i>
-                            </div>
-                            <h3 class="text-xl font-bold mb-4">Livraison Rapide</h3>
-                            <p class="text-emerald-200">Livraison gratuite dès 5000 DA d'achat dans toute l'Algérie</p>
-                        </div>
-                        
-                        <div class="text-center">
-                            <div class="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                                <i class="fas fa-certificate text-3xl text-emerald-200"></i>
-                            </div>
-                            <h3 class="text-xl font-bold mb-4">Produits Certifiés</h3>
-                            <p class="text-emerald-200">Tous nos produits sont authentiques et de qualité pharmaceutique</p>
-                        </div>
-                        
-                        <div class="text-center">
-                            <div class="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                                <i class="fas fa-headset text-3xl text-emerald-200"></i>
-                            </div>
-                            <h3 class="text-xl font-bold mb-4">Support 24/7</h3>
-                            <p class="text-emerald-200">Notre équipe est disponible pour répondre à toutes vos questions</p>
-                        </div>
+                    <div id="promotionProducts" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <!-- Promotion products will be loaded here -->
                     </div>
                 </div>
             </section>
@@ -267,18 +303,18 @@ class PharmacieGaherApp {
     }
     
     async loadCategories() {
-        // Show all 10 categories with Vitalité first
+        // Show all 10 categories with VitalitÃ© first
         const mainPageCategories = [
-            { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
+            { nom: 'VitalitÃ©', description: 'Vitamines & Ã‰nergie', icon: 'fa-seedling' },
             { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
             { nom: 'Visage', description: 'Soins du visage', icon: 'fa-smile' },
             { nom: 'Cheveux', description: 'Soins capillaires', icon: 'fa-cut' },
             { nom: 'Solaire', description: 'Protection solaire', icon: 'fa-sun' },
-            { nom: 'Intime', description: 'Hygiène intime', icon: 'fa-heart' },
+            { nom: 'Intime', description: 'HygiÃ¨ne intime', icon: 'fa-heart' },
             { nom: 'Soins', description: 'Soins corporels', icon: 'fa-spa' },
-            { nom: 'Bébé', description: 'Soins bébé', icon: 'fa-baby-carriage' },
+            { nom: 'BÃ©bÃ©', description: 'Soins bÃ©bÃ©', icon: 'fa-baby-carriage' },
             { nom: 'Homme', description: 'Soins masculins', icon: 'fa-user-tie' },
-            { nom: 'Dentaire', description: 'Hygiène dentaire', icon: 'fa-tooth' }
+            { nom: 'Dentaire', description: 'HygiÃ¨ne dentaire', icon: 'fa-tooth' }
         ];
         
         const categoriesGrid = document.getElementById('categoriesGrid');
@@ -291,7 +327,7 @@ class PharmacieGaherApp {
                     </div>
                     <h3 class="font-bold text-emerald-800 mb-2 text-sm lg:text-base">${category.nom}</h3>
                     <p class="text-xs lg:text-sm text-emerald-600 font-medium">${category.description}</p>
-                    ${index === 0 ? '<div class="mt-2"><span class="text-xs bg-emerald-500 text-white px-2 py-1 rounded-full font-semibold">★ POPULAIRE</span></div>' : ''}
+                    ${index === 0 ? '<div class="mt-2"><span class="text-xs bg-emerald-500 text-white px-2 py-1 rounded-full font-semibold">â˜… POPULAIRE</span></div>' : ''}
                 </div>
             `).join('');
         }
@@ -313,7 +349,7 @@ class PharmacieGaherApp {
                         <p class="text-emerald-600 mb-8">Ajoutez des produits en vedette depuis l'administration</p>
                         ${this.currentUser && this.currentUser.role === 'admin' ? `
                         <button onclick="app.showPage('admin')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                            <i class="fas fa-cog mr-2"></i>Aller à l'administration
+                            <i class="fas fa-cog mr-2"></i>Aller Ã  l'administration
                         </button>
                         ` : ''}
                     </div>
@@ -337,7 +373,7 @@ class PharmacieGaherApp {
                     <div class="col-span-full text-center py-16">
                         <i class="fas fa-tags text-6xl text-red-300 mb-6"></i>
                         <h3 class="text-2xl font-bold text-red-800 mb-4">Aucune promotion active</h3>
-                        <p class="text-red-600 mb-8">Créez des promotions depuis l'administration</p>
+                        <p class="text-red-600 mb-8">CrÃ©ez des promotions depuis l'administration</p>
                     </div>
                 `;
             } else {
@@ -360,9 +396,9 @@ class PharmacieGaherApp {
         } else {
             const getCategoryColor = (category) => {
                 const colors = {
-                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                    'VitalitÃ©': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
                     'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                    'BÃ©bÃ©': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
                     'Dentaire': '6366f1'
                 };
                 return colors[category] || '10b981';
@@ -454,7 +490,7 @@ class PharmacieGaherApp {
             const product = allProducts.find(p => p._id === productId);
             
             if (!product) {
-                throw new Error('Produit non trouvé');
+                throw new Error('Produit non trouvÃ©');
             }
             
             if (product.stock === 0) {
@@ -470,9 +506,9 @@ class PharmacieGaherApp {
             // Generate image URL
             const getCategoryColor = (category) => {
                 const colors = {
-                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                    'VitalitÃ©': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
                     'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                    'BÃ©bÃ©': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
                     'Dentaire': '6366f1'
                 };
                 return colors[category] || '10b981';
@@ -518,7 +554,7 @@ class PharmacieGaherApp {
             
             this.saveCart();
             this.updateCartUI();
-            this.showToast(`${product.nom} ajouté au panier`, 'success');
+            this.showToast(`${product.nom} ajoutÃ© au panier`, 'success');
             
         } catch (error) {
             console.error('Erreur ajout au panier:', error);
@@ -632,7 +668,7 @@ class PharmacieGaherApp {
             this.cart.splice(itemIndex, 1);
             this.saveCart();
             this.updateCartUI();
-            this.showToast(`${item.nom} retiré du panier`, 'success');
+            this.showToast(`${item.nom} retirÃ© du panier`, 'success');
         }
     }
     
@@ -640,7 +676,7 @@ class PharmacieGaherApp {
         this.cart = [];
         this.saveCart();
         this.updateCartUI();
-        this.showToast('Panier vidé', 'success');
+        this.showToast('Panier vidÃ©', 'success');
     }
     
     saveCart() {
@@ -659,7 +695,7 @@ class PharmacieGaherApp {
         localStorage.removeItem('token');
         this.currentUser = null;
         this.updateUserUI();
-        this.showToast('Déconnexion réussie', 'success');
+        this.showToast('DÃ©connexion rÃ©ussie', 'success');
         this.showPage('home');
     }
     
@@ -670,13 +706,13 @@ class PharmacieGaherApp {
             <div class="container mx-auto px-4 py-8 max-w-6xl">
                 <div class="text-center mb-12">
                     <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
-                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
+                    <p class="text-xl text-gray-600">Nous sommes lÃ  pour vous aider</p>
                 </div>
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     <div class="space-y-8">
                         <div>
-                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnées</h2>
+                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnÃ©es</h2>
                             
                             <div class="space-y-6">
                                 <div class="flex items-start space-x-4">
@@ -685,7 +721,7 @@ class PharmacieGaherApp {
                                     </div>
                                     <div>
                                         <h3 class="font-semibold text-gray-900">Adresse</h3>
-                                        <p class="text-gray-600">Tipaza, Algérie</p>
+                                        <p class="text-gray-600">Tipaza, AlgÃ©rie</p>
                                     </div>
                                 </div>
                                 
@@ -694,7 +730,7 @@ class PharmacieGaherApp {
                                         <i class="fas fa-phone text-white"></i>
                                     </div>
                                     <div>
-                                        <h3 class="font-semibold text-gray-900">Téléphone</h3>
+                                        <h3 class="font-semibold text-gray-900">TÃ©lÃ©phone</h3>
                                         <p class="text-gray-600">+213 123 456 789</p>
                                     </div>
                                 </div>
@@ -813,7 +849,7 @@ class PharmacieGaherApp {
     // Method to check if user is admin
     requireAdmin() {
         if (!this.currentUser || this.currentUser.role !== 'admin') {
-            this.showToast('Accès administrateur requis', 'error');
+            this.showToast('AccÃ¨s administrateur requis', 'error');
             this.showPage('home');
             return false;
         }
@@ -829,14 +865,14 @@ class PharmacieGaherApp {
             localStorage.removeItem('token');
             this.currentUser = null;
             this.updateUserUI();
-            this.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
+            this.showToast('Session expirÃ©e. Veuillez vous reconnecter.', 'warning');
             this.showPage('login');
         } else if (error.message.includes('403')) {
-            this.showToast('Accès refusé', 'error');
+            this.showToast('AccÃ¨s refusÃ©', 'error');
         } else if (error.message.includes('404')) {
-            this.showToast('Ressource non trouvée', 'error');
+            this.showToast('Ressource non trouvÃ©e', 'error');
         } else if (error.message.includes('500')) {
-            this.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
+            this.showToast('Erreur serveur. Veuillez rÃ©essayer plus tard.', 'error');
         } else {
             this.showToast(error.message || 'Une erreur est survenue', 'error');
         }
@@ -913,7 +949,7 @@ function handleContactForm(event) {
         event.target.reset();
         
         if (window.app) {
-            window.app.showToast('Message envoyé avec succès !', 'success');
+            window.app.showToast('Message envoyÃ© avec succÃ¨s !', 'success');
         }
     }, 2000);
 }
@@ -921,279 +957,6 @@ function handleContactForm(event) {
 function logout() {
     if (window.app) {
         window.app.logout();
-    }
-}
-
-// Admin helper functions
-function toggleAdminProducts() {
-    console.log('Toggling admin products view');
-    // This could expand to show product management interface
-    if (window.app) {
-        window.app.showToast('Gestion des produits - Fonctionnalité en développement', 'info');
-    }
-}
-
-function showAdminStats() {
-    console.log('Showing admin statistics');
-    if (window.app) {
-        window.app.showToast('Statistiques détaillées - Fonctionnalité en développement', 'info');
-    }
-}
-
-// Authentication functions
-async function handleLogin(event) {
-    event.preventDefault();
-    
-    const submitBtn = document.getElementById('loginSubmitBtn');
-    const submitText = document.getElementById('loginSubmitText');
-    const submitSpinner = document.getElementById('loginSubmitSpinner');
-    
-    if (!submitBtn || !submitText || !submitSpinner) {
-        console.error('Login form elements not found');
-        return;
-    }
-    
-    // Disable button and show loading
-    submitBtn.disabled = true;
-    submitText.textContent = 'Connexion...';
-    submitSpinner.classList.remove('hidden');
-    
-    try {
-        const formData = new FormData(event.target);
-        const email = formData.get('email');
-        const password = formData.get('password');
-        
-        // Check for admin credentials first (demo mode)
-        if (email === 'pharmaciegaher@gmail.com' && password === 'anesaya75') {
-            // Simulate admin login
-            const adminUser = {
-                _id: 'admin123',
-                prenom: 'Admin',
-                nom: 'Shifa',
-                email: 'pharmaciegaher@gmail.com',
-                role: 'admin'
-            };
-            
-            localStorage.setItem('token', 'demo-admin-token');
-            localStorage.setItem('currentUser', JSON.stringify(adminUser));
-            
-            if (window.app) {
-                window.app.currentUser = adminUser;
-                window.app.updateUserUI();
-                window.app.showToast('Connexion administrateur réussie !', 'success');
-                window.app.showPage('admin');
-            }
-            return;
-        }
-        
-        // Try API login
-        if (typeof buildApiUrl === 'function') {
-            try {
-                const response = await fetch(buildApiUrl('/auth/login'), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    localStorage.setItem('token', data.token);
-                    
-                    if (window.app) {
-                        window.app.currentUser = data.user;
-                        window.app.updateUserUI();
-                        window.app.showToast('Connexion réussie !', 'success');
-                        window.app.showPage('home');
-                    }
-                    return;
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.message || 'Erreur de connexion');
-                }
-            } catch (apiError) {
-                console.log('API login failed, using demo mode:', apiError.message);
-            }
-        }
-        
-        // Demo mode fallback
-        const demoUser = {
-            _id: 'demo123',
-            prenom: 'Demo',
-            nom: 'User',
-            email: email,
-            role: 'client'
-        };
-        
-        localStorage.setItem('token', 'demo-token');
-        localStorage.setItem('currentUser', JSON.stringify(demoUser));
-        
-        if (window.app) {
-            window.app.currentUser = demoUser;
-            window.app.updateUserUI();
-            window.app.showToast('Connexion démo réussie !', 'success');
-            window.app.showPage('home');
-        }
-        
-    } catch (error) {
-        console.error('Erreur login:', error);
-        if (window.app) {
-            window.app.showToast(error.message || 'Erreur de connexion', 'error');
-        }
-    } finally {
-        // Re-enable button
-        submitBtn.disabled = false;
-        submitText.textContent = 'Se connecter';
-        submitSpinner.classList.add('hidden');
-    }
-}
-
-async function handleRegister(event) {
-    event.preventDefault();
-    
-    const submitBtn = document.getElementById('registerSubmitBtn');
-    const submitText = document.getElementById('registerSubmitText');
-    const submitSpinner = document.getElementById('registerSubmitSpinner');
-    
-    if (!submitBtn || !submitText || !submitSpinner) {
-        console.error('Register form elements not found');
-        return;
-    }
-    
-    // Disable button and show loading
-    submitBtn.disabled = true;
-    submitText.textContent = 'Création du compte...';
-    submitSpinner.classList.remove('hidden');
-    
-    try {
-        const formData = new FormData(event.target);
-        const userData = {
-            prenom: formData.get('prenom'),
-            nom: formData.get('nom'),
-            email: formData.get('email'),
-            password: formData.get('password')
-        };
-        
-        // Try API registration
-        if (typeof buildApiUrl === 'function') {
-            try {
-                const response = await fetch(buildApiUrl('/auth/register'), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(userData)
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    localStorage.setItem('token', data.token);
-                    
-                    if (window.app) {
-                        window.app.currentUser = data.user;
-                        window.app.updateUserUI();
-                        window.app.showToast('Compte créé avec succès !', 'success');
-                        window.app.showPage('home');
-                    }
-                    return;
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.message || 'Erreur de création de compte');
-                }
-            } catch (apiError) {
-                console.log('API registration failed, using demo mode:', apiError.message);
-            }
-        }
-        
-        // Demo mode fallback
-        const demoUser = {
-            _id: 'demo' + Date.now(),
-            prenom: userData.prenom,
-            nom: userData.nom,
-            email: userData.email,
-            role: 'client'
-        };
-        
-        localStorage.setItem('token', 'demo-token-' + Date.now());
-        localStorage.setItem('currentUser', JSON.stringify(demoUser));
-        
-        if (window.app) {
-            window.app.currentUser = demoUser;
-            window.app.updateUserUI();
-            window.app.showToast('Compte démo créé avec succès !', 'success');
-            window.app.showPage('home');
-        }
-        
-    } catch (error) {
-        console.error('Erreur inscription:', error);
-        if (window.app) {
-            window.app.showToast(error.message || 'Erreur de création de compte', 'error');
-        }
-    } finally {
-        // Re-enable button
-        submitBtn.disabled = false;
-        submitText.textContent = 'Créer mon compte';
-        submitSpinner.classList.add('hidden');
-    }
-}
-
-async function handleCheckout(event) {
-    event.preventDefault();
-    
-    if (!window.app || window.app.cart.length === 0) {
-        if (window.app) {
-            window.app.showToast('Votre panier est vide', 'warning');
-        }
-        return;
-    }
-    
-    try {
-        const formData = new FormData(event.target);
-        const orderData = {
-            numeroCommande: 'CMD' + Date.now(),
-            client: {
-                prenom: formData.get('prenom'),
-                nom: formData.get('nom'),
-                email: formData.get('email'),
-                telephone: formData.get('telephone'),
-                adresse: formData.get('adresse'),
-                wilaya: formData.get('wilaya')
-            },
-            articles: window.app.cart.map(item => ({
-                id: item.id,
-                nom: item.nom,
-                prix: item.prix,
-                quantite: item.quantite,
-                image: item.image
-            })),
-            sousTotal: window.app.getCartTotal(),
-            fraisLivraison: window.app.getCartTotal() >= 5000 ? 0 : 300,
-            total: window.app.getCartTotal() + (window.app.getCartTotal() >= 5000 ? 0 : 300),
-            statut: 'en-attente',
-            modePaiement: 'Paiement à la livraison',
-            dateCommande: new Date().toISOString(),
-            commentaires: formData.get('commentaires') || ''
-        };
-        
-        // Save order to localStorage (demo mode)
-        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        orders.unshift(orderData);
-        localStorage.setItem('adminOrders', JSON.stringify(orders));
-        
-        // Clear cart
-        window.app.clearCart();
-        
-        // Show confirmation page
-        window.app.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
-        
-        window.app.showToast('Commande passée avec succès !', 'success');
-        
-    } catch (error) {
-        console.error('Erreur checkout:', error);
-        if (window.app) {
-            window.app.showToast('Erreur lors de la commande', 'error');
-        }
     }
 }
 
@@ -1206,4 +969,4 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('App initialized and made globally available');
 });
 
-console.log('✅ Updated app.js loaded with all 10 categories (Vitalité, Sport, Visage, Cheveux, Solaire, Intime, Soins, Bébé, Homme, Dentaire) on homepage');
+console.log('âœ… Updated app.js loaded with all 10 categories (VitalitÃ©, Sport, Visage, Cheveux, Solaire, Intime, Soins, BÃ©bÃ©, Homme, Dentaire) on homepage');
