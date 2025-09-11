@@ -1,5 +1,4 @@
-// Complete Fixed PharmacieGaherApp - app.js
-
+// Clean PharmacieGaherApp - Updated with 10 categories (Vitalité first)
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -172,76 +171,90 @@ class PharmacieGaherApp {
                 </div>
                 <div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-50 to-transparent"></div>
             </section>
-            
-            <section class="py-20 bg-gradient-to-b from-green-50 to-emerald-50 section-with-decoration">
+
+            <!-- Categories Section -->
+            <section class="py-20 bg-gradient-to-br from-green-50 to-emerald-100 relative">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-16">
-                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Spécialités Santé</h2>
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Spécialités</h2>
                         <p class="text-xl text-emerald-600 max-w-2xl mx-auto">
-                            Découvrez nos gammes spécialisées pour votre bien-être quotidien
+                            Découvrez notre large gamme de produits pour votre santé et votre beauté
                         </p>
                     </div>
-                    <div id="categoriesGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6" id="categoriesGrid">
+                        <!-- Categories will be loaded here -->
                     </div>
                 </div>
             </section>
-            
-            <section class="py-20 bg-gradient-to-b from-emerald-50 to-green-100">
+
+            <!-- Featured Products -->
+            <section class="py-20 bg-white relative">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-16">
-                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Coups de Cœur</h2>
-                        <p class="text-xl text-emerald-600">
-                            Nos produits les plus appréciés par nos clients
-                        </p>
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Coups de Cœur</h2>
+                        <p class="text-xl text-emerald-600">Produits sélectionnés avec soin pour votre bien-être</p>
                     </div>
-                    <div id="featuredProducts" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8" id="featuredProducts">
+                        <div class="col-span-full text-center py-8">
+                            <i class="fas fa-spinner fa-spin text-4xl text-emerald-400 mb-4"></i>
+                            <p class="text-emerald-600">Chargement des produits en vedette...</p>
+                        </div>
                     </div>
                 </div>
             </section>
-            
-            <section class="py-20 bg-gradient-to-b from-green-100 to-emerald-100">
+
+            <!-- Promotions -->
+            <section class="py-20 bg-gradient-to-br from-red-50 to-pink-100 relative">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-16">
-                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Offres Spéciales</h2>
-                        <p class="text-xl text-emerald-600">
-                            Profitez de nos promotions exclusives
-                        </p>
+                        <h2 class="text-4xl font-bold text-red-800 mb-4">Promotions Exceptionnelles</h2>
+                        <p class="text-xl text-red-600">Profitez de nos offres spéciales du moment</p>
                     </div>
-                    <div id="promotionProducts" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8" id="promotionProducts">
+                        <div class="col-span-full text-center py-8">
+                            <i class="fas fa-spinner fa-spin text-4xl text-red-400 mb-4"></i>
+                            <p class="text-red-600">Chargement des promotions...</p>
+                        </div>
                     </div>
                 </div>
             </section>
-            
-            <section class="py-20 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 text-white relative overflow-hidden">
-                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-green-600/30 to-teal-700/20"></div>
-                <div class="container mx-auto px-4 relative z-10">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
-                        <div class="text-center group">
-                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 border border-white/30">
-                                <i class="fas fa-truck-fast text-3xl drop-shadow-lg"></i>
+
+            <!-- Services Section -->
+            <section class="py-20 bg-emerald-800 text-white relative">
+                <div class="container mx-auto px-4">
+                    <div class="text-center mb-16">
+                        <h2 class="text-4xl font-bold mb-4">Pourquoi nous choisir ?</h2>
+                        <p class="text-xl text-emerald-200 max-w-2xl mx-auto">
+                            Des services de qualité pour votre satisfaction
+                        </p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div class="text-center">
+                            <div class="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                <i class="fas fa-shipping-fast text-3xl text-emerald-200"></i>
                             </div>
-                            <h3 class="text-2xl font-bold mb-4">Livraison Express</h3>
-                            <p class="text-lg opacity-90 text-green-100">
-                                Livraison rapide dans toute l'Algérie avec suivi en temps réel
-                            </p>
+                            <h3 class="text-xl font-bold mb-4">Livraison Rapide</h3>
+                            <p class="text-emerald-200">Livraison gratuite dès 5000 DA d'achat dans toute l'Algérie</p>
                         </div>
-                        <div class="text-center group">
-                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 border border-white/30">
-                                <i class="fas fa-certificate text-3xl drop-shadow-lg"></i>
+                        
+                        <div class="text-center">
+                            <div class="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                <i class="fas fa-certificate text-3xl text-emerald-200"></i>
                             </div>
-                            <h3 class="text-2xl font-bold mb-4">Qualité Certifiée</h3>
-                            <p class="text-lg opacity-90 text-green-100">
-                                Produits authentiques avec garantie qualité pharmaceutique
-                            </p>
+                            <h3 class="text-xl font-bold mb-4">Produits Certifiés</h3>
+                            <p class="text-emerald-200">Tous nos produits sont authentiques et de qualité pharmaceutique</p>
                         </div>
-                        <div class="text-center group">
-                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 border border-white/30">
-                                <i class="fas fa-user-md text-3xl drop-shadow-lg"></i>
+                        
+                        <div class="text-center">
+                            <div class="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                <i class="fas fa-headset text-3xl text-emerald-200"></i>
                             </div>
-                            <h3 class="text-2xl font-bold mb-4">Conseil Expert</h3>
-                            <p class="text-lg opacity-90 text-green-100">
-                                Accompagnement par nos pharmaciens qualifiés 24h/7j
-                            </p>
+                            <h3 class="text-xl font-bold mb-4">Support 24/7</h3>
+                            <p class="text-emerald-200">Notre équipe est disponible pour répondre à toutes vos questions</p>
                         </div>
                     </div>
                 </div>
@@ -254,6 +267,7 @@ class PharmacieGaherApp {
     }
     
     async loadCategories() {
+        // Show all 10 categories with Vitalité first
         const mainPageCategories = [
             { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
             { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
@@ -284,7 +298,9 @@ class PharmacieGaherApp {
     }
     
     async loadFeaturedProducts() {
+        // Get products from localStorage that include ALL categories
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        // Filter for featured products from all categories
         const filteredProducts = localProducts.filter(p => p.enVedette && p.actif !== false);
         
         const container = document.getElementById('featuredProducts');
@@ -309,7 +325,9 @@ class PharmacieGaherApp {
     }
     
     async loadPromotionProducts() {
+        // Get products from localStorage that include ALL categories  
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        // Filter for promotion products from all categories
         const promotionProducts = localProducts.filter(p => p.enPromotion && p.actif !== false);
         
         const container = document.getElementById('promotionProducts');
@@ -426,364 +444,12 @@ class PharmacieGaherApp {
         }
     }
     
-    async loadProductsPage(params = {}) {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">Nos Produits</h1>
-                    <p class="text-xl text-emerald-600">Découvrez notre gamme complète</p>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8" id="productsContainer">
-                    <div class="col-span-full text-center py-16">
-                        <i class="fas fa-pills text-6xl text-emerald-200 mb-6"></i>
-                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Produits disponibles bientôt</h3>
-                        <p class="text-emerald-600">Notre catalogue sera disponible prochainement</p>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadProductPage(productId) {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="text-center py-16">
-                    <i class="fas fa-pill text-6xl text-emerald-200 mb-6"></i>
-                    <h3 class="text-2xl font-bold text-emerald-800 mb-4">Détail du produit</h3>
-                    <p class="text-emerald-600">Chargement des informations produit...</p>
-                    <button onclick="app.showPage('products')" class="mt-6 bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600">
-                        Retour aux produits
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadLoginPage() {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-md">
-                <div class="bg-white rounded-2xl shadow-xl p-8">
-                    <div class="text-center mb-8">
-                        <h1 class="text-3xl font-bold text-emerald-800 mb-2">Connexion</h1>
-                        <p class="text-emerald-600">Accédez à votre compte</p>
-                    </div>
-                    
-                    <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-6">
-                        <div>
-                            <label for="loginEmail" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                            <input type="email" id="loginEmail" name="email" required 
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                   placeholder="votre@email.com">
-                        </div>
-                        
-                        <div>
-                            <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
-                            <input type="password" id="loginPassword" name="password" required 
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                   placeholder="Votre mot de passe">
-                        </div>
-                        
-                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-lg hover:from-emerald-600 hover:to-green-700 transition-all font-bold">
-                            Se connecter
-                        </button>
-                    </form>
-                    
-                    <div class="mt-6 text-center">
-                        <p class="text-gray-600">Pas de compte ? 
-                            <button onclick="app.showPage('register')" class="text-emerald-600 hover:text-emerald-700 font-medium">
-                                Créer un compte
-                            </button>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadRegisterPage() {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-md">
-                <div class="bg-white rounded-2xl shadow-xl p-8">
-                    <div class="text-center mb-8">
-                        <h1 class="text-3xl font-bold text-emerald-800 mb-2">Inscription</h1>
-                        <p class="text-emerald-600">Créez votre compte</p>
-                    </div>
-                    
-                    <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-6">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="registerPrenom" class="block text-sm font-medium text-gray-700 mb-2">Prénom</label>
-                                <input type="text" id="registerPrenom" name="prenom" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                            <div>
-                                <label for="registerNom" class="block text-sm font-medium text-gray-700 mb-2">Nom</label>
-                                <input type="text" id="registerNom" name="nom" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label for="registerEmail" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                            <input type="email" id="registerEmail" name="email" required 
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                        </div>
-                        
-                        <div>
-                            <label for="registerPassword" class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
-                            <input type="password" id="registerPassword" name="password" required 
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                        </div>
-                        
-                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-lg hover:from-emerald-600 hover:to-green-700 transition-all font-bold">
-                            Créer mon compte
-                        </button>
-                    </form>
-                    
-                    <div class="mt-6 text-center">
-                        <p class="text-gray-600">Déjà un compte ? 
-                            <button onclick="app.showPage('login')" class="text-emerald-600 hover:text-emerald-700 font-medium">
-                                Se connecter
-                            </button>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadCheckoutPage() {
-        const mainContent = document.getElementById('mainContent');
-        
-        if (this.cart.length === 0) {
-            mainContent.innerHTML = `
-                <div class="container mx-auto px-4 py-8">
-                    <div class="text-center py-16">
-                        <i class="fas fa-shopping-cart text-6xl text-emerald-200 mb-6"></i>
-                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Panier vide</h3>
-                        <p class="text-emerald-600 mb-8">Ajoutez des produits pour passer commande</p>
-                        <button onclick="app.showPage('products')" class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600">
-                            Voir les produits
-                        </button>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <h1 class="text-3xl font-bold text-emerald-800 mb-8">Finaliser ma commande</h1>
-                <div class="text-center py-16">
-                    <i class="fas fa-credit-card text-6xl text-emerald-200 mb-6"></i>
-                    <h3 class="text-2xl font-bold text-emerald-800 mb-4">Commande en développement</h3>
-                    <p class="text-emerald-600">Le processus de commande sera disponible prochainement</p>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadProfilePage() {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <h1 class="text-3xl font-bold text-emerald-800 mb-8">Mon Profil</h1>
-                <div class="text-center py-16">
-                    <i class="fas fa-user text-6xl text-emerald-200 mb-6"></i>
-                    <h3 class="text-2xl font-bold text-emerald-800 mb-4">Profil utilisateur</h3>
-                    <p class="text-emerald-600">Gestion du profil en développement</p>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadOrderConfirmationPage(orderNumber) {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="text-center py-16">
-                    <i class="fas fa-check-circle text-6xl text-green-500 mb-6"></i>
-                    <h3 class="text-2xl font-bold text-emerald-800 mb-4">Commande confirmée</h3>
-                    <p class="text-emerald-600">Numéro de commande: ${orderNumber || 'N/A'}</p>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadContactPage() {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
-                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
-                </div>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    <div class="space-y-8">
-                        <div>
-                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnées</h2>
-                            
-                            <div class="space-y-6">
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-map-marker-alt text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Adresse</h3>
-                                        <p class="text-gray-600">Tipaza, Algérie</p>
-                                    </div>
-                                </div>
-                                
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-phone text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Téléphone</h3>
-                                        <p class="text-gray-600">+213 123 456 789</p>
-                                    </div>
-                                </div>
-                                
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-envelope text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Email</h3>
-                                        <a href="mailto:pharmaciegaher@gmail.com" class="text-primary hover:text-secondary">
-                                            pharmaciegaher@gmail.com
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-lg shadow-lg p-8">
-                        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Envoyez-nous un message</h2>
-                        
-                        <form id="contactForm" onsubmit="handleContactForm(event)" class="space-y-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="contactName" class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
-                                    <input type="text" id="contactName" name="name" required class="form-input" placeholder="Votre nom complet">
-                                </div>
-                                <div>
-                                    <label for="contactEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                                    <input type="email" id="contactEmail" name="email" required class="form-input" placeholder="votre@email.com">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label for="contactMessage" class="block text-sm font-medium text-gray-700 mb-2">Message *</label>
-                                <textarea id="contactMessage" name="message" rows="5" required class="form-input resize-none" placeholder="Votre message..."></textarea>
-                            </div>
-                            
-                            <button type="submit" class="w-full btn-primary py-3" id="contactSubmitBtn">
-                                <span id="contactSubmitText">Envoyer le message</span>
-                                <i id="contactSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadAdminPage() {
-        if (!this.currentUser || this.currentUser.role !== 'admin') {
-            this.showToast('Accès refusé - Droits administrateur requis', 'error');
-            this.showPage('home');
-            return;
-        }
-
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <!-- Admin Header -->
-                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                        <div>
-                            <h1 class="text-4xl font-bold text-emerald-800 mb-2">Panel d'Administration</h1>
-                            <p class="text-emerald-600 text-lg">Gestion complète de Shifa - Parapharmacie</p>
-                        </div>
-                        <div class="flex items-center space-x-4">
-                            <div class="text-right">
-                                <p class="text-sm text-emerald-500">Connecté en tant que</p>
-                                <p class="font-bold text-emerald-800 text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
-                                <p class="text-sm text-emerald-600">${this.currentUser.email}</p>
-                            </div>
-                            <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/30">
-                                <i class="fas fa-user-shield text-white text-2xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Admin Content -->
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
-                    <h2 class="text-2xl font-bold text-emerald-800 mb-6">Administration temporaire</h2>
-                    <div class="text-center py-16">
-                        <i class="fas fa-tools text-6xl text-emerald-200 mb-6"></i>
-                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Panel d'administration</h3>
-                        <p class="text-emerald-600 mb-8">
-                            Le panel d'administration complet sera disponible une fois que les problèmes de backend seront résolus.
-                        </p>
-                        <p class="text-emerald-600 mb-8">
-                            Pour l'instant, vous pouvez utiliser le panel d'administration en remplaçant votre fichier admin.js 
-                            avec la version corrigée fournie.
-                        </p>
-                        
-                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mt-8">
-                            <h4 class="text-lg font-semibold text-blue-800 mb-4">Actions disponibles</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="bg-white p-4 rounded-lg border">
-                                    <h5 class="font-semibold text-gray-800 mb-2">Gestion des produits</h5>
-                                    <p class="text-gray-600 text-sm">Ajouter, modifier et gérer vos produits</p>
-                                    <button onclick="alert('Remplacez votre admin.js avec la version corrigée')" 
-                                            class="mt-2 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm">
-                                        Accéder
-                                    </button>
-                                </div>
-                                <div class="bg-white p-4 rounded-lg border">
-                                    <h5 class="font-semibold text-gray-800 mb-2">Gestion des commandes</h5>
-                                    <p class="text-gray-600 text-sm">Voir et gérer les commandes</p>
-                                    <button onclick="alert('Remplacez votre admin.js avec la version corrigée')" 
-                                            class="mt-2 bg-blue-500 text-white px-4 py-2 rounded-lg text-sm">
-                                        Accéder
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-8">
-                            <button onclick="app.showPage('home')" 
-                                    class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 transition-all">
-                                Retour à l'accueil
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
+    // ADD TO CART FUNCTIONALITY - FIXED
     async addToCart(productId, quantity = 1) {
         try {
             console.log('Adding to cart:', productId, quantity);
             
+            // Get all products from localStorage (includes all categories)
             const allProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             const product = allProducts.find(p => p._id === productId);
             
@@ -801,6 +467,7 @@ class PharmacieGaherApp {
                 return;
             }
             
+            // Generate image URL
             const getCategoryColor = (category) => {
                 const colors = {
                     'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
@@ -823,6 +490,7 @@ class PharmacieGaherApp {
                 imageUrl = `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
             }
             
+            // Check if product already in cart
             const existingIndex = this.cart.findIndex(item => item.id === productId);
             
             if (existingIndex > -1) {
@@ -995,6 +663,88 @@ class PharmacieGaherApp {
         this.showPage('home');
     }
     
+    async loadContactPage() {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
+                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div class="space-y-8">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnées</h2>
+                            
+                            <div class="space-y-6">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-map-marker-alt text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Adresse</h3>
+                                        <p class="text-gray-600">Tipaza, Algérie</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-phone text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Téléphone</h3>
+                                        <p class="text-gray-600">+213 123 456 789</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-envelope text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Email</h3>
+                                        <a href="mailto:pharmaciegaher@gmail.com" class="text-primary hover:text-secondary">
+                                            pharmaciegaher@gmail.com
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-lg p-8">
+                        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Envoyez-nous un message</h2>
+                        
+                        <form id="contactForm" onsubmit="handleContactForm(event)" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="contactName" class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
+                                    <input type="text" id="contactName" name="name" required class="form-input" placeholder="Votre nom complet">
+                                </div>
+                                <div>
+                                    <label for="contactEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                                    <input type="email" id="contactEmail" name="email" required class="form-input" placeholder="votre@email.com">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label for="contactMessage" class="block text-sm font-medium text-gray-700 mb-2">Message *</label>
+                                <textarea id="contactMessage" name="message" rows="5" required class="form-input resize-none" placeholder="Votre message..."></textarea>
+                            </div>
+                            
+                            <button type="submit" class="w-full btn-primary py-3" id="contactSubmitBtn">
+                                <span id="contactSubmitText">Envoyer le message</span>
+                                <i id="contactSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
     showLoading() {
         const spinner = document.getElementById('loadingSpinner');
         if (spinner) {
@@ -1049,9 +799,51 @@ class PharmacieGaherApp {
         };
         return icons[type] || icons.info;
     }
+    
+    // Method to check if user is authenticated for protected actions
+    requireAuth() {
+        if (!this.currentUser) {
+            this.showToast('Veuillez vous connecter pour continuer', 'warning');
+            this.showPage('login');
+            return false;
+        }
+        return true;
+    }
+    
+    // Method to check if user is admin
+    requireAdmin() {
+        if (!this.currentUser || this.currentUser.role !== 'admin') {
+            this.showToast('Accès administrateur requis', 'error');
+            this.showPage('home');
+            return false;
+        }
+        return true;
+    }
+    
+    // Enhanced error handling for authentication
+    handleAuthError(error, context = '') {
+        console.error(`Auth Error ${context}:`, error);
+        
+        if (error.message.includes('401') || error.message.includes('Token invalide')) {
+            // Token expired or invalid
+            localStorage.removeItem('token');
+            this.currentUser = null;
+            this.updateUserUI();
+            this.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
+            this.showPage('login');
+        } else if (error.message.includes('403')) {
+            this.showToast('Accès refusé', 'error');
+        } else if (error.message.includes('404')) {
+            this.showToast('Ressource non trouvée', 'error');
+        } else if (error.message.includes('500')) {
+            this.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
+        } else {
+            this.showToast(error.message || 'Une erreur est survenue', 'error');
+        }
+    }
 }
 
-// Global functions that work properly
+// Global functions - CRITICAL FIXES
 function addToCartFromCard(productId, quantity = 1) {
     console.log('Add to cart from card called:', productId);
     if (window.app && typeof window.app.addToCart === 'function') {
@@ -1126,47 +918,19 @@ function handleContactForm(event) {
     }, 2000);
 }
 
-function handleLogin(event) {
-    event.preventDefault();
-    
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    
-    if (email === 'pharmaciegaher@gmail.com' && password === 'anesaya75') {
-        window.app.currentUser = {
-            id: 'demo_admin',
-            nom: 'Gaher',
-            prenom: 'Parapharmacie',
-            email: 'pharmaciegaher@gmail.com',
-            role: 'admin'
-        };
-        
-        localStorage.setItem('token', 'demo-token');
-        window.app.updateUserUI();
-        window.app.showToast('Connexion réussie !', 'success');
-        window.app.showPage('admin');
-    } else {
-        window.app.showToast('Email ou mot de passe incorrect', 'error');
-    }
-}
-
-function handleRegister(event) {
-    event.preventDefault();
-    window.app.showToast('Inscription réussie !', 'success');
-    window.app.showPage('login');
-}
-
 function logout() {
     if (window.app) {
         window.app.logout();
     }
 }
 
-// Single initialization
+// Initialize app
+let app;
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing app...');
-    window.app = new PharmacieGaherApp();
+    app = new PharmacieGaherApp();
+    window.app = app;
     console.log('App initialized and made globally available');
 });
 
-console.log('Complete app.js loaded - All functionality should work properly');
+console.log('✅ Updated app.js loaded with all 10 categories (Vitalité, Sport, Visage, Cheveux, Solaire, Intime, Soins, Bébé, Homme, Dentaire) on homepage');
