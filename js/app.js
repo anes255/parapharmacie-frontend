@@ -1,4 +1,4 @@
-// Clean PharmacieGaherApp - Updated with 10 categories (VitalitÃ© first)
+// Clean PharmacieGaherApp - Updated with proper admin integration
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -44,7 +44,7 @@ class PharmacieGaherApp {
                     localStorage.removeItem('token');
                 }
             } catch (error) {
-                console.error('Erreur vÃ©rification auth:', error);
+                console.error('Erreur vérification auth:', error);
                 localStorage.removeItem('token');
             }
         }
@@ -122,7 +122,7 @@ class PharmacieGaherApp {
                     break;
                 case 'admin':
                     if (!this.currentUser || this.currentUser.role !== 'admin') {
-                        this.showToast('AccÃ¨s refusÃ©', 'error');
+                        this.showToast('Accès refusé', 'error');
                         await this.showPage('home');
                         return;
                     }
@@ -138,91 +138,6 @@ class PharmacieGaherApp {
             this.hideLoading();
             this.showToast('Erreur de chargement de la page', 'error');
         }
-    }
-    
-    // Basic admin page loader - will be enhanced by admin.js
-    async loadAdminPage() {
-        if (!this.currentUser || this.currentUser.role !== 'admin') {
-            this.showToast('AccÃ¨s refusÃ© - Droits administrateur requis', 'error');
-            this.showPage('home');
-            return;
-        }
-
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <!-- Admin Header -->
-                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                        <div>
-                            <h1 class="text-4xl font-bold text-emerald-800 mb-2">Panel d'Administration</h1>
-                            <p class="text-emerald-600 text-lg">Gestion complÃ¨te de Shifa - Parapharmacie </p>
-                        </div>
-                        <div class="flex items-center space-x-4">
-                            <div class="text-right">
-                                <p class="text-sm text-emerald-500">ConnectÃ© en tant que</p>
-                                <p class="font-bold text-emerald-800 text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
-                                <p class="text-sm text-emerald-600">${this.currentUser.email}</p>
-                            </div>
-                            <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/30">
-                                <i class="fas fa-user-shield text-white text-2xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Loading Admin Content -->
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8 text-center">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-                    <p class="text-emerald-600">Chargement du panel d'administration...</p>
-                </div>
-            </div>
-        `;
-        
-        // Wait for admin.js to load and then call the enhanced admin loader
-        setTimeout(() => {
-            if (typeof window.loadAdminDashboard === 'function') {
-                window.loadAdminDashboard();
-            } else {
-                this.loadBasicAdminDashboard();
-            }
-        }, 100);
-    }
-    
-    // Basic dashboard if admin.js is not loaded
-    loadBasicAdminDashboard() {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-2">Panel d'Administration</h1>
-                    <p class="text-emerald-600 text-lg">Gestion complÃ¨te de Shifa - Parapharmacie</p>
-                </div>
-                
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
-                    <h2 class="text-2xl font-bold text-emerald-800 mb-6">Tableau de bord</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-6">
-                            <h3 class="text-lg font-semibold text-blue-800 mb-2">Produits</h3>
-                            <p class="text-3xl font-bold text-blue-600">${JSON.parse(localStorage.getItem('demoProducts') || '[]').length}</p>
-                        </div>
-                        <div class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-2xl p-6">
-                            <h3 class="text-lg font-semibold text-green-800 mb-2">Commandes</h3>
-                            <p class="text-3xl font-bold text-green-600">${JSON.parse(localStorage.getItem('adminOrders') || '[]').length}</p>
-                        </div>
-                        <div class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-2xl p-6">
-                            <h3 class="text-lg font-semibold text-purple-800 mb-2">Panel complet</h3>
-                            <p class="text-sm text-purple-600">Rechargez la page pour accÃ©der aux fonctionnalitÃ©s complÃ¨tes</p>
-                        </div>
-                        <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-6">
-                            <h3 class="text-lg font-semibold text-yellow-800 mb-2">Statut</h3>
-                            <p class="text-sm text-yellow-600">Mode basique</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
     }
     
     async loadHomePage() {
@@ -244,7 +159,7 @@ class PharmacieGaherApp {
                             Parapharmacie
                         </h2>
                         <p class="text-xl md:text-2xl mb-12 opacity-90 text-green-50">
-                            Votre bien-Ãªtre, notre mission naturelle
+                            Votre bien-être, notre mission naturelle
                         </p>
                         <div class="flex justify-center">
                             <button onclick="app.showPage('products')" class="btn-primary bg-white text-emerald-600 hover:bg-green-50 text-lg px-10 py-5 transform hover:scale-105">
@@ -261,36 +176,36 @@ class PharmacieGaherApp {
             <section class="py-16 bg-gradient-to-br from-green-50 to-emerald-100">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
-                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos CatÃ©gories</h2>
-                        <p class="text-xl text-emerald-600">DÃ©couvrez notre large gamme de produits</p>
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Catégories</h2>
+                        <p class="text-xl text-emerald-600">Découvrez notre gamme complète de produits</p>
                     </div>
-                    <div id="categoriesGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-6">
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="categoriesGrid">
                         <!-- Categories will be loaded here -->
                     </div>
                 </div>
             </section>
             
-            <!-- Featured Products Section -->
+            <!-- Featured Products -->
             <section class="py-16 bg-white">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
-                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Coups de Coeur</h2>
-                        <p class="text-xl text-emerald-600">SÃ©lection spÃ©ciale de nos meilleurs produits</p>
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Coups de Cœur</h2>
+                        <p class="text-xl text-emerald-600">Produits sélectionnés pour vous</p>
                     </div>
-                    <div id="featuredProducts" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="featuredProducts">
                         <!-- Featured products will be loaded here -->
                     </div>
                 </div>
             </section>
             
-            <!-- Promotions Section -->
+            <!-- Promotions -->
             <section class="py-16 bg-gradient-to-br from-red-50 to-pink-100">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
                         <h2 class="text-4xl font-bold text-red-800 mb-4">Promotions</h2>
-                        <p class="text-xl text-red-600">Profitez de nos offres exceptionnelles</p>
+                        <p class="text-xl text-red-600">Offres spéciales et réductions</p>
                     </div>
-                    <div id="promotionProducts" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="promotionProducts">
                         <!-- Promotion products will be loaded here -->
                     </div>
                 </div>
@@ -303,18 +218,18 @@ class PharmacieGaherApp {
     }
     
     async loadCategories() {
-        // Show all 10 categories with VitalitÃ© first
+        // Show all 10 categories with Vitalité first
         const mainPageCategories = [
-            { nom: 'VitalitÃ©', description: 'Vitamines & Ã‰nergie', icon: 'fa-seedling' },
+            { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
             { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
             { nom: 'Visage', description: 'Soins du visage', icon: 'fa-smile' },
             { nom: 'Cheveux', description: 'Soins capillaires', icon: 'fa-cut' },
             { nom: 'Solaire', description: 'Protection solaire', icon: 'fa-sun' },
-            { nom: 'Intime', description: 'HygiÃ¨ne intime', icon: 'fa-heart' },
+            { nom: 'Intime', description: 'Hygiène intime', icon: 'fa-heart' },
             { nom: 'Soins', description: 'Soins corporels', icon: 'fa-spa' },
-            { nom: 'BÃ©bÃ©', description: 'Soins bÃ©bÃ©', icon: 'fa-baby-carriage' },
+            { nom: 'Bébé', description: 'Soins bébé', icon: 'fa-baby-carriage' },
             { nom: 'Homme', description: 'Soins masculins', icon: 'fa-user-tie' },
-            { nom: 'Dentaire', description: 'HygiÃ¨ne dentaire', icon: 'fa-tooth' }
+            { nom: 'Dentaire', description: 'Hygiène dentaire', icon: 'fa-tooth' }
         ];
         
         const categoriesGrid = document.getElementById('categoriesGrid');
@@ -327,7 +242,7 @@ class PharmacieGaherApp {
                     </div>
                     <h3 class="font-bold text-emerald-800 mb-2 text-sm lg:text-base">${category.nom}</h3>
                     <p class="text-xs lg:text-sm text-emerald-600 font-medium">${category.description}</p>
-                    ${index === 0 ? '<div class="mt-2"><span class="text-xs bg-emerald-500 text-white px-2 py-1 rounded-full font-semibold">â˜… POPULAIRE</span></div>' : ''}
+                    ${index === 0 ? '<div class="mt-2"><span class="text-xs bg-emerald-500 text-white px-2 py-1 rounded-full font-semibold">★ POPULAIRE</span></div>' : ''}
                 </div>
             `).join('');
         }
@@ -349,7 +264,7 @@ class PharmacieGaherApp {
                         <p class="text-emerald-600 mb-8">Ajoutez des produits en vedette depuis l'administration</p>
                         ${this.currentUser && this.currentUser.role === 'admin' ? `
                         <button onclick="app.showPage('admin')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                            <i class="fas fa-cog mr-2"></i>Aller Ã  l'administration
+                            <i class="fas fa-cog mr-2"></i>Aller à l'administration
                         </button>
                         ` : ''}
                     </div>
@@ -373,7 +288,7 @@ class PharmacieGaherApp {
                     <div class="col-span-full text-center py-16">
                         <i class="fas fa-tags text-6xl text-red-300 mb-6"></i>
                         <h3 class="text-2xl font-bold text-red-800 mb-4">Aucune promotion active</h3>
-                        <p class="text-red-600 mb-8">CrÃ©ez des promotions depuis l'administration</p>
+                        <p class="text-red-600 mb-8">Créez des promotions depuis l'administration</p>
                     </div>
                 `;
             } else {
@@ -396,9 +311,9 @@ class PharmacieGaherApp {
         } else {
             const getCategoryColor = (category) => {
                 const colors = {
-                    'VitalitÃ©': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
                     'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-                    'BÃ©bÃ©': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
                     'Dentaire': '6366f1'
                 };
                 return colors[category] || '10b981';
@@ -490,7 +405,7 @@ class PharmacieGaherApp {
             const product = allProducts.find(p => p._id === productId);
             
             if (!product) {
-                throw new Error('Produit non trouvÃ©');
+                throw new Error('Produit non trouvé');
             }
             
             if (product.stock === 0) {
@@ -506,9 +421,9 @@ class PharmacieGaherApp {
             // Generate image URL
             const getCategoryColor = (category) => {
                 const colors = {
-                    'VitalitÃ©': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
                     'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-                    'BÃ©bÃ©': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
                     'Dentaire': '6366f1'
                 };
                 return colors[category] || '10b981';
@@ -554,7 +469,7 @@ class PharmacieGaherApp {
             
             this.saveCart();
             this.updateCartUI();
-            this.showToast(`${product.nom} ajoutÃ© au panier`, 'success');
+            this.showToast(`${product.nom} ajouté au panier`, 'success');
             
         } catch (error) {
             console.error('Erreur ajout au panier:', error);
@@ -668,7 +583,7 @@ class PharmacieGaherApp {
             this.cart.splice(itemIndex, 1);
             this.saveCart();
             this.updateCartUI();
-            this.showToast(`${item.nom} retirÃ© du panier`, 'success');
+            this.showToast(`${item.nom} retiré du panier`, 'success');
         }
     }
     
@@ -676,7 +591,7 @@ class PharmacieGaherApp {
         this.cart = [];
         this.saveCart();
         this.updateCartUI();
-        this.showToast('Panier vidÃ©', 'success');
+        this.showToast('Panier vidé', 'success');
     }
     
     saveCart() {
@@ -695,7 +610,7 @@ class PharmacieGaherApp {
         localStorage.removeItem('token');
         this.currentUser = null;
         this.updateUserUI();
-        this.showToast('DÃ©connexion rÃ©ussie', 'success');
+        this.showToast('Déconnexion réussie', 'success');
         this.showPage('home');
     }
     
@@ -706,13 +621,13 @@ class PharmacieGaherApp {
             <div class="container mx-auto px-4 py-8 max-w-6xl">
                 <div class="text-center mb-12">
                     <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
-                    <p class="text-xl text-gray-600">Nous sommes lÃ  pour vous aider</p>
+                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
                 </div>
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     <div class="space-y-8">
                         <div>
-                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnÃ©es</h2>
+                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnées</h2>
                             
                             <div class="space-y-6">
                                 <div class="flex items-start space-x-4">
@@ -721,7 +636,7 @@ class PharmacieGaherApp {
                                     </div>
                                     <div>
                                         <h3 class="font-semibold text-gray-900">Adresse</h3>
-                                        <p class="text-gray-600">Tipaza, AlgÃ©rie</p>
+                                        <p class="text-gray-600">Tipaza, Algérie</p>
                                     </div>
                                 </div>
                                 
@@ -730,7 +645,7 @@ class PharmacieGaherApp {
                                         <i class="fas fa-phone text-white"></i>
                                     </div>
                                     <div>
-                                        <h3 class="font-semibold text-gray-900">TÃ©lÃ©phone</h3>
+                                        <h3 class="font-semibold text-gray-900">Téléphone</h3>
                                         <p class="text-gray-600">+213 123 456 789</p>
                                     </div>
                                 </div>
@@ -779,6 +694,215 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
+    }
+    
+    // ADMIN METHODS - These need to be part of the main app class
+    async loadAdminPage() {
+        if (!this.currentUser || this.currentUser.role !== 'admin') {
+            this.showToast('Accès refusé - Droits administrateur requis', 'error');
+            this.showPage('home');
+            return;
+        }
+
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <!-- Admin Header -->
+                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                        <div>
+                            <h1 class="text-4xl font-bold text-emerald-800 mb-2">Panel d'Administration</h1>
+                            <p class="text-emerald-600 text-lg">Gestion complète de Shifa - Parapharmacie</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-sm text-emerald-500">Connecté en tant que</p>
+                                <p class="font-bold text-emerald-800 text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
+                                <p class="text-sm text-emerald-600">${this.currentUser.email}</p>
+                            </div>
+                            <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/30">
+                                <i class="fas fa-user-shield text-white text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Navigation Admin -->
+                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 mb-8 overflow-hidden">
+                    <nav class="flex flex-wrap">
+                        <button onclick="switchAdminSection('dashboard')" 
+                                class="admin-nav-btn dashboard flex-1 min-w-max px-6 py-4 text-sm font-bold bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+                            <i class="fas fa-chart-line mr-2"></i>Tableau de bord
+                        </button>
+                        <button onclick="switchAdminSection('products')" 
+                                class="admin-nav-btn products flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
+                            <i class="fas fa-pills mr-2"></i>Produits
+                        </button>
+                        <button onclick="switchAdminSection('orders')" 
+                                class="admin-nav-btn orders flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
+                            <i class="fas fa-shopping-bag mr-2"></i>Commandes
+                        </button>
+                        <button onclick="switchAdminSection('featured')" 
+                                class="admin-nav-btn featured flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
+                            <i class="fas fa-star mr-2"></i>Coups de Coeur
+                        </button>
+                        <button onclick="switchAdminSection('cleanup')" 
+                                class="admin-nav-btn cleanup flex-1 min-w-max px-6 py-4 text-sm font-semibold text-red-700 hover:bg-red-50 transition-all">
+                            <i class="fas fa-broom mr-2"></i>Nettoyage
+                        </button>
+                    </nav>
+                </div>
+                
+                <!-- Admin Content -->
+                <div id="adminContent" class="min-h-96">
+                    <!-- Content will be loaded here -->
+                </div>
+            </div>
+        `;
+        
+        await this.loadAdminDashboard();
+    }
+    
+    async loadAdminDashboard() {
+        try {
+            // Initialize default products if needed
+            this.initializeDefaultProducts();
+            
+            // Get stats from localStorage
+            const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            
+            let stats = {
+                totalProducts: products.length,
+                totalOrders: adminOrders.length,
+                pendingOrders: adminOrders.filter(o => o.statut === 'en-attente').length,
+                totalUsers: 1,
+                monthlyRevenue: adminOrders.reduce((sum, o) => sum + (o.total || 0), 0)
+            };
+
+            try {
+                const data = await apiCall('/admin/dashboard');
+                if (data && data.stats) {
+                    stats = { ...stats, ...data.stats };
+                }
+            } catch (error) {
+                console.log('API unavailable, using local stats');
+            }
+            
+            document.getElementById('adminContent').innerHTML = `
+                <!-- Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-blue-600 uppercase tracking-wide">Produits</p>
+                                <p class="text-3xl font-bold text-blue-800">${stats.totalProducts}</p>
+                                <p class="text-xs text-blue-500 mt-1">Total actifs</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-pills text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-green-600 uppercase tracking-wide">Commandes</p>
+                                <p class="text-3xl font-bold text-green-800">${stats.totalOrders}</p>
+                                <p class="text-xs text-green-500 mt-1">Total reçues</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-shopping-bag text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-yellow-600 uppercase tracking-wide">En attente</p>
+                                <p class="text-3xl font-bold text-yellow-800">${stats.pendingOrders}</p>
+                                <p class="text-xs text-yellow-500 mt-1">Commandes</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-clock text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-purple-600 uppercase tracking-wide">Revenus</p>
+                                <p class="text-3xl font-bold text-purple-800">${stats.monthlyRevenue} DA</p>
+                                <p class="text-xs text-purple-500 mt-1">Ce mois</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-coins text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('products')">
+                        <i class="fas fa-plus-circle text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Gérer les produits</h3>
+                        <p class="text-emerald-100">Ajouter, modifier et gérer vos produits</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('orders')">
+                        <i class="fas fa-shopping-bag text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Commandes</h3>
+                        <p class="text-blue-100">Voir et gérer les commandes</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('featured')">
+                        <i class="fas fa-star text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Coups de Coeur</h3>
+                        <p class="text-yellow-100">Gérer les produits mis en avant</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('cleanup')">
+                        <i class="fas fa-broom text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Nettoyage</h3>
+                        <p class="text-red-100">Supprimer produits indésirables</p>
+                    </div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+            document.getElementById('adminContent').innerHTML = `
+                <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                    <p class="text-red-800">Erreur de chargement du tableau de bord</p>
+                </div>
+            `;
+        }
+    }
+    
+    // Initialize default products if localStorage is empty
+    initializeDefaultProducts() {
+        const existingProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        
+        if (existingProducts.length === 0) {
+            const defaultProducts = [
+                { _id: '1', nom: 'Multivitamines VitalForce', prix: 2800, categorie: 'Vitalité', marque: 'Shifa', stock: 50, enVedette: true, actif: true, description: 'Complexe de vitamines et minéraux pour votre bien-être quotidien' },
+                { _id: '2', nom: 'Shampoing Anti-Chute L\'Oréal', prix: 2500, categorie: 'Cheveux', marque: 'L\'Oréal', stock: 25, actif: true, description: 'Shampoing fortifiant pour cheveux fragiles' },
+                { _id: '3', nom: 'Crème Hydratante Visage Avène', prix: 3200, categorie: 'Visage', marque: 'Avène', stock: 30, enVedette: true, actif: true, description: 'Crème hydratante apaisante pour tous types de peau' },
+                { _id: '4', nom: 'Lait Nettoyant Bébé Mustela', prix: 1800, categorie: 'Bébé', marque: 'Mustela', stock: 20, actif: true, description: 'Lait nettoyant doux pour la peau délicate de bébé' },
+                { _id: '5', nom: 'Crème Solaire SPF 50+ La Roche Posay', prix: 4500, categorie: 'Solaire', marque: 'La Roche Posay', stock: 15, enVedette: true, actif: true, description: 'Protection solaire très haute pour toute la famille' },
+                { _id: '6', nom: 'Dentifrice Sensodyne Protection Complète', prix: 950, categorie: 'Dentaire', marque: 'Sensodyne', stock: 40, actif: true, description: 'Dentifrice pour dents sensibles avec protection renforcée' },
+                { _id: '7', nom: 'Gel Nettoyant Intime Saforelle', prix: 1600, categorie: 'Intime', marque: 'Saforelle', stock: 22, actif: true, description: 'Gel doux pour l\'hygiène intime quotidienne' },
+                { _id: '8', nom: 'Gel Douche Homme Vichy', prix: 1400, categorie: 'Homme', marque: 'Vichy', stock: 18, actif: true, description: 'Gel douche hydratant pour la peau masculine' },
+                { _id: '9', nom: 'Protéine Whey Sport Nutrition', prix: 3500, categorie: 'Sport', marque: 'SportMax', stock: 25, enVedette: true, actif: true, description: 'Protéine en poudre pour sportifs et amateurs de fitness' }
+            ];
+            localStorage.setItem('demoProducts', JSON.stringify(defaultProducts));
+            console.log('Default products initialized with all categories');
+        }
     }
     
     showLoading() {
@@ -849,7 +973,7 @@ class PharmacieGaherApp {
     // Method to check if user is admin
     requireAdmin() {
         if (!this.currentUser || this.currentUser.role !== 'admin') {
-            this.showToast('AccÃ¨s administrateur requis', 'error');
+            this.showToast('Accès administrateur requis', 'error');
             this.showPage('home');
             return false;
         }
@@ -865,14 +989,14 @@ class PharmacieGaherApp {
             localStorage.removeItem('token');
             this.currentUser = null;
             this.updateUserUI();
-            this.showToast('Session expirÃ©e. Veuillez vous reconnecter.', 'warning');
+            this.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
             this.showPage('login');
         } else if (error.message.includes('403')) {
-            this.showToast('AccÃ¨s refusÃ©', 'error');
+            this.showToast('Accès refusé', 'error');
         } else if (error.message.includes('404')) {
-            this.showToast('Ressource non trouvÃ©e', 'error');
+            this.showToast('Ressource non trouvée', 'error');
         } else if (error.message.includes('500')) {
-            this.showToast('Erreur serveur. Veuillez rÃ©essayer plus tard.', 'error');
+            this.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
         } else {
             this.showToast(error.message || 'Une erreur est survenue', 'error');
         }
@@ -949,7 +1073,7 @@ function handleContactForm(event) {
         event.target.reset();
         
         if (window.app) {
-            window.app.showToast('Message envoyÃ© avec succÃ¨s !', 'success');
+            window.app.showToast('Message envoyé avec succès !', 'success');
         }
     }, 2000);
 }
@@ -969,4 +1093,4 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('App initialized and made globally available');
 });
 
-console.log('âœ… Updated app.js loaded with all 10 categories (VitalitÃ©, Sport, Visage, Cheveux, Solaire, Intime, Soins, BÃ©bÃ©, Homme, Dentaire) on homepage');
+console.log('✅ Fixed app.js loaded with proper admin integration');
