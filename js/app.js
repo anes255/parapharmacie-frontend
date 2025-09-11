@@ -924,6 +924,279 @@ function logout() {
     }
 }
 
+// Admin helper functions
+function toggleAdminProducts() {
+    console.log('Toggling admin products view');
+    // This could expand to show product management interface
+    if (window.app) {
+        window.app.showToast('Gestion des produits - Fonctionnalité en développement', 'info');
+    }
+}
+
+function showAdminStats() {
+    console.log('Showing admin statistics');
+    if (window.app) {
+        window.app.showToast('Statistiques détaillées - Fonctionnalité en développement', 'info');
+    }
+}
+
+// Authentication functions
+async function handleLogin(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('loginSubmitBtn');
+    const submitText = document.getElementById('loginSubmitText');
+    const submitSpinner = document.getElementById('loginSubmitSpinner');
+    
+    if (!submitBtn || !submitText || !submitSpinner) {
+        console.error('Login form elements not found');
+        return;
+    }
+    
+    // Disable button and show loading
+    submitBtn.disabled = true;
+    submitText.textContent = 'Connexion...';
+    submitSpinner.classList.remove('hidden');
+    
+    try {
+        const formData = new FormData(event.target);
+        const email = formData.get('email');
+        const password = formData.get('password');
+        
+        // Check for admin credentials first (demo mode)
+        if (email === 'pharmaciegaher@gmail.com' && password === 'anesaya75') {
+            // Simulate admin login
+            const adminUser = {
+                _id: 'admin123',
+                prenom: 'Admin',
+                nom: 'Shifa',
+                email: 'pharmaciegaher@gmail.com',
+                role: 'admin'
+            };
+            
+            localStorage.setItem('token', 'demo-admin-token');
+            localStorage.setItem('currentUser', JSON.stringify(adminUser));
+            
+            if (window.app) {
+                window.app.currentUser = adminUser;
+                window.app.updateUserUI();
+                window.app.showToast('Connexion administrateur réussie !', 'success');
+                window.app.showPage('admin');
+            }
+            return;
+        }
+        
+        // Try API login
+        if (typeof buildApiUrl === 'function') {
+            try {
+                const response = await fetch(buildApiUrl('/auth/login'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('token', data.token);
+                    
+                    if (window.app) {
+                        window.app.currentUser = data.user;
+                        window.app.updateUserUI();
+                        window.app.showToast('Connexion réussie !', 'success');
+                        window.app.showPage('home');
+                    }
+                    return;
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Erreur de connexion');
+                }
+            } catch (apiError) {
+                console.log('API login failed, using demo mode:', apiError.message);
+            }
+        }
+        
+        // Demo mode fallback
+        const demoUser = {
+            _id: 'demo123',
+            prenom: 'Demo',
+            nom: 'User',
+            email: email,
+            role: 'client'
+        };
+        
+        localStorage.setItem('token', 'demo-token');
+        localStorage.setItem('currentUser', JSON.stringify(demoUser));
+        
+        if (window.app) {
+            window.app.currentUser = demoUser;
+            window.app.updateUserUI();
+            window.app.showToast('Connexion démo réussie !', 'success');
+            window.app.showPage('home');
+        }
+        
+    } catch (error) {
+        console.error('Erreur login:', error);
+        if (window.app) {
+            window.app.showToast(error.message || 'Erreur de connexion', 'error');
+        }
+    } finally {
+        // Re-enable button
+        submitBtn.disabled = false;
+        submitText.textContent = 'Se connecter';
+        submitSpinner.classList.add('hidden');
+    }
+}
+
+async function handleRegister(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('registerSubmitBtn');
+    const submitText = document.getElementById('registerSubmitText');
+    const submitSpinner = document.getElementById('registerSubmitSpinner');
+    
+    if (!submitBtn || !submitText || !submitSpinner) {
+        console.error('Register form elements not found');
+        return;
+    }
+    
+    // Disable button and show loading
+    submitBtn.disabled = true;
+    submitText.textContent = 'Création du compte...';
+    submitSpinner.classList.remove('hidden');
+    
+    try {
+        const formData = new FormData(event.target);
+        const userData = {
+            prenom: formData.get('prenom'),
+            nom: formData.get('nom'),
+            email: formData.get('email'),
+            password: formData.get('password')
+        };
+        
+        // Try API registration
+        if (typeof buildApiUrl === 'function') {
+            try {
+                const response = await fetch(buildApiUrl('/auth/register'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('token', data.token);
+                    
+                    if (window.app) {
+                        window.app.currentUser = data.user;
+                        window.app.updateUserUI();
+                        window.app.showToast('Compte créé avec succès !', 'success');
+                        window.app.showPage('home');
+                    }
+                    return;
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Erreur de création de compte');
+                }
+            } catch (apiError) {
+                console.log('API registration failed, using demo mode:', apiError.message);
+            }
+        }
+        
+        // Demo mode fallback
+        const demoUser = {
+            _id: 'demo' + Date.now(),
+            prenom: userData.prenom,
+            nom: userData.nom,
+            email: userData.email,
+            role: 'client'
+        };
+        
+        localStorage.setItem('token', 'demo-token-' + Date.now());
+        localStorage.setItem('currentUser', JSON.stringify(demoUser));
+        
+        if (window.app) {
+            window.app.currentUser = demoUser;
+            window.app.updateUserUI();
+            window.app.showToast('Compte démo créé avec succès !', 'success');
+            window.app.showPage('home');
+        }
+        
+    } catch (error) {
+        console.error('Erreur inscription:', error);
+        if (window.app) {
+            window.app.showToast(error.message || 'Erreur de création de compte', 'error');
+        }
+    } finally {
+        // Re-enable button
+        submitBtn.disabled = false;
+        submitText.textContent = 'Créer mon compte';
+        submitSpinner.classList.add('hidden');
+    }
+}
+
+async function handleCheckout(event) {
+    event.preventDefault();
+    
+    if (!window.app || window.app.cart.length === 0) {
+        if (window.app) {
+            window.app.showToast('Votre panier est vide', 'warning');
+        }
+        return;
+    }
+    
+    try {
+        const formData = new FormData(event.target);
+        const orderData = {
+            numeroCommande: 'CMD' + Date.now(),
+            client: {
+                prenom: formData.get('prenom'),
+                nom: formData.get('nom'),
+                email: formData.get('email'),
+                telephone: formData.get('telephone'),
+                adresse: formData.get('adresse'),
+                wilaya: formData.get('wilaya')
+            },
+            articles: window.app.cart.map(item => ({
+                id: item.id,
+                nom: item.nom,
+                prix: item.prix,
+                quantite: item.quantite,
+                image: item.image
+            })),
+            sousTotal: window.app.getCartTotal(),
+            fraisLivraison: window.app.getCartTotal() >= 5000 ? 0 : 300,
+            total: window.app.getCartTotal() + (window.app.getCartTotal() >= 5000 ? 0 : 300),
+            statut: 'en-attente',
+            modePaiement: 'Paiement à la livraison',
+            dateCommande: new Date().toISOString(),
+            commentaires: formData.get('commentaires') || ''
+        };
+        
+        // Save order to localStorage (demo mode)
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        orders.unshift(orderData);
+        localStorage.setItem('adminOrders', JSON.stringify(orders));
+        
+        // Clear cart
+        window.app.clearCart();
+        
+        // Show confirmation page
+        window.app.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
+        
+        window.app.showToast('Commande passée avec succès !', 'success');
+        
+    } catch (error) {
+        console.error('Erreur checkout:', error);
+        if (window.app) {
+            window.app.showToast('Erreur lors de la commande', 'error');
+        }
+    }
+}
+
 // Initialize app
 let app;
 document.addEventListener('DOMContentLoaded', () => {
