@@ -1,22 +1,25 @@
 // Fixed Configuration for Shifa Parapharmacie Frontend-Backend Connection
 const API_CONFIG = {
-    // Backend URL configuration - Using your provided URL
+    // Backend URL configuration - Updated with your actual URL
     BASE_URL: 'https://parapharmacie-gaher.onrender.com/api',
     
     // Request configuration
-    TIMEOUT: 30000, // 30 seconds for Render cold starts
-    RETRY_ATTEMPTS: 3,
-    RETRY_DELAY: 2000, // 2 seconds
+    TIMEOUT: 45000, // 45 seconds for Render cold starts
+    RETRY_ATTEMPTS: 2, // Reduced to avoid too many retries
+    RETRY_DELAY: 3000, // 3 seconds between retries
     
     // Endpoints
     ENDPOINTS: {
         AUTH: {
             LOGIN: '/auth/login',
-            REGISTER: '/auth/register',
+            REGISTER: '/auth/register', 
             PROFILE: '/auth/profile'
         },
         PRODUCTS: {
             LIST: '/products',
+            CREATE: '/admin/products',
+            UPDATE: '/admin/products/',
+            DELETE: '/admin/products/',
             DETAIL: '/products/',
             CATEGORIES: '/products/categories/all',
             FEATURED: '/products/featured/all',
@@ -24,13 +27,12 @@ const API_CONFIG = {
         },
         ORDERS: {
             CREATE: '/orders',
+            LIST: '/admin/orders',
             DETAIL: '/orders/',
             USER_ORDERS: '/orders/user/all'
         },
         ADMIN: {
-            DASHBOARD: '/admin/dashboard',
-            PRODUCTS: '/admin/products',
-            ORDERS: '/admin/orders'
+            DASHBOARD: '/admin/dashboard'
         },
         HEALTH: '/health'
     }
@@ -39,11 +41,11 @@ const API_CONFIG = {
 // Helper function to build API URLs
 function buildApiUrl(endpoint) {
     const url = API_CONFIG.BASE_URL + endpoint;
-    console.log(`🌐 API URL: ${url}`);
+    console.log(`🌐 Building API URL: ${url}`);
     return url;
 }
 
-// Enhanced API call function
+// Enhanced API call function with proper error handling
 async function apiCall(endpoint, options = {}) {
     const url = buildApiUrl(endpoint);
     
@@ -52,8 +54,7 @@ async function apiCall(endpoint, options = {}) {
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
-        },
-        mode: 'cors'
+        }
     };
     
     // Add auth token if available
@@ -71,95 +72,69 @@ async function apiCall(endpoint, options = {}) {
         }
     };
     
-    // Retry logic for Render cold starts
-    for (let attempt = 1; attempt <= API_CONFIG.RETRY_ATTEMPTS; attempt++) {
-        try {
-            console.log(`🔄 API Call Attempt ${attempt}: ${finalOptions.method} ${url}`);
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => {
-                controller.abort();
-            }, API_CONFIG.TIMEOUT);
-            
-            const response = await fetch(url, {
-                ...finalOptions,
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            console.log(`📡 Response: ${response.status} ${response.statusText}`);
-            
-            const contentType = response.headers.get('content-type');
-            let data;
-            
-            if (contentType && contentType.includes('application/json')) {
-                data = await response.json();
-            } else {
-                const text = await response.text();
+    console.log(`📡 API Call: ${finalOptions.method} ${url}`);
+    
+    // Single attempt with longer timeout for Render
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+        }, API_CONFIG.TIMEOUT);
+        
+        const response = await fetch(url, {
+            ...finalOptions,
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        console.log(`📡 Response Status: ${response.status}`);
+        
+        // Handle different content types
+        const contentType = response.headers.get('content-type');
+        let data;
+        
+        if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            const text = await response.text();
+            if (text) {
                 try {
                     data = JSON.parse(text);
                 } catch {
-                    data = { message: text || 'Empty response' };
+                    data = { message: text };
                 }
+            } else {
+                data = { message: 'Réponse vide' };
             }
-            
-            if (!response.ok) {
-                console.error(`❌ HTTP Error ${response.status}:`, data);
-                
-                // Don't retry on client errors
-                if (response.status >= 400 && response.status < 500) {
-                    throw new Error(data.message || `Erreur HTTP: ${response.status}`);
-                }
-                
-                // Retry on server errors if we have attempts left
-                if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
-                    continue;
-                }
-                
-                throw new Error(data.message || `Erreur serveur: ${response.status}`);
-            }
-            
-            console.log('✅ API Success');
-            return data;
-            
-        } catch (error) {
-            console.error(`💥 API Call Error (Attempt ${attempt}):`, error.message);
-            
-            if (error.name === 'AbortError') {
-                if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`⏱️ Timeout - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
-                    continue;
-                } else {
-                    throw new Error('Le serveur met trop de temps à répondre. Réessayez plus tard.');
-                }
-            } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🌐 Network error - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
-                    continue;
-                } else {
-                    throw new Error('Impossible de contacter le serveur. Vérifiez votre connexion.');
-                }
-            }
-            
-            if (attempt === API_CONFIG.RETRY_ATTEMPTS) {
-                throw error;
-            }
-            
-            console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
-            await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
         }
+        
+        if (!response.ok) {
+            console.error(`❌ HTTP Error ${response.status}:`, data);
+            throw new Error(data.message || `Erreur HTTP: ${response.status}`);
+        }
+        
+        console.log('✅ API Call Success');
+        return data;
+        
+    } catch (error) {
+        console.error(`💥 API Call Failed:`, error.message);
+        
+        if (error.name === 'AbortError') {
+            throw new Error('Délai d\'attente dépassé. Le serveur met trop de temps à répondre.');
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            throw new Error('Impossible de contacter le serveur. Vérifiez votre connexion internet.');
+        }
+        
+        throw error;
     }
 }
 
-// Test backend connection
+// Test backend connection with retry
 async function testBackendConnection() {
+    console.log('🔍 Testing backend connection...');
+    
     try {
-        console.log('🔍 Testing backend connection...');
         const response = await apiCall('/health');
         console.log('✅ Backend connection successful:', response);
         return { success: true, data: response };
@@ -169,10 +144,32 @@ async function testBackendConnection() {
     }
 }
 
+// Wake up Render service (for cold starts)
+async function wakeUpService() {
+    console.log('⏰ Waking up Render service...');
+    try {
+        // Make a simple call to wake up the service
+        await fetch(API_CONFIG.BASE_URL + '/health', { 
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        console.log('✅ Service wake-up call sent');
+    } catch (error) {
+        console.log('⚠️ Wake-up call failed:', error.message);
+    }
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+    // Wake up the service immediately
+    wakeUpService();
+});
+
 // Export for global access
 window.API_CONFIG = API_CONFIG;
 window.buildApiUrl = buildApiUrl;
 window.apiCall = apiCall;
 window.testBackendConnection = testBackendConnection;
+window.wakeUpService = wakeUpService;
 
-console.log('✅ Config loaded - Backend URL:', API_CONFIG.BASE_URL);
+console.log('✅ Fixed Config loaded - Backend URL:', API_CONFIG.BASE_URL);
