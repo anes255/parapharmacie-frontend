@@ -1,6 +1,350 @@
-// Fixed Checkout System with Backend Integration
+// Fixed Checkout System with Persistent Backend Saving
 
-// Checkout page implementation
+// Process order submission - FIXED to ensure backend saving
+PharmacieGaherApp.prototype.processOrder = async function() {
+    try {
+        const submitBtn = document.getElementById('submitOrderBtn');
+        const submitText = document.getElementById('submitOrderText');
+        const submitSpinner = document.getElementById('submitOrderSpinner');
+        
+        // Disable form
+        submitBtn.disabled = true;
+        submitText.classList.add('hidden');
+        submitSpinner.classList.remove('hidden');
+        
+        // Get form data
+        const form = document.getElementById('checkoutForm');
+        const formData = new FormData(form);
+        
+        // Validate required fields
+        const requiredFields = ['prenom', 'nom', 'email', 'telephone', 'adresse', 'wilaya'];
+        const missingFields = [];
+        
+        for (const field of requiredFields) {
+            if (!formData.get(field)?.trim()) {
+                missingFields.push(field);
+            }
+        }
+        
+        if (missingFields.length > 0) {
+            throw new Error('Veuillez remplir tous les champs obligatoires');
+        }
+        
+        // Validate email
+        const email = formData.get('email').trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw new Error('Veuillez entrer une adresse email valide');
+        }
+        
+        // Validate phone
+        const telephone = formData.get('telephone').trim();
+        const phoneRegex = /^(\+213|0)[0-9]{9}$/;
+        if (!phoneRegex.test(telephone.replace(/\s/g, ''))) {
+            throw new Error('Veuillez entrer un numéro de téléphone algérien valide');
+        }
+        
+        // Calculate totals
+        const sousTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
+        const total = sousTotal + fraisLivraison;
+        
+        // Prepare order data
+        const orderData = {
+            client: {
+                prenom: formData.get('prenom').trim(),
+                nom: formData.get('nom').trim(),
+                email: email,
+                telephone: telephone.replace(/\s/g, ''),
+                adresse: formData.get('adresse').trim(),
+                wilaya: formData.get('wilaya'),
+                codePostal: formData.get('codePostal')?.trim() || ''
+            },
+            articles: this.cart.map(item => ({
+                id: item.id,
+                nom: item.nom,
+                prix: item.prix,
+                quantite: item.quantite,
+                image: item.image,
+                categorie: item.categorie
+            })),
+            sousTotal: sousTotal,
+            fraisLivraison: fraisLivraison,
+            total: total,
+            modePaiement: formData.get('modePaiement') || 'paiement-livraison',
+            commentaires: formData.get('commentaires')?.trim() || ''
+        };
+        
+        console.log('🛒 Processing order:', orderData);
+        
+        // Wake up the backend service first
+        await this.wakeUpBackend();
+        
+        // Try multiple times to save to backend - BE PERSISTENT!
+        let orderResult = null;
+        let backendSuccess = false;
+        let lastError = null;
+        
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`📡 Attempt ${attempt}/${maxRetries}: Submitting order to backend...`);
+                
+                // Show progress to user
+                if (attempt > 1) {
+                    submitSpinner.parentElement.querySelector('span').textContent = `Tentative ${attempt}/${maxRetries}...`;
+                }
+                
+                const response = await apiCall('/orders', {
+                    method: 'POST',
+                    body: JSON.stringify(orderData)
+                });
+                
+                if (response && response.success && response.order) {
+                    orderResult = response.order;
+                    backendSuccess = true;
+                    console.log('✅ Order successfully saved to backend:', orderResult.numeroCommande);
+                    
+                    this.showToast('Commande créée avec succès et sauvegardée !', 'success');
+                    break; // Success! Exit retry loop
+                } else {
+                    throw new Error('Réponse backend invalide');
+                }
+                
+            } catch (error) {
+                console.warn(`⚠️ Backend attempt ${attempt} failed:`, error.message);
+                lastError = error;
+                
+                // If this isn't the last attempt, wait and retry
+                if (attempt < maxRetries) {
+                    console.log(`🔄 Retrying in 3 seconds...`);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                } else {
+                    console.error('❌ All backend attempts failed');
+                }
+            }
+        }
+        
+        // If backend failed after all retries, DO NOT CREATE LOCAL ORDER
+        if (!backendSuccess) {
+            throw new Error(`Impossible de sauvegarder la commande sur le serveur après ${maxRetries} tentatives. Veuillez vérifier votre connexion internet et réessayer. Dernière erreur: ${lastError?.message || 'Erreur inconnue'}`);
+        }
+        
+        // Add order to local storage for admin panel (as backup/cache)
+        if (orderResult && window.addOrderToDemo) {
+            window.addOrderToDemo({
+                ...orderResult,
+                ...orderData,
+                _id: orderResult._id,
+                numeroCommande: orderResult.numeroCommande,
+                statut: 'en-attente',
+                dateCommande: new Date().toISOString()
+            });
+        }
+        
+        // Clear cart only after successful backend save
+        this.clearCart();
+        
+        // Show success page
+        this.showPage('order-confirmation', { 
+            orderNumber: orderResult.numeroCommande,
+            backendSuccess: true,
+            orderId: orderResult._id
+        });
+        
+    } catch (error) {
+        console.error('❌ Order processing error:', error);
+        
+        // Show specific error message to user
+        let userMessage = error.message;
+        
+        if (error.message.includes('connexion') || error.message.includes('fetch')) {
+            userMessage = 'Problème de connexion internet. Veuillez vérifier votre connexion et réessayer.';
+        } else if (error.message.includes('serveur')) {
+            userMessage = 'Problème temporaire avec nos serveurs. Veuillez réessayer dans quelques instants.';
+        }
+        
+        this.showToast(userMessage, 'error');
+        
+        // Re-enable form
+        const submitBtn = document.getElementById('submitOrderBtn');
+        const submitText = document.getElementById('submitOrderText');
+        const submitSpinner = document.getElementById('submitOrderSpinner');
+        
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitText.classList.remove('hidden');
+            submitSpinner.classList.add('hidden');
+        }
+    }
+};
+
+// Wake up backend service
+PharmacieGaherApp.prototype.wakeUpBackend = async function() {
+    try {
+        console.log('⏰ Waking up backend service...');
+        
+        // Make a simple health check call to wake up the service
+        const response = await fetch(buildApiUrl('/health'), {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        
+        if (response.ok) {
+            console.log('✅ Backend is awake and responding');
+        } else {
+            console.warn('⚠️ Backend responded but with error status:', response.status);
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not wake up backend:', error.message);
+    }
+};
+
+// Enhanced order confirmation page
+PharmacieGaherApp.prototype.loadOrderConfirmationPage = async function(orderNumber, backendSuccess = false, orderId = null) {
+    const mainContent = document.getElementById('mainContent');
+    
+    mainContent.innerHTML = `
+        <div class="container mx-auto px-4 py-8 max-w-4xl">
+            <div class="text-center">
+                <div class="mb-8">
+                    <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-check text-green-600 text-4xl"></i>
+                    </div>
+                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Commande confirmée !</h1>
+                    <p class="text-xl text-gray-600 mb-4">Merci pour votre confiance</p>
+                    
+                    ${backendSuccess ? `
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md mx-auto mb-4">
+                            <div class="flex items-center justify-center">
+                                <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                                <p class="text-green-800 font-semibold">Commande sauvegardée avec succès</p>
+                            </div>
+                            <p class="text-green-700 text-sm mt-1">Votre commande est visible dans tous nos systèmes</p>
+                        </div>
+                    ` : `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md mx-auto mb-4">
+                            <div class="flex items-center justify-center">
+                                <i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>
+                                <p class="text-yellow-800 font-semibold">Commande enregistrée localement</p>
+                            </div>
+                            <p class="text-yellow-700 text-sm mt-1">Sera synchronisée automatiquement</p>
+                        </div>
+                    `}
+                </div>
+                
+                <div class="bg-white rounded-2xl shadow-lg p-8 mb-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Détails de votre commande</h2>
+                    
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-6 mb-6">
+                        <div class="text-center">
+                            <p class="text-sm text-emerald-600 mb-2">Numéro de commande</p>
+                            <p class="text-3xl font-bold text-emerald-800">${orderNumber}</p>
+                            ${orderId ? `<p class="text-xs text-emerald-500 mt-1">ID: ${orderId}</p>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4 text-left">
+                        <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                            <span class="text-gray-600">Statut:</span>
+                            <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">En attente de confirmation</span>
+                        </div>
+                        <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                            <span class="text-gray-600">Mode de paiement:</span>
+                            <span class="font-medium">Paiement à la livraison</span>
+                        </div>
+                        <div class="flex items-center justify-between py-3">
+                            <span class="text-gray-600">Date de commande:</span>
+                            <span class="font-medium">${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="space-y-6">
+                    <h3 class="text-xl font-bold text-gray-900">Que se passe-t-il maintenant ?</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                        <div class="bg-blue-50 rounded-lg p-6">
+                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-clock text-blue-600 text-xl"></i>
+                            </div>
+                            <h4 class="font-bold text-blue-800 mb-2">1. Confirmation</h4>
+                            <p class="text-blue-600 text-sm">Nous confirmons votre commande sous 2h</p>
+                        </div>
+                        
+                        <div class="bg-purple-50 rounded-lg p-6">
+                            <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-box text-purple-600 text-xl"></i>
+                            </div>
+                            <h4 class="font-bold text-purple-800 mb-2">2. Préparation</h4>
+                            <p class="text-purple-600 text-sm">Préparation soignée de votre commande</p>
+                        </div>
+                        
+                        <div class="bg-green-50 rounded-lg p-6">
+                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-truck text-green-600 text-xl"></i>
+                            </div>
+                            <h4 class="font-bold text-green-800 mb-2">3. Livraison</h4>
+                            <p class="text-green-600 text-sm">Livraison rapide à votre domicile</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-12 space-y-6">
+                    ${backendSuccess ? `
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
+                            <h4 class="font-bold text-emerald-800 mb-2">
+                                <i class="fas fa-shield-alt mr-2"></i>
+                                Commande sécurisée
+                            </h4>
+                            <p class="text-emerald-700 mb-4">Votre commande est enregistrée dans notre système sécurisé et sera traitée rapidement</p>
+                            <div class="space-y-2 text-sm text-emerald-600">
+                                <p><i class="fas fa-envelope mr-2"></i>Confirmation envoyée par email</p>
+                                <p><i class="fas fa-bell mr-2"></i>Notifications de suivi activées</p>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                            <h4 class="font-bold text-blue-800 mb-2">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                Important
+                            </h4>
+                            <p class="text-blue-700 mb-4">Votre commande est enregistrée et sera traitée. En cas de problème, contactez-nous avec votre numéro de commande.</p>
+                        </div>
+                    `}
+                    
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                        <h4 class="font-bold text-gray-800 mb-2">
+                            <i class="fas fa-phone mr-2"></i>
+                            Besoin d'aide ?
+                        </h4>
+                        <p class="text-gray-700 mb-4">Notre équipe est là pour vous accompagner</p>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <p><i class="fas fa-envelope mr-2"></i>pharmaciegaher@gmail.com</p>
+                            <p><i class="fas fa-phone mr-2"></i>+213 123 456 789</p>
+                            <p><i class="fas fa-map-marker-alt mr-2"></i>Tipaza, Algérie</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                        <button onclick="app.showPage('home')" 
+                                class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-home mr-2"></i>
+                            Retour à l'accueil
+                        </button>
+                        <button onclick="app.showPage('products')" 
+                                class="bg-white text-emerald-600 font-bold py-3 px-8 rounded-xl border-2 border-emerald-600 hover:bg-emerald-50 transition-all">
+                            <i class="fas fa-shopping-bag mr-2"></i>
+                            Continuer les achats
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+// Checkout page implementation (keeping existing loadCheckoutPage method)
 PharmacieGaherApp.prototype.loadCheckoutPage = async function() {
     // Check if cart is empty
     if (this.cart.length === 0) {
@@ -18,9 +362,15 @@ PharmacieGaherApp.prototype.loadCheckoutPage = async function() {
     
     mainContent.innerHTML = `
         <div class="container mx-auto px-4 py-8 max-w-6xl">
+            <!-- Header with backend status -->
             <div class="text-center mb-8">
-                <h1 class="text-4xl font-bold text-emerald-800 mb-4">Finaliser votre commande</h1>
-                <p class="text-xl text-emerald-600">Vérifiez vos informations avant de confirmer</p>
+                <h1 class="text-4xl font-bold text-gray-900 mb-4">Finaliser votre commande</h1>
+                <p class="text-xl text-gray-600">Vérifiez vos informations avant de confirmer</p>
+                <div class="mt-4">
+                    <div id="backendStatus" class="inline-block px-4 py-2 rounded-lg text-sm font-medium">
+                        <i class="fas fa-circle-notch fa-spin mr-2"></i>Vérification du serveur...
+                    </div>
+                </div>
             </div>
             
             <form id="checkoutForm" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -151,7 +501,6 @@ PharmacieGaherApp.prototype.loadCheckoutPage = async function() {
                                 </div>
                             </label>
                             
-                            <!-- Future payment methods can be added here -->
                             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                 <p class="text-blue-800 text-sm">
                                     <i class="fas fa-info-circle mr-2"></i>
@@ -229,7 +578,7 @@ PharmacieGaherApp.prototype.loadCheckoutPage = async function() {
                         <button type="submit" id="submitOrderBtn" 
                                 class="w-full mt-6 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg">
                             <span id="submitOrderText">
-                                <i class="fas fa-credit-card mr-2"></i>
+                                <i class="fas fa-shield-alt mr-2"></i>
                                 Confirmer la commande
                             </span>
                             <span id="submitOrderSpinner" class="hidden">
@@ -253,6 +602,37 @@ PharmacieGaherApp.prototype.loadCheckoutPage = async function() {
     
     // Add form submission handler
     this.setupCheckoutForm();
+    
+    // Check backend status
+    this.checkBackendStatus();
+};
+
+// Check backend status
+PharmacieGaherApp.prototype.checkBackendStatus = async function() {
+    const statusElement = document.getElementById('backendStatus');
+    
+    try {
+        const response = await fetch(buildApiUrl('/health'), {
+            method: 'GET',
+            timeout: 10000
+        });
+        
+        if (response.ok) {
+            statusElement.innerHTML = `
+                <i class="fas fa-check-circle mr-2 text-green-600"></i>
+                <span class="text-green-800">Serveur connecté - Commandes sauvegardées de façon sécurisée</span>
+            `;
+            statusElement.className = 'inline-block px-4 py-2 rounded-lg text-sm font-medium bg-green-100 border border-green-200';
+        } else {
+            throw new Error('Server error');
+        }
+    } catch (error) {
+        statusElement.innerHTML = `
+            <i class="fas fa-exclamation-triangle mr-2 text-red-600"></i>
+            <span class="text-red-800">Problème de connexion - Votre commande sera traitée dès que possible</span>
+        `;
+        statusElement.className = 'inline-block px-4 py-2 rounded-lg text-sm font-medium bg-red-100 border border-red-200';
+    }
 };
 
 // Setup checkout form validation and submission
@@ -267,151 +647,6 @@ PharmacieGaherApp.prototype.setupCheckoutForm = function() {
     }
 };
 
-// Process order submission - FIXED to use backend
-PharmacieGaherApp.prototype.processOrder = async function() {
-    try {
-        const submitBtn = document.getElementById('submitOrderBtn');
-        const submitText = document.getElementById('submitOrderText');
-        const submitSpinner = document.getElementById('submitOrderSpinner');
-        
-        // Disable form
-        submitBtn.disabled = true;
-        submitText.classList.add('hidden');
-        submitSpinner.classList.remove('hidden');
-        
-        // Get form data
-        const form = document.getElementById('checkoutForm');
-        const formData = new FormData(form);
-        
-        // Validate required fields
-        const requiredFields = ['prenom', 'nom', 'email', 'telephone', 'adresse', 'wilaya'];
-        const missingFields = [];
-        
-        for (const field of requiredFields) {
-            if (!formData.get(field)?.trim()) {
-                missingFields.push(field);
-            }
-        }
-        
-        if (missingFields.length > 0) {
-            throw new Error('Veuillez remplir tous les champs obligatoires');
-        }
-        
-        // Validate email
-        const email = formData.get('email').trim();
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            throw new Error('Veuillez entrer une adresse email valide');
-        }
-        
-        // Validate phone
-        const telephone = formData.get('telephone').trim();
-        const phoneRegex = /^(\+213|0)[0-9]{9}$/;
-        if (!phoneRegex.test(telephone)) {
-            throw new Error('Veuillez entrer un numéro de téléphone algérien valide');
-        }
-        
-        // Calculate totals
-        const sousTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
-        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
-        const total = sousTotal + fraisLivraison;
-        
-        // Prepare order data
-        const orderData = {
-            client: {
-                prenom: formData.get('prenom').trim(),
-                nom: formData.get('nom').trim(),
-                email: email,
-                telephone: telephone,
-                adresse: formData.get('adresse').trim(),
-                wilaya: formData.get('wilaya'),
-                codePostal: formData.get('codePostal')?.trim() || ''
-            },
-            articles: this.cart.map(item => ({
-                id: item.id,
-                nom: item.nom,
-                prix: item.prix,
-                quantite: item.quantite,
-                image: item.image,
-                categorie: item.categorie
-            })),
-            sousTotal: sousTotal,
-            fraisLivraison: fraisLivraison,
-            total: total,
-            modePaiement: formData.get('modePaiement') || 'paiement-livraison',
-            commentaires: formData.get('commentaires')?.trim() || ''
-        };
-        
-        console.log('🛒 Submitting order:', orderData);
-        
-        // Try to submit to backend first
-        let orderResult = null;
-        let backendSuccess = false;
-        
-        try {
-            console.log('📡 Submitting order to backend...');
-            const response = await apiCall('/orders', {
-                method: 'POST',
-                body: JSON.stringify(orderData)
-            });
-            
-            if (response && response.order) {
-                orderResult = response.order;
-                backendSuccess = true;
-                console.log('✅ Order submitted to backend successfully:', orderResult.numeroCommande);
-                
-                this.showToast('Commande créée avec succès et synchronisée !', 'success');
-            }
-        } catch (error) {
-            console.warn('⚠️ Backend submission failed, creating local order:', error.message);
-            
-            // Fallback to local order creation
-            orderResult = {
-                _id: Date.now().toString(),
-                numeroCommande: this.generateOrderNumber(),
-                ...orderData,
-                statut: 'en-attente',
-                dateCommande: new Date().toISOString()
-            };
-            
-            this.showToast('Commande créée localement (sera synchronisée plus tard)', 'warning');
-        }
-        
-        // Add order to local storage for admin panel
-        if (orderResult) {
-            if (window.addOrderToDemo) {
-                window.addOrderToDemo(orderResult);
-            }
-            
-            // Clear cart
-            this.clearCart();
-            
-            // Show success page
-            this.showPage('order-confirmation', { 
-                orderNumber: orderResult.numeroCommande,
-                backendSuccess: backendSuccess
-            });
-        } else {
-            throw new Error('Échec de la création de la commande');
-        }
-        
-    } catch (error) {
-        console.error('❌ Order processing error:', error);
-        this.showToast(error.message || 'Erreur lors du traitement de la commande', 'error');
-        
-        // Re-enable form
-        const submitBtn = document.getElementById('submitOrderBtn');
-        const submitText = document.getElementById('submitOrderText');
-        const submitSpinner = document.getElementById('submitOrderSpinner');
-        
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitText.classList.remove('hidden');
-            submitSpinner.classList.add('hidden');
-        }
-    }
-};
-
 // Generate order number
 PharmacieGaherApp.prototype.generateOrderNumber = function() {
     const timestamp = Date.now().toString();
@@ -419,115 +654,4 @@ PharmacieGaherApp.prototype.generateOrderNumber = function() {
     return `CMD${timestamp.slice(-6)}${random}`;
 };
 
-// Order confirmation page
-PharmacieGaherApp.prototype.loadOrderConfirmationPage = async function(orderNumber, backendSuccess = false) {
-    const mainContent = document.getElementById('mainContent');
-    
-    mainContent.innerHTML = `
-        <div class="container mx-auto px-4 py-8 max-w-4xl">
-            <div class="text-center">
-                <div class="mb-8">
-                    <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <i class="fas fa-check text-green-600 text-4xl"></i>
-                    </div>
-                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Commande confirmée !</h1>
-                    <p class="text-xl text-gray-600 mb-2">Merci pour votre confiance</p>
-                    ${backendSuccess ? `
-                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md mx-auto">
-                            <p class="text-green-800 text-sm">✅ Commande synchronisée avec nos serveurs</p>
-                        </div>
-                    ` : `
-                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md mx-auto">
-                            <p class="text-yellow-800 text-sm">⚠️ Commande enregistrée localement (sera synchronisée automatiquement)</p>
-                        </div>
-                    `}
-                </div>
-                
-                <div class="bg-white rounded-2xl shadow-lg p-8 mb-8">
-                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Détails de votre commande</h2>
-                    
-                    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-6 mb-6">
-                        <div class="text-center">
-                            <p class="text-sm text-emerald-600 mb-2">Numéro de commande</p>
-                            <p class="text-3xl font-bold text-emerald-800">${orderNumber}</p>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-4 text-left">
-                        <div class="flex items-center justify-between py-3 border-b border-gray-100">
-                            <span class="text-gray-600">Statut:</span>
-                            <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">En attente</span>
-                        </div>
-                        <div class="flex items-center justify-between py-3 border-b border-gray-100">
-                            <span class="text-gray-600">Mode de paiement:</span>
-                            <span class="font-medium">Paiement à la livraison</span>
-                        </div>
-                        <div class="flex items-center justify-between py-3">
-                            <span class="text-gray-600">Date de commande:</span>
-                            <span class="font-medium">${new Date().toLocaleDateString('fr-FR')}</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="space-y-4">
-                    <h3 class="text-xl font-bold text-gray-900">Que se passe-t-il maintenant ?</h3>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                        <div class="bg-blue-50 rounded-lg p-6">
-                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <i class="fas fa-clock text-blue-600 text-xl"></i>
-                            </div>
-                            <h4 class="font-bold text-blue-800 mb-2">1. Traitement</h4>
-                            <p class="text-blue-600 text-sm">Nous préparons votre commande avec soin</p>
-                        </div>
-                        
-                        <div class="bg-purple-50 rounded-lg p-6">
-                            <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <i class="fas fa-truck text-purple-600 text-xl"></i>
-                            </div>
-                            <h4 class="font-bold text-purple-800 mb-2">2. Expédition</h4>
-                            <p class="text-purple-600 text-sm">Livraison dans les plus brefs délais</p>
-                        </div>
-                        
-                        <div class="bg-green-50 rounded-lg p-6">
-                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <i class="fas fa-home text-green-600 text-xl"></i>
-                            </div>
-                            <h4 class="font-bold text-green-800 mb-2">3. Réception</h4>
-                            <p class="text-green-600 text-sm">Recevez vos produits chez vous</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mt-12 space-y-4">
-                    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
-                        <h4 class="font-bold text-emerald-800 mb-2">
-                            <i class="fas fa-phone mr-2"></i>
-                            Besoin d'aide ?
-                        </h4>
-                        <p class="text-emerald-700 mb-4">Notre équipe est là pour vous accompagner</p>
-                        <div class="space-y-2 text-sm text-emerald-600">
-                            <p><i class="fas fa-envelope mr-2"></i>pharmaciegaher@gmail.com</p>
-                            <p><i class="fas fa-phone mr-2"></i>+213 123 456 789</p>
-                        </div>
-                    </div>
-                    
-                    <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                        <button onclick="app.showPage('home')" 
-                                class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                            <i class="fas fa-home mr-2"></i>
-                            Retour à l'accueil
-                        </button>
-                        <button onclick="app.showPage('products')" 
-                                class="bg-white text-emerald-600 font-bold py-3 px-8 rounded-xl border-2 border-emerald-600 hover:bg-emerald-50 transition-all">
-                            <i class="fas fa-shopping-bag mr-2"></i>
-                            Continuer les achats
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-};
-
-console.log('✅ Fixed checkout.js loaded with backend integration');
+console.log('✅ Fixed checkout.js loaded with persistent backend saving');
