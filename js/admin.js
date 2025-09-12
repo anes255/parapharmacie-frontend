@@ -38,7 +38,7 @@ async function apiCall(endpoint, options = {}) {
     const response = await fetch(url, finalOptions);
     
     if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
         throw new Error(error.message || `HTTP error! status: ${response.status}`);
     }
     
@@ -48,20 +48,20 @@ async function apiCall(endpoint, options = {}) {
 // Products Management - Add to app prototype
 PharmacieGaherApp.prototype.loadAdminProducts = async function() {
     try {
-        // Initialize default products if localStorage is empty
-        this.initializeDefaultProducts();
-        
         // Get products from localStorage
         let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
         // Try to get products from API as well
         try {
-            const data = await apiCall('/admin/products');
+            const data = await apiCall('/products');
             if (data && data.products && data.products.length > 0) {
-                // Merge API products with local ones
+                // Merge API products with local ones, avoiding duplicates
                 const localIds = products.map(p => p._id);
                 const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
                 products = [...products, ...newApiProducts];
+                
+                // Update localStorage with merged data
+                localStorage.setItem('demoProducts', JSON.stringify(products));
             }
         } catch (error) {
             console.log('API unavailable, using local products only');
@@ -201,7 +201,7 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
         
         // Try to merge with API orders
         try {
-            const data = await apiCall('/admin/orders');
+            const data = await apiCall('/orders');
             if (data && data.orders && data.orders.length > 0) {
                 console.log('API orders loaded:', data.orders.length);
                 const apiOrders = data.orders.filter(apiOrder => 
@@ -328,14 +328,14 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
         
         // Try to get products from API
         try {
-            const featuredData = await apiCall('/products/featured/all');
-            if (featuredData && featuredData.length > 0) {
-                featuredProducts = featuredData;
-            }
-            
-            const allData = await apiCall('/products?limit=20');
+            const allData = await apiCall('/products');
             if (allData && allData.products && allData.products.length > 0) {
-                allProducts = allData.products.filter(p => !p.enVedette);
+                // Merge API products, avoiding duplicates
+                const localIds = localProducts.map(p => p._id);
+                const newApiProducts = allData.products.filter(p => !localIds.includes(p._id));
+                
+                featuredProducts = [...featuredProducts, ...newApiProducts.filter(p => p.enVedette)];
+                allProducts = [...allProducts, ...newApiProducts.filter(p => !p.enVedette)];
             }
         } catch (error) {
             console.log('API unavailable, using local products');
@@ -920,7 +920,8 @@ function saveProduct() {
             categorie: categorie,
             actif: actif,
             enVedette: enVedette,
-            enPromotion: enPromotion
+            enPromotion: enPromotion,
+            dateAjout: new Date().toISOString()
         };
         
         // Add optional fields
@@ -944,7 +945,7 @@ function saveProduct() {
         
         console.log('Product data to save:', productData);
         
-        // Save to localStorage
+        // Save to localStorage first
         let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
         if (isEditing) {
@@ -964,27 +965,37 @@ function saveProduct() {
         localStorage.setItem('demoProducts', JSON.stringify(localProducts));
         console.log('Product saved to localStorage');
         
+        // Update the app's product cache to refresh main page immediately
+        if (window.app) {
+            window.app.refreshProductsCache();
+        }
+        
         // Try to save to API (optional)
-        try {
-            const endpoint = isEditing ? `/products/${productData._id}` : '/products';
-            const method = isEditing ? 'PUT' : 'POST';
-            
-            fetch(buildApiUrl(endpoint), {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(productData)
-            }).then(response => {
+        const saveToApi = async () => {
+            try {
+                const endpoint = isEditing ? `/products/${productData._id}` : '/products';
+                const method = isEditing ? 'PUT' : 'POST';
+                
+                const response = await fetch(buildApiUrl(endpoint), {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(productData)
+                });
+                
                 if (response.ok) {
                     console.log('Product saved to API successfully');
+                } else {
+                    console.log('API save failed but product saved locally');
                 }
-            }).catch(error => {
+            } catch (error) {
                 console.log('API save failed, but product saved locally:', error);
-            });
-        } catch (error) {
-            console.log('API save failed, but product saved locally:', error);
-        }
+            }
+        };
+        
+        // Save to API in background
+        saveToApi();
         
         // Show success message
         app.showToast(isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 'success');
@@ -1021,11 +1032,16 @@ async function toggleFeatured(productId, newStatus) {
             localProducts[productIndex].enVedette = newStatus;
             localStorage.setItem('demoProducts', JSON.stringify(localProducts));
             console.log('Product featured status updated locally');
+            
+            // Update the app's product cache
+            if (window.app) {
+                window.app.refreshProductsCache();
+            }
         }
         
         // Try to update via API
         try {
-            await apiCall(`/products/${productId}/featured`, {
+            await apiCall(`/products/${productId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ enVedette: newStatus })
             });
@@ -1061,6 +1077,11 @@ async function deleteProduct(productId) {
             
             const localDeleteSuccess = localProducts.length < initialCount;
             console.log('Product deleted locally:', localDeleteSuccess);
+            
+            // Update the app's product cache
+            if (window.app) {
+                window.app.refreshProductsCache();
+            }
             
             // Try to delete from API
             try {
@@ -1235,7 +1256,7 @@ async function updateOrderStatus(orderId, newStatus) {
         
         // Try to update via API
         try {
-            await apiCall(`/admin/orders/${orderId}/status`, {
+            await apiCall(`/orders/${orderId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ 
                     statut: newStatus,
@@ -1265,6 +1286,9 @@ async function updateOrderStatus(orderId, newStatus) {
 
 // Utility functions
 async function refreshProductCache() {
+    if (window.app) {
+        window.app.refreshProductsCache();
+    }
     app.showToast('Cache actualisé', 'success');
 }
 
@@ -1275,6 +1299,12 @@ async function validateAllProducts() {
 async function clearAllProducts() {
     if (confirm('ATTENTION: Cette action supprimera TOUS les produits. Êtes-vous absolument sûr ?')) {
         localStorage.removeItem('demoProducts');
+        
+        // Update the app's product cache
+        if (window.app) {
+            window.app.refreshProductsCache();
+        }
+        
         app.showToast('Tous les produits ont été supprimés', 'success');
         if (adminCurrentSection === 'products') {
             app.loadAdminProducts();
@@ -1390,25 +1420,5 @@ window.viewOrderDetails = viewOrderDetails;
 window.updateOrderStatus = updateOrderStatus;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
-
-// Initialize local products on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize default products if none exist
-    if (!localStorage.getItem('demoProducts')) {
-        const defaultProducts = [
-            { _id: '1', nom: 'Multivitamines VitalForce', prix: 2800, categorie: 'Vitalité', marque: 'Shifa', stock: 50, enVedette: true, actif: true, description: 'Complexe de vitamines et minéraux pour votre bien-être quotidien' },
-            { _id: '2', nom: 'Shampoing Anti-Chute L\'Oréal', prix: 2500, categorie: 'Cheveux', marque: 'L\'Oréal', stock: 25, actif: true, description: 'Shampoing fortifiant pour cheveux fragiles' },
-            { _id: '3', nom: 'Crème Hydratante Visage Avène', prix: 3200, categorie: 'Visage', marque: 'Avène', stock: 30, enVedette: true, actif: true, description: 'Crème hydratante apaisante pour tous types de peau' },
-            { _id: '4', nom: 'Lait Nettoyant Bébé Mustela', prix: 1800, categorie: 'Bébé', marque: 'Mustela', stock: 20, actif: true, description: 'Lait nettoyant doux pour la peau délicate de bébé' },
-            { _id: '5', nom: 'Crème Solaire SPF 50+ La Roche Posay', prix: 4500, categorie: 'Solaire', marque: 'La Roche Posay', stock: 15, enVedette: true, actif: true, description: 'Protection solaire très haute pour toute la famille' },
-            { _id: '6', nom: 'Dentifrice Sensodyne Protection Complète', prix: 950, categorie: 'Dentaire', marque: 'Sensodyne', stock: 40, actif: true, description: 'Dentifrice pour dents sensibles avec protection renforcée' },
-            { _id: '7', nom: 'Gel Nettoyant Intime Saforelle', prix: 1600, categorie: 'Intime', marque: 'Saforelle', stock: 22, actif: true, description: 'Gel doux pour l\'hygiène intime quotidienne' },
-            { _id: '8', nom: 'Gel Douche Homme Vichy', prix: 1400, categorie: 'Homme', marque: 'Vichy', stock: 18, actif: true, description: 'Gel douche hydratant pour la peau masculine' },
-            { _id: '9', nom: 'Protéine Whey Sport Nutrition', prix: 3500, categorie: 'Sport', marque: 'SportMax', stock: 25, enVedette: true, actif: true, description: 'Protéine en poudre pour sportifs et amateurs de fitness' }
-        ];
-        localStorage.setItem('demoProducts', JSON.stringify(defaultProducts));
-        console.log('✅ Default products initialized with all categories including Sport');
-    }
-});
 
 console.log('✅ Fixed Admin.js loaded with proper app integration');
