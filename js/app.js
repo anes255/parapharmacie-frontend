@@ -3,6 +3,7 @@ class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
         this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        this.allProducts = []; // Cache for all products
         this.settings = {
             couleurPrimaire: '#10b981',
             couleurSecondaire: '#059669',
@@ -19,6 +20,7 @@ class PharmacieGaherApp {
     async init() {
         try {
             await this.checkAuth();
+            await this.loadProductsCache(); // Load products from localStorage/API
             this.initUI();
             await this.showPage('home');
             this.updateCartUI();
@@ -27,6 +29,73 @@ class PharmacieGaherApp {
             console.error('Erreur initialisation app:', error);
             this.showToast('Erreur de chargement de l\'application', 'error');
         }
+    }
+    
+    // New method to load and cache products
+    async loadProductsCache() {
+        try {
+            console.log('Loading products cache...');
+            
+            // Start with localStorage products
+            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            this.allProducts = [...localProducts];
+            
+            // Try to load from API and merge
+            try {
+                const response = await fetch(buildApiUrl('/products'));
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.products && data.products.length > 0) {
+                        // Merge API products with local ones, avoiding duplicates
+                        const localIds = localProducts.map(p => p._id);
+                        const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
+                        
+                        if (newApiProducts.length > 0) {
+                            this.allProducts = [...localProducts, ...newApiProducts];
+                            // Update localStorage with merged data
+                            localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log('API unavailable, using local products only:', error.message);
+            }
+            
+            console.log(`Products cache loaded: ${this.allProducts.length} products`);
+            
+        } catch (error) {
+            console.error('Error loading products cache:', error);
+            this.allProducts = [];
+        }
+    }
+    
+    // New method to refresh products cache (called from admin when products are modified)
+    refreshProductsCache() {
+        console.log('Refreshing products cache...');
+        
+        // Reload from localStorage
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        this.allProducts = [...localProducts];
+        
+        console.log(`Products cache refreshed: ${this.allProducts.length} products`);
+        
+        // If we're on the home page, refresh the displayed products
+        if (this.currentPage === 'home') {
+            this.refreshHomePage();
+        } else if (this.currentPage === 'products') {
+            // Refresh products page if we're on it
+            this.showPage('products');
+        }
+    }
+    
+    // New method to refresh home page content
+    refreshHomePage() {
+        console.log('Refreshing home page content...');
+        
+        // Refresh featured products
+        this.loadFeaturedProducts();
+        // Refresh promotion products  
+        this.loadPromotionProducts();
     }
     
     async checkAuth() {
@@ -249,14 +318,16 @@ class PharmacieGaherApp {
     }
     
     async loadFeaturedProducts() {
-        // Get products from localStorage that include ALL categories
-        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        // Filter for featured products from all categories
-        const filteredProducts = localProducts.filter(p => p.enVedette && p.actif !== false);
+        console.log('Loading featured products...');
+        
+        // Use cached products and filter for featured products
+        const featuredProducts = this.allProducts.filter(p => p.enVedette && p.actif !== false);
+        
+        console.log(`Found ${featuredProducts.length} featured products`);
         
         const container = document.getElementById('featuredProducts');
         if (container) {
-            if (filteredProducts.length === 0) {
+            if (featuredProducts.length === 0) {
                 container.innerHTML = `
                     <div class="col-span-full text-center py-16">
                         <i class="fas fa-star text-6xl text-emerald-200 mb-6"></i>
@@ -270,16 +341,18 @@ class PharmacieGaherApp {
                     </div>
                 `;
             } else {
-                container.innerHTML = filteredProducts.slice(0, 8).map(product => this.createProductCard(product)).join('');
+                container.innerHTML = featuredProducts.slice(0, 8).map(product => this.createProductCard(product)).join('');
             }
         }
     }
     
     async loadPromotionProducts() {
-        // Get products from localStorage that include ALL categories  
-        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        // Filter for promotion products from all categories
-        const promotionProducts = localProducts.filter(p => p.enPromotion && p.actif !== false);
+        console.log('Loading promotion products...');
+        
+        // Use cached products and filter for promotion products
+        const promotionProducts = this.allProducts.filter(p => p.enPromotion && p.actif !== false);
+        
+        console.log(`Found ${promotionProducts.length} promotion products`);
         
         const container = document.getElementById('promotionProducts');
         if (container) {
@@ -400,9 +473,8 @@ class PharmacieGaherApp {
         try {
             console.log('Adding to cart:', productId, quantity);
             
-            // Get all products from localStorage (includes all categories)
-            const allProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            const product = allProducts.find(p => p._id === productId);
+            // Find product in our cached products
+            const product = this.allProducts.find(p => p._id === productId);
             
             if (!product) {
                 throw new Error('Produit non trouvé');
@@ -766,12 +838,9 @@ class PharmacieGaherApp {
     
     async loadAdminDashboard() {
         try {
-            // Initialize default products if needed
-            this.initializeDefaultProducts();
-            
-            // Get stats from localStorage
+            // Get stats from localStorage and cached products
             const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-            const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            const products = this.allProducts;
             
             let stats = {
                 totalProducts: products.length,
@@ -881,27 +950,6 @@ class PharmacieGaherApp {
                     <p class="text-red-800">Erreur de chargement du tableau de bord</p>
                 </div>
             `;
-        }
-    }
-    
-    // Initialize default products if localStorage is empty
-    initializeDefaultProducts() {
-        const existingProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        
-        if (existingProducts.length === 0) {
-            const defaultProducts = [
-                { _id: '1', nom: 'Multivitamines VitalForce', prix: 2800, categorie: 'Vitalité', marque: 'Shifa', stock: 50, enVedette: true, actif: true, description: 'Complexe de vitamines et minéraux pour votre bien-être quotidien' },
-                { _id: '2', nom: 'Shampoing Anti-Chute L\'Oréal', prix: 2500, categorie: 'Cheveux', marque: 'L\'Oréal', stock: 25, actif: true, description: 'Shampoing fortifiant pour cheveux fragiles' },
-                { _id: '3', nom: 'Crème Hydratante Visage Avène', prix: 3200, categorie: 'Visage', marque: 'Avène', stock: 30, enVedette: true, actif: true, description: 'Crème hydratante apaisante pour tous types de peau' },
-                { _id: '4', nom: 'Lait Nettoyant Bébé Mustela', prix: 1800, categorie: 'Bébé', marque: 'Mustela', stock: 20, actif: true, description: 'Lait nettoyant doux pour la peau délicate de bébé' },
-                { _id: '5', nom: 'Crème Solaire SPF 50+ La Roche Posay', prix: 4500, categorie: 'Solaire', marque: 'La Roche Posay', stock: 15, enVedette: true, actif: true, description: 'Protection solaire très haute pour toute la famille' },
-                { _id: '6', nom: 'Dentifrice Sensodyne Protection Complète', prix: 950, categorie: 'Dentaire', marque: 'Sensodyne', stock: 40, actif: true, description: 'Dentifrice pour dents sensibles avec protection renforcée' },
-                { _id: '7', nom: 'Gel Nettoyant Intime Saforelle', prix: 1600, categorie: 'Intime', marque: 'Saforelle', stock: 22, actif: true, description: 'Gel doux pour l\'hygiène intime quotidienne' },
-                { _id: '8', nom: 'Gel Douche Homme Vichy', prix: 1400, categorie: 'Homme', marque: 'Vichy', stock: 18, actif: true, description: 'Gel douche hydratant pour la peau masculine' },
-                { _id: '9', nom: 'Protéine Whey Sport Nutrition', prix: 3500, categorie: 'Sport', marque: 'SportMax', stock: 25, enVedette: true, actif: true, description: 'Protéine en poudre pour sportifs et amateurs de fitness' }
-            ];
-            localStorage.setItem('demoProducts', JSON.stringify(defaultProducts));
-            console.log('Default products initialized with all categories');
         }
     }
     
