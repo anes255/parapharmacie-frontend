@@ -1422,3 +1422,4 @@ window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
 console.log('✅ Fixed Admin.js loaded with proper app integration');
+
