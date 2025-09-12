@@ -1,695 +1,533 @@
-// Complete Checkout System with Order Storage for Admin - COMPLETE VERSION
+// Fixed Checkout System with Backend Integration
 
+// Checkout page implementation
 PharmacieGaherApp.prototype.loadCheckoutPage = async function() {
+    // Check if cart is empty
     if (this.cart.length === 0) {
         this.showToast('Votre panier est vide', 'warning');
         this.showPage('products');
         return;
     }
     
-    const wilayas = [
-        'Adrar', 'Chlef', 'Laghouat', 'Oum El Bouaghi', 'Batna', 'Béjaïa', 
-        'Biskra', 'Béchar', 'Blida', 'Bouira', 'Tamanrasset', 'Tébessa', 
-        'Tlemcen', 'Tiaret', 'Tizi Ouzou', 'Alger', 'Djelfa', 'Jijel', 
-        'Sétif', 'Saïda', 'Skikda', 'Sidi Bel Abbès', 'Annaba', 'Guelma', 
-        'Constantine', 'Médéa', 'Mostaganem', 'M\'Sila', 'Mascara', 'Ouargla', 
-        'Oran', 'El Bayadh', 'Illizi', 'Bordj Bou Arréridj', 'Boumeerdès', 
-        'El Tarf', 'Tindouf', 'Tissemsilt', 'El Oued', 'Khenchela', 
-        'Souk Ahras', 'Tipaza', 'Mila', 'Aïn Defla', 'Naâma', 'Aïn Témouchent', 
-        'Ghardaïa', 'Relizane'
-    ];
-    
     const mainContent = document.getElementById('mainContent');
+    
+    // Calculate totals
+    const sousTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+    const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
+    const total = sousTotal + fraisLivraison;
     
     mainContent.innerHTML = `
         <div class="container mx-auto px-4 py-8 max-w-6xl">
-            <div class="mb-8">
-                <h1 class="text-3xl font-bold text-emerald-900 mb-4">Finaliser la commande</h1>
-                
-                <!-- Étapes -->
-                <div class="flex items-center space-x-4 mb-8">
-                    <div class="flex items-center">
-                        <div class="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">
-                            1
-                        </div>
-                        <span class="ml-2 text-sm font-medium text-emerald-600">Panier</span>
-                    </div>
-                    <div class="flex-1 h-1 bg-emerald-600"></div>
-                    <div class="flex items-center">
-                        <div class="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">
-                            2
-                        </div>
-                        <span class="ml-2 text-sm font-medium text-emerald-600">Informations</span>
-                    </div>
-                    <div class="flex-1 h-1 bg-gray-200"></div>
-                    <div class="flex items-center">
-                        <div class="w-8 h-8 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center text-sm font-semibold">
-                            3
-                        </div>
-                        <span class="ml-2 text-sm font-medium text-gray-600">Confirmation</span>
-                    </div>
-                </div>
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-emerald-800 mb-4">Finaliser votre commande</h1>
+                <p class="text-xl text-emerald-600">Vérifiez vos informations avant de confirmer</p>
             </div>
             
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Formulaire de commande -->
+            <form id="checkoutForm" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Customer Information -->
                 <div class="lg:col-span-2 space-y-8">
-                    <!-- Informations personnelles -->
-                    <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6">
-                        <h2 class="text-xl font-semibold text-emerald-800 mb-6">
-                            <i class="fas fa-user mr-2"></i>
-                            Informations personnelles
-                        </h2>
-                        
-                        <form id="checkoutForm" class="space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="checkoutNom" class="block text-sm font-semibold text-emerald-700 mb-2">
-                                        Nom *
-                                    </label>
-                                    <input type="text" id="checkoutNom" name="nom" required
-                                           value="${this.currentUser ? this.currentUser.nom : ''}"
-                                           class="w-full px-4 py-3 bg-emerald-50/50 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/20 transition-all text-emerald-800" placeholder="Votre nom">
-                                </div>
-                                
-                                <div>
-                                    <label for="checkoutPrenom" class="block text-sm font-semibold text-emerald-700 mb-2">
-                                        Prénom *
-                                    </label>
-                                    <input type="text" id="checkoutPrenom" name="prenom" required
-                                           value="${this.currentUser ? this.currentUser.prenom : ''}"
-                                           class="w-full px-4 py-3 bg-emerald-50/50 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/20 transition-all text-emerald-800" placeholder="Votre prénom">
-                                </div>
-                            </div>
-                            
+                    <!-- Personal Info -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6">Informations personnelles</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label for="checkoutEmail" class="block text-sm font-semibold text-emerald-700 mb-2">
-                                    Email *
-                                </label>
-                                <input type="email" id="checkoutEmail" name="email" required
-                                       value="${this.currentUser ? this.currentUser.email : ''}"
-                                       class="w-full px-4 py-3 bg-emerald-50/50 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/20 transition-all text-emerald-800" placeholder="votre@email.com">
+                                <label for="prenom" class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
+                                <input type="text" id="prenom" name="prenom" required 
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                       value="${this.currentUser?.prenom || ''}"
+                                       placeholder="Votre prénom">
                             </div>
-                            
                             <div>
-                                <label for="checkoutTelephone" class="block text-sm font-semibold text-emerald-700 mb-2">
-                                    Téléphone *
-                                </label>
-                                <input type="tel" id="checkoutTelephone" name="telephone" required
-                                       value="${this.currentUser ? (this.currentUser.telephone || '') : ''}"
-                                       class="w-full px-4 py-3 bg-emerald-50/50 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/20 transition-all text-emerald-800" placeholder="+213 xxx xxx xxx">
+                                <label for="nom" class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
+                                <input type="text" id="nom" name="nom" required 
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                       value="${this.currentUser?.nom || ''}"
+                                       placeholder="Votre nom">
                             </div>
-                            
                             <div>
-                                <label for="checkoutAdresse" class="block text-sm font-semibold text-emerald-700 mb-2">
-                                    Adresse complète *
-                                </label>
-                                <input type="text" id="checkoutAdresse" name="adresse" required
-                                       value="${this.currentUser ? (this.currentUser.adresse || '') : ''}"
-                                       class="w-full px-4 py-3 bg-emerald-50/50 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/20 transition-all text-emerald-800" placeholder="Rue, ville, code postal">
+                                <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                                <input type="email" id="email" name="email" required 
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                       value="${this.currentUser?.email || ''}"
+                                       placeholder="votre@email.com">
                             </div>
-                            
                             <div>
-                                <label for="checkoutWilaya" class="block text-sm font-semibold text-emerald-700 mb-2">
-                                    Wilaya *
-                                </label>
-                                <select id="checkoutWilaya" name="wilaya" required class="w-full px-4 py-3 bg-emerald-50/50 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/20 transition-all text-emerald-800">
-                                    <option value="">Sélectionnez votre wilaya</option>
-                                    ${wilayas.map(wilaya => `
-                                        <option value="${wilaya}" ${this.currentUser && this.currentUser.wilaya === wilaya ? 'selected' : ''}>
-                                            ${wilaya}
-                                        </option>
-                                    `).join('')}
-                                </select>
+                                <label for="telephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
+                                <input type="tel" id="telephone" name="telephone" required 
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                       value="${this.currentUser?.telephone || ''}"
+                                       placeholder="+213 XX XX XX XX XX">
                             </div>
-                            
-                            <div>
-                                <label for="checkoutCommentaires" class="block text-sm font-semibold text-emerald-700 mb-2">
-                                    Commentaires (optionnel)
-                                </label>
-                                <textarea id="checkoutCommentaires" name="commentaires" rows="3"
-                                          class="w-full px-4 py-3 bg-emerald-50/50 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/20 transition-all text-emerald-800 resize-none" 
-                                          placeholder="Instructions de livraison, commentaires..."></textarea>
-                            </div>
-                        </form>
+                        </div>
                     </div>
                     
-                    <!-- Mode de paiement -->
-                    <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6">
-                        <h2 class="text-xl font-semibold text-emerald-800 mb-6">
-                            <i class="fas fa-credit-card mr-2"></i>
-                            Mode de paiement
-                        </h2>
-                        
-                        <div class="bg-green-50 border border-green-200 rounded-xl p-4">
-                            <div class="flex items-center">
-                                <input type="radio" id="cashPayment" name="payment" value="cash" checked
-                                       class="text-emerald-600 focus:ring-emerald-600">
-                                <label for="cashPayment" class="ml-3">
-                                    <div class="flex items-center">
-                                        <i class="fas fa-money-bill-wave text-green-600 mr-3"></i>
-                                        <div>
-                                            <p class="font-medium text-gray-900">Paiement à la livraison</p>
-                                            <p class="text-sm text-gray-600">Payez en espèces lors de la réception</p>
-                                        </div>
-                                    </div>
-                                </label>
+                    <!-- Delivery Address -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6">Adresse de livraison</h2>
+                        <div class="space-y-6">
+                            <div>
+                                <label for="adresse" class="block text-sm font-medium text-gray-700 mb-2">Adresse complète *</label>
+                                <textarea id="adresse" name="adresse" required rows="3" 
+                                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                          placeholder="Rue, numéro, quartier...">${this.currentUser?.adresse || ''}</textarea>
                             </div>
-                        </div>
-                        
-                        <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                            <div class="flex items-start">
-                                <i class="fas fa-info-circle text-blue-600 mr-3 mt-1"></i>
-                                <div class="text-sm text-blue-700">
-                                    <p class="font-medium">Important :</p>
-                                    <p>Le paiement s'effectue uniquement à la livraison. Aucun paiement en ligne n'est requis.</p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="wilaya" class="block text-sm font-medium text-gray-700 mb-2">Wilaya *</label>
+                                    <select id="wilaya" name="wilaya" required 
+                                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                                        <option value="">Sélectionnez votre wilaya</option>
+                                        <option value="Adrar" ${this.currentUser?.wilaya === 'Adrar' ? 'selected' : ''}>01 - Adrar</option>
+                                        <option value="Chlef" ${this.currentUser?.wilaya === 'Chlef' ? 'selected' : ''}>02 - Chlef</option>
+                                        <option value="Laghouat" ${this.currentUser?.wilaya === 'Laghouat' ? 'selected' : ''}>03 - Laghouat</option>
+                                        <option value="Oum El Bouaghi" ${this.currentUser?.wilaya === 'Oum El Bouaghi' ? 'selected' : ''}>04 - Oum El Bouaghi</option>
+                                        <option value="Batna" ${this.currentUser?.wilaya === 'Batna' ? 'selected' : ''}>05 - Batna</option>
+                                        <option value="Béjaïa" ${this.currentUser?.wilaya === 'Béjaïa' ? 'selected' : ''}>06 - Béjaïa</option>
+                                        <option value="Biskra" ${this.currentUser?.wilaya === 'Biskra' ? 'selected' : ''}>07 - Biskra</option>
+                                        <option value="Béchar" ${this.currentUser?.wilaya === 'Béchar' ? 'selected' : ''}>08 - Béchar</option>
+                                        <option value="Blida" ${this.currentUser?.wilaya === 'Blida' ? 'selected' : ''}>09 - Blida</option>
+                                        <option value="Bouira" ${this.currentUser?.wilaya === 'Bouira' ? 'selected' : ''}>10 - Bouira</option>
+                                        <option value="Tamanrasset" ${this.currentUser?.wilaya === 'Tamanrasset' ? 'selected' : ''}>11 - Tamanrasset</option>
+                                        <option value="Tébessa" ${this.currentUser?.wilaya === 'Tébessa' ? 'selected' : ''}>12 - Tébessa</option>
+                                        <option value="Tlemcen" ${this.currentUser?.wilaya === 'Tlemcen' ? 'selected' : ''}>13 - Tlemcen</option>
+                                        <option value="Tiaret" ${this.currentUser?.wilaya === 'Tiaret' ? 'selected' : ''}>14 - Tiaret</option>
+                                        <option value="Tizi Ouzou" ${this.currentUser?.wilaya === 'Tizi Ouzou' ? 'selected' : ''}>15 - Tizi Ouzou</option>
+                                        <option value="Alger" ${this.currentUser?.wilaya === 'Alger' ? 'selected' : ''}>16 - Alger</option>
+                                        <option value="Djelfa" ${this.currentUser?.wilaya === 'Djelfa' ? 'selected' : ''}>17 - Djelfa</option>
+                                        <option value="Jijel" ${this.currentUser?.wilaya === 'Jijel' ? 'selected' : ''}>18 - Jijel</option>
+                                        <option value="Sétif" ${this.currentUser?.wilaya === 'Sétif' ? 'selected' : ''}>19 - Sétif</option>
+                                        <option value="Saïda" ${this.currentUser?.wilaya === 'Saïda' ? 'selected' : ''}>20 - Saïda</option>
+                                        <option value="Skikda" ${this.currentUser?.wilaya === 'Skikda' ? 'selected' : ''}>21 - Skikda</option>
+                                        <option value="Sidi Bel Abbès" ${this.currentUser?.wilaya === 'Sidi Bel Abbès' ? 'selected' : ''}>22 - Sidi Bel Abbès</option>
+                                        <option value="Annaba" ${this.currentUser?.wilaya === 'Annaba' ? 'selected' : ''}>23 - Annaba</option>
+                                        <option value="Guelma" ${this.currentUser?.wilaya === 'Guelma' ? 'selected' : ''}>24 - Guelma</option>
+                                        <option value="Constantine" ${this.currentUser?.wilaya === 'Constantine' ? 'selected' : ''}>25 - Constantine</option>
+                                        <option value="Médéa" ${this.currentUser?.wilaya === 'Médéa' ? 'selected' : ''}>26 - Médéa</option>
+                                        <option value="Mostaganem" ${this.currentUser?.wilaya === 'Mostaganem' ? 'selected' : ''}>27 - Mostaganem</option>
+                                        <option value="M'Sila" ${this.currentUser?.wilaya === 'M\'Sila' ? 'selected' : ''}>28 - M'Sila</option>
+                                        <option value="Mascara" ${this.currentUser?.wilaya === 'Mascara' ? 'selected' : ''}>29 - Mascara</option>
+                                        <option value="Ouargla" ${this.currentUser?.wilaya === 'Ouargla' ? 'selected' : ''}>30 - Ouargla</option>
+                                        <option value="Oran" ${this.currentUser?.wilaya === 'Oran' ? 'selected' : ''}>31 - Oran</option>
+                                        <option value="El Bayadh" ${this.currentUser?.wilaya === 'El Bayadh' ? 'selected' : ''}>32 - El Bayadh</option>
+                                        <option value="Illizi" ${this.currentUser?.wilaya === 'Illizi' ? 'selected' : ''}>33 - Illizi</option>
+                                        <option value="Bordj Bou Arréridj" ${this.currentUser?.wilaya === 'Bordj Bou Arréridj' ? 'selected' : ''}>34 - Bordj Bou Arréridj</option>
+                                        <option value="Boumerdès" ${this.currentUser?.wilaya === 'Boumerdès' ? 'selected' : ''}>35 - Boumerdès</option>
+                                        <option value="El Tarf" ${this.currentUser?.wilaya === 'El Tarf' ? 'selected' : ''}>36 - El Tarf</option>
+                                        <option value="Tindouf" ${this.currentUser?.wilaya === 'Tindouf' ? 'selected' : ''}>37 - Tindouf</option>
+                                        <option value="Tissemsilt" ${this.currentUser?.wilaya === 'Tissemsilt' ? 'selected' : ''}>38 - Tissemsilt</option>
+                                        <option value="El Oued" ${this.currentUser?.wilaya === 'El Oued' ? 'selected' : ''}>39 - El Oued</option>
+                                        <option value="Khenchela" ${this.currentUser?.wilaya === 'Khenchela' ? 'selected' : ''}>40 - Khenchela</option>
+                                        <option value="Souk Ahras" ${this.currentUser?.wilaya === 'Souk Ahras' ? 'selected' : ''}>41 - Souk Ahras</option>
+                                        <option value="Tipaza" ${this.currentUser?.wilaya === 'Tipaza' ? 'selected' : ''}>42 - Tipaza</option>
+                                        <option value="Mila" ${this.currentUser?.wilaya === 'Mila' ? 'selected' : ''}>43 - Mila</option>
+                                        <option value="Aïn Defla" ${this.currentUser?.wilaya === 'Aïn Defla' ? 'selected' : ''}>44 - Aïn Defla</option>
+                                        <option value="Naâma" ${this.currentUser?.wilaya === 'Naâma' ? 'selected' : ''}>45 - Naâma</option>
+                                        <option value="Aïn Témouchent" ${this.currentUser?.wilaya === 'Aïn Témouchent' ? 'selected' : ''}>46 - Aïn Témouchent</option>
+                                        <option value="Ghardaïa" ${this.currentUser?.wilaya === 'Ghardaïa' ? 'selected' : ''}>47 - Ghardaïa</option>
+                                        <option value="Relizane" ${this.currentUser?.wilaya === 'Relizane' ? 'selected' : ''}>48 - Relizane</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="codePostal" class="block text-sm font-medium text-gray-700 mb-2">Code postal</label>
+                                    <input type="text" id="codePostal" name="codePostal" 
+                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                           value="${this.currentUser?.codePostal || ''}"
+                                           placeholder="Code postal (optionnel)">
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    
+                    <!-- Payment Method -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6">Mode de paiement</h2>
+                        <div class="space-y-4">
+                            <label class="flex items-center p-4 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                <input type="radio" name="modePaiement" value="paiement-livraison" checked 
+                                       class="text-emerald-600 focus:ring-emerald-500">
+                                <div class="ml-3">
+                                    <div class="font-medium text-gray-900">Paiement à la livraison</div>
+                                    <div class="text-sm text-gray-600">Payez en espèces lors de la réception</div>
+                                </div>
+                            </label>
+                            
+                            <!-- Future payment methods can be added here -->
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <p class="text-blue-800 text-sm">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    D'autres modes de paiement seront disponibles prochainement
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Comments -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6">Commentaires (optionnel)</h2>
+                        <textarea id="commentaires" name="commentaires" rows="3" 
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                  placeholder="Instructions spéciales, préférences de livraison..."></textarea>
                     </div>
                 </div>
                 
-                <!-- Résumé de la commande -->
-                <div class="lg:col-span-1">
-                    <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6 sticky top-4">
-                        <h2 class="text-xl font-semibold text-emerald-800 mb-6">
-                            <i class="fas fa-shopping-bag mr-2"></i>
-                            Résumé de la commande
-                        </h2>
-                        
-                        <!-- Articles -->
-                        <div class="space-y-4 mb-6">
+                <!-- Order Summary -->
+                <div class="space-y-6">
+                    <!-- Cart Items -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6">Votre commande</h2>
+                        <div class="space-y-4">
                             ${this.cart.map(item => `
-                                <div class="flex items-center space-x-3 p-3 bg-emerald-50/50 rounded-xl border border-emerald-200/50">
+                                <div class="flex items-center space-x-4 py-3 border-b border-gray-100 last:border-b-0">
                                     <img src="${item.image}" alt="${item.nom}" 
-                                         class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200">
+                                         class="w-16 h-16 object-cover rounded-lg">
                                     <div class="flex-1">
-                                        <h4 class="font-medium text-emerald-800 text-sm line-clamp-2">${item.nom}</h4>
-                                        <p class="text-sm text-emerald-600">
-                                            ${item.quantite} × ${item.prix} DA
-                                        </p>
-                                        <p class="text-sm font-medium text-emerald-800">
-                                            ${item.quantite * item.prix} DA
-                                        </p>
+                                        <h4 class="font-medium text-gray-900">${item.nom}</h4>
+                                        <p class="text-sm text-gray-600">${item.prix} DA × ${item.quantite}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-medium text-gray-900">${item.prix * item.quantite} DA</p>
                                     </div>
                                 </div>
                             `).join('')}
                         </div>
-                        
-                        <!-- Totaux -->
-                        <div class="border-t border-emerald-200 pt-4 space-y-2">
-                            <div class="flex justify-between text-sm">
-                                <span class="text-emerald-600">Sous-total :</span>
-                                <span id="checkoutSubtotal" class="text-emerald-800">${this.getCartTotal()} DA</span>
+                    </div>
+                    
+                    <!-- Order Total -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6">
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-gray-600">
+                                <span>Sous-total:</span>
+                                <span>${sousTotal} DA</span>
                             </div>
-                            <div class="flex justify-between text-sm">
-                                <span class="text-emerald-600">Livraison :</span>
-                                <span id="checkoutShipping" class="text-emerald-800">Calcul en cours...</span>
+                            <div class="flex justify-between text-gray-600">
+                                <span>Frais de livraison:</span>
+                                <span>${fraisLivraison} DA</span>
                             </div>
-                            <div class="border-t border-emerald-200 pt-2">
-                                <div class="flex justify-between text-lg font-semibold">
-                                    <span class="text-emerald-800">Total :</span>
-                                    <span id="checkoutTotal" class="text-emerald-600">Calcul en cours...</span>
+                            ${sousTotal >= 5000 ? `
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                                    <p class="text-green-800 text-sm font-medium">
+                                        <i class="fas fa-check-circle mr-2"></i>
+                                        Livraison gratuite !
+                                    </p>
+                                </div>
+                            ` : `
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                    <p class="text-blue-800 text-sm">
+                                        <i class="fas fa-info-circle mr-2"></i>
+                                        Livraison gratuite à partir de 5 000 DA
+                                    </p>
+                                </div>
+                            `}
+                            <div class="border-t border-gray-200 pt-3">
+                                <div class="flex justify-between text-lg font-bold text-gray-900">
+                                    <span>Total:</span>
+                                    <span class="text-emerald-600">${total} DA</span>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Informations de livraison -->
-                        <div class="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-                            <div class="flex items-start">
-                                <i class="fas fa-truck text-emerald-600 mr-3 mt-1"></i>
-                                <div class="text-sm">
-                                    <p class="font-medium text-emerald-800">Livraison</p>
-                                    <p class="text-emerald-700">Délai de livraison : 2-5 jours ouvrables</p>
-                                    <p id="freeShippingInfo" class="text-emerald-600 font-medium mt-1"></p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Bouton de commande -->
-                        <button onclick="submitOrder()" 
-                                class="w-full mt-6 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 text-lg"
-                                id="orderButton">
-                            <span id="orderButtonText">
-                                <i class="fas fa-check-circle mr-2"></i>
+                        <button type="submit" id="submitOrderBtn" 
+                                class="w-full mt-6 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg">
+                            <span id="submitOrderText">
+                                <i class="fas fa-credit-card mr-2"></i>
                                 Confirmer la commande
                             </span>
-                            <i id="orderSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                            <span id="submitOrderSpinner" class="hidden">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>
+                                Traitement en cours...
+                            </span>
                         </button>
                         
-                        <div id="checkoutError" class="mt-4 hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                        <div class="mt-4 text-center">
+                            <button type="button" onclick="app.showPage('products')" 
+                                    class="text-emerald-600 hover:text-emerald-700 font-medium">
+                                <i class="fas fa-arrow-left mr-2"></i>
+                                Continuer les achats
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    // Add form submission handler
+    this.setupCheckoutForm();
+};
+
+// Setup checkout form validation and submission
+PharmacieGaherApp.prototype.setupCheckoutForm = function() {
+    const form = document.getElementById('checkoutForm');
+    
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.processOrder();
+        });
+    }
+};
+
+// Process order submission - FIXED to use backend
+PharmacieGaherApp.prototype.processOrder = async function() {
+    try {
+        const submitBtn = document.getElementById('submitOrderBtn');
+        const submitText = document.getElementById('submitOrderText');
+        const submitSpinner = document.getElementById('submitOrderSpinner');
+        
+        // Disable form
+        submitBtn.disabled = true;
+        submitText.classList.add('hidden');
+        submitSpinner.classList.remove('hidden');
+        
+        // Get form data
+        const form = document.getElementById('checkoutForm');
+        const formData = new FormData(form);
+        
+        // Validate required fields
+        const requiredFields = ['prenom', 'nom', 'email', 'telephone', 'adresse', 'wilaya'];
+        const missingFields = [];
+        
+        for (const field of requiredFields) {
+            if (!formData.get(field)?.trim()) {
+                missingFields.push(field);
+            }
+        }
+        
+        if (missingFields.length > 0) {
+            throw new Error('Veuillez remplir tous les champs obligatoires');
+        }
+        
+        // Validate email
+        const email = formData.get('email').trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw new Error('Veuillez entrer une adresse email valide');
+        }
+        
+        // Validate phone
+        const telephone = formData.get('telephone').trim();
+        const phoneRegex = /^(\+213|0)[0-9]{9}$/;
+        if (!phoneRegex.test(telephone)) {
+            throw new Error('Veuillez entrer un numéro de téléphone algérien valide');
+        }
+        
+        // Calculate totals
+        const sousTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
+        const total = sousTotal + fraisLivraison;
+        
+        // Prepare order data
+        const orderData = {
+            client: {
+                prenom: formData.get('prenom').trim(),
+                nom: formData.get('nom').trim(),
+                email: email,
+                telephone: telephone,
+                adresse: formData.get('adresse').trim(),
+                wilaya: formData.get('wilaya'),
+                codePostal: formData.get('codePostal')?.trim() || ''
+            },
+            articles: this.cart.map(item => ({
+                id: item.id,
+                nom: item.nom,
+                prix: item.prix,
+                quantite: item.quantite,
+                image: item.image,
+                categorie: item.categorie
+            })),
+            sousTotal: sousTotal,
+            fraisLivraison: fraisLivraison,
+            total: total,
+            modePaiement: formData.get('modePaiement') || 'paiement-livraison',
+            commentaires: formData.get('commentaires')?.trim() || ''
+        };
+        
+        console.log('🛒 Submitting order:', orderData);
+        
+        // Try to submit to backend first
+        let orderResult = null;
+        let backendSuccess = false;
+        
+        try {
+            console.log('📡 Submitting order to backend...');
+            const response = await apiCall('/orders', {
+                method: 'POST',
+                body: JSON.stringify(orderData)
+            });
+            
+            if (response && response.order) {
+                orderResult = response.order;
+                backendSuccess = true;
+                console.log('✅ Order submitted to backend successfully:', orderResult.numeroCommande);
+                
+                this.showToast('Commande créée avec succès et synchronisée !', 'success');
+            }
+        } catch (error) {
+            console.warn('⚠️ Backend submission failed, creating local order:', error.message);
+            
+            // Fallback to local order creation
+            orderResult = {
+                _id: Date.now().toString(),
+                numeroCommande: this.generateOrderNumber(),
+                ...orderData,
+                statut: 'en-attente',
+                dateCommande: new Date().toISOString()
+            };
+            
+            this.showToast('Commande créée localement (sera synchronisée plus tard)', 'warning');
+        }
+        
+        // Add order to local storage for admin panel
+        if (orderResult) {
+            if (window.addOrderToDemo) {
+                window.addOrderToDemo(orderResult);
+            }
+            
+            // Clear cart
+            this.clearCart();
+            
+            // Show success page
+            this.showPage('order-confirmation', { 
+                orderNumber: orderResult.numeroCommande,
+                backendSuccess: backendSuccess
+            });
+        } else {
+            throw new Error('Échec de la création de la commande');
+        }
+        
+    } catch (error) {
+        console.error('❌ Order processing error:', error);
+        this.showToast(error.message || 'Erreur lors du traitement de la commande', 'error');
+        
+        // Re-enable form
+        const submitBtn = document.getElementById('submitOrderBtn');
+        const submitText = document.getElementById('submitOrderText');
+        const submitSpinner = document.getElementById('submitOrderSpinner');
+        
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitText.classList.remove('hidden');
+            submitSpinner.classList.add('hidden');
+        }
+    }
+};
+
+// Generate order number
+PharmacieGaherApp.prototype.generateOrderNumber = function() {
+    const timestamp = Date.now().toString();
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `CMD${timestamp.slice(-6)}${random}`;
+};
+
+// Order confirmation page
+PharmacieGaherApp.prototype.loadOrderConfirmationPage = async function(orderNumber, backendSuccess = false) {
+    const mainContent = document.getElementById('mainContent');
+    
+    mainContent.innerHTML = `
+        <div class="container mx-auto px-4 py-8 max-w-4xl">
+            <div class="text-center">
+                <div class="mb-8">
+                    <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-check text-green-600 text-4xl"></i>
+                    </div>
+                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Commande confirmée !</h1>
+                    <p class="text-xl text-gray-600 mb-2">Merci pour votre confiance</p>
+                    ${backendSuccess ? `
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md mx-auto">
+                            <p class="text-green-800 text-sm">✅ Commande synchronisée avec nos serveurs</p>
+                        </div>
+                    ` : `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md mx-auto">
+                            <p class="text-yellow-800 text-sm">⚠️ Commande enregistrée localement (sera synchronisée automatiquement)</p>
+                        </div>
+                    `}
+                </div>
+                
+                <div class="bg-white rounded-2xl shadow-lg p-8 mb-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Détails de votre commande</h2>
+                    
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-6 mb-6">
+                        <div class="text-center">
+                            <p class="text-sm text-emerald-600 mb-2">Numéro de commande</p>
+                            <p class="text-3xl font-bold text-emerald-800">${orderNumber}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4 text-left">
+                        <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                            <span class="text-gray-600">Statut:</span>
+                            <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">En attente</span>
+                        </div>
+                        <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                            <span class="text-gray-600">Mode de paiement:</span>
+                            <span class="font-medium">Paiement à la livraison</span>
+                        </div>
+                        <div class="flex items-center justify-between py-3">
+                            <span class="text-gray-600">Date de commande:</span>
+                            <span class="font-medium">${new Date().toLocaleDateString('fr-FR')}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <h3 class="text-xl font-bold text-gray-900">Que se passe-t-il maintenant ?</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                        <div class="bg-blue-50 rounded-lg p-6">
+                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-clock text-blue-600 text-xl"></i>
+                            </div>
+                            <h4 class="font-bold text-blue-800 mb-2">1. Traitement</h4>
+                            <p class="text-blue-600 text-sm">Nous préparons votre commande avec soin</p>
                         </div>
                         
-                        <p class="text-xs text-emerald-600 text-center mt-4">
-                            En passant commande, vous acceptez nos conditions de vente.
-                        </p>
+                        <div class="bg-purple-50 rounded-lg p-6">
+                            <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-truck text-purple-600 text-xl"></i>
+                            </div>
+                            <h4 class="font-bold text-purple-800 mb-2">2. Expédition</h4>
+                            <p class="text-purple-600 text-sm">Livraison dans les plus brefs délais</p>
+                        </div>
+                        
+                        <div class="bg-green-50 rounded-lg p-6">
+                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-home text-green-600 text-xl"></i>
+                            </div>
+                            <h4 class="font-bold text-green-800 mb-2">3. Réception</h4>
+                            <p class="text-green-600 text-sm">Recevez vos produits chez vous</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-12 space-y-4">
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
+                        <h4 class="font-bold text-emerald-800 mb-2">
+                            <i class="fas fa-phone mr-2"></i>
+                            Besoin d'aide ?
+                        </h4>
+                        <p class="text-emerald-700 mb-4">Notre équipe est là pour vous accompagner</p>
+                        <div class="space-y-2 text-sm text-emerald-600">
+                            <p><i class="fas fa-envelope mr-2"></i>pharmaciegaher@gmail.com</p>
+                            <p><i class="fas fa-phone mr-2"></i>+213 123 456 789</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                        <button onclick="app.showPage('home')" 
+                                class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-home mr-2"></i>
+                            Retour à l'accueil
+                        </button>
+                        <button onclick="app.showPage('products')" 
+                                class="bg-white text-emerald-600 font-bold py-3 px-8 rounded-xl border-2 border-emerald-600 hover:bg-emerald-50 transition-all">
+                            <i class="fas fa-shopping-bag mr-2"></i>
+                            Continuer les achats
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     `;
-    
-    // Calculer les frais de livraison
-    await this.calculateShippingCosts();
 };
 
-// Calculate shipping costs
-PharmacieGaherApp.prototype.calculateShippingCosts = async function() {
-    try {
-        const response = await fetch(buildApiUrl('/settings/shipping'));
-        let shippingInfo;
-        
-        if (response.ok) {
-            shippingInfo = await response.json();
-        } else {
-            // Fallback values
-            shippingInfo = {
-                fraisLivraison: 300,
-                livraisonGratuite: 5000
-            };
-        }
-        
-        const subtotal = this.getCartTotal();
-        const shippingCost = subtotal >= shippingInfo.livraisonGratuite ? 0 : shippingInfo.fraisLivraison;
-        const total = subtotal + shippingCost;
-        
-        // Update display
-        const shippingElement = document.getElementById('checkoutShipping');
-        const totalElement = document.getElementById('checkoutTotal');
-        const freeShippingInfo = document.getElementById('freeShippingInfo');
-        
-        if (shippingElement) shippingElement.textContent = `${shippingCost} DA`;
-        if (totalElement) totalElement.textContent = `${total} DA`;
-        
-        if (freeShippingInfo) {
-            if (shippingCost === 0) {
-                freeShippingInfo.textContent = '🎉 Livraison gratuite !';
-            } else {
-                const remaining = shippingInfo.livraisonGratuite - subtotal;
-                freeShippingInfo.textContent = `Plus que ${remaining} DA pour la livraison gratuite`;
-            }
-        }
-        
-    } catch (error) {
-        console.error('Erreur calcul frais livraison:', error);
-        const shippingElement = document.getElementById('checkoutShipping');
-        const totalElement = document.getElementById('checkoutTotal');
-        
-        if (shippingElement) shippingElement.textContent = '300 DA';
-        if (totalElement) totalElement.textContent = `${this.getCartTotal() + 300} DA`;
-    }
-};
-
-// Order confirmation page
-PharmacieGaherApp.prototype.loadOrderConfirmationPage = async function(orderNumber) {
-    try {
-        let order = null;
-        
-        // Try to get order from API
-        try {
-            const response = await fetch(buildApiUrl(`/orders/${orderNumber}`));
-            if (response.ok) {
-                order = await response.json();
-            }
-        } catch (apiError) {
-            console.log('API unavailable, using localStorage order');
-        }
-        
-        // Fallback to localStorage if API fails
-        if (!order) {
-            const storedOrder = localStorage.getItem('lastOrder');
-            if (storedOrder) {
-                order = JSON.parse(storedOrder);
-            } else {
-                throw new Error('Commande non trouvée');
-            }
-        }
-        
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-4xl">
-                <div class="text-center mb-12">
-                    <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <i class="fas fa-check-circle text-green-600 text-4xl"></i>
-                    </div>
-                    <h1 class="text-3xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
-                    <p class="text-xl text-emerald-600">Merci pour votre commande</p>
-                </div>
-                
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8 mb-8">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                        <div>
-                            <h3 class="font-semibold text-emerald-800 mb-4">Détails de la commande</h3>
-                            <div class="space-y-2 text-sm">
-                                <div class="flex justify-between">
-                                    <span class="text-emerald-600">Numéro de commande :</span>
-                                    <span class="font-medium text-emerald-800">${order.numeroCommande || orderNumber}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-emerald-600">Date :</span>
-                                    <span class="text-emerald-800">${new Date(order.dateCommande || Date.now()).toLocaleDateString('fr-FR')}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-emerald-600">Statut :</span>
-                                    <span class="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold">En attente</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-emerald-600">Mode de paiement :</span>
-                                    <span class="text-emerald-800">${order.modePaiement || 'Paiement à la livraison'}</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <h3 class="font-semibold text-emerald-800 mb-4">Adresse de livraison</h3>
-                            <div class="text-sm text-emerald-700">
-                                <p class="font-medium">${order.client.prenom} ${order.client.nom}</p>
-                                <p>${order.client.adresse}</p>
-                                <p>${order.client.wilaya}, Algérie</p>
-                                <p class="mt-2">
-                                    <i class="fas fa-phone mr-2 text-emerald-400"></i>
-                                    ${order.client.telephone}
-                                </p>
-                                <p>
-                                    <i class="fas fa-envelope mr-2 text-emerald-400"></i>
-                                    ${order.client.email}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Articles commandés -->
-                    <div class="border-t border-emerald-200 pt-6">
-                        <h3 class="font-semibold text-emerald-800 mb-4">Articles commandés</h3>
-                        <div class="space-y-3">
-                            ${order.articles.map(article => `
-                                <div class="flex items-center space-x-4 p-4 bg-emerald-50/50 rounded-xl border border-emerald-200/50">
-                                    <img src="${article.image || 'https://via.placeholder.com/64x64/10b981/ffffff?text=' + encodeURIComponent(article.nom.substring(0, 2))}" 
-                                         alt="${article.nom}" 
-                                         class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200">
-                                    <div class="flex-1">
-                                        <h4 class="font-medium text-emerald-800">${article.nom}</h4>
-                                        <p class="text-sm text-emerald-600">
-                                            Quantité: ${article.quantite} × ${article.prix} DA
-                                        </p>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="font-medium text-emerald-800">${article.quantite * article.prix} DA</p>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        
-                        <!-- Totaux -->
-                        <div class="border-t border-emerald-200 mt-6 pt-4">
-                            <div class="space-y-2">
-                                <div class="flex justify-between text-sm">
-                                    <span class="text-emerald-600">Sous-total :</span>
-                                    <span class="text-emerald-800">${order.sousTotal} DA</span>
-                                </div>
-                                <div class="flex justify-between text-sm">
-                                    <span class="text-emerald-600">Frais de livraison :</span>
-                                    <span class="text-emerald-800">${order.fraisLivraison} DA</span>
-                                </div>
-                                <div class="flex justify-between text-lg font-semibold border-t border-emerald-200 pt-2">
-                                    <span class="text-emerald-800">Total :</span>
-                                    <span class="text-emerald-600">${order.total} DA</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Informations importantes -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-6">
-                        <div class="flex items-start">
-                            <i class="fas fa-info-circle text-blue-600 mr-3 mt-1"></i>
-                            <div>
-                                <h4 class="font-medium text-blue-900 mb-2">Prochaines étapes</h4>
-                                <div class="text-blue-800 text-sm space-y-1">
-                                    <p>• Nous préparons votre commande</p>
-                                    <p>• Vous recevrez un suivi par email</p>
-                                    <p>• Livraison sous 2-5 jours ouvrables</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-green-50 border border-green-200 rounded-xl p-6">
-                        <div class="flex items-start">
-                            <i class="fas fa-headset text-green-600 mr-3 mt-1"></i>
-                            <div>
-                                <h4 class="font-medium text-green-900 mb-2">Besoin d'aide ?</h4>
-                                <div class="text-green-800 text-sm space-y-1">
-                                    <p>Email: pharmaciegaher@gmail.com</p>
-                                    <p>Téléphone: +213 123 456 789</p>
-                                    <p>Numéro de commande: ${order.numeroCommande || orderNumber}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Actions -->
-                <div class="text-center space-y-4">
-                    <button onclick="app.showPage('products')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 mr-4">
-                        <i class="fas fa-shopping-bag mr-2"></i>
-                        Continuer mes achats
-                    </button>
-                    ${this.currentUser ? `
-                    <button onclick="app.showPage('profile')" class="bg-white text-emerald-600 border-2 border-emerald-200 font-semibold py-3 px-8 rounded-xl hover:bg-emerald-50 hover:border-emerald-300 transition-all">
-                        <i class="fas fa-user mr-2"></i>
-                        Mon compte
-                    </button>
-                    ` : ''}
-                    
-                    <p class="text-sm text-emerald-600 mt-4">
-                        Vous pouvez suivre l'état de votre commande en nous contactant avec votre numéro de commande.
-                    </p>
-                </div>
-            </div>
-        `;
-        
-    } catch (error) {
-        console.error('Erreur chargement confirmation:', error);
-        this.showToast('Erreur lors du chargement de la confirmation', 'error');
-        this.showPage('home');
-    }
-};
-
-// Validate checkout form
-function validateCheckoutForm() {
-    const form = document.getElementById('checkoutForm');
-    const requiredFields = ['nom', 'prenom', 'email', 'telephone', 'adresse', 'wilaya'];
-    let isValid = true;
-    
-    requiredFields.forEach(field => {
-        const input = form.querySelector(`[name="${field}"]`);
-        if (!input || !input.value.trim()) {
-            input?.classList.add('border-red-500');
-            isValid = false;
-        } else {
-            input?.classList.remove('border-red-500');
-        }
-    });
-    
-    // Validate email format
-    const emailInput = form.querySelector('[name="email"]');
-    if (emailInput && emailInput.value) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(emailInput.value)) {
-            emailInput.classList.add('border-red-500');
-            isValid = false;
-        } else {
-            emailInput.classList.remove('border-red-500');
-        }
-    }
-    
-    return isValid;
-}
-
-// Submit order - COMPLETE FIXED VERSION WITH PROPER ADMIN INTEGRATION
-async function submitOrder() {
-    console.log('📦 submitOrder called - Starting order submission process');
-    
-    if (!validateCheckoutForm()) {
-        app.showToast('Veuillez remplir tous les champs obligatoires', 'error');
-        return;
-    }
-    
-    if (app.cart.length === 0) {
-        app.showToast('Votre panier est vide', 'error');
-        return;
-    }
-    
-    const form = document.getElementById('checkoutForm');
-    const formData = new FormData(form);
-    
-    const orderButton = document.getElementById('orderButton');
-    const orderButtonText = document.getElementById('orderButtonText');
-    const orderSpinner = document.getElementById('orderSpinner');
-    const errorDiv = document.getElementById('checkoutError');
-    
-    // Disable button and show loading
-    orderButton.disabled = true;
-    orderButtonText.textContent = 'Traitement en cours...';
-    orderSpinner.classList.remove('hidden');
-    errorDiv.classList.add('hidden');
-    
-    try {
-        // Calculate totals
-        const subtotal = app.getCartTotal();
-        let shippingCost = 300; // Default shipping
-        
-        try {
-            const shippingResponse = await fetch(buildApiUrl('/settings/shipping'));
-            if (shippingResponse.ok) {
-                const shippingInfo = await shippingResponse.json();
-                shippingCost = subtotal >= shippingInfo.livraisonGratuite ? 0 : shippingInfo.fraisLivraison;
-            }
-        } catch (error) {
-            console.log('Using default shipping cost');
-        }
-        
-        const total = subtotal + shippingCost;
-        
-        // Generate order number
-        const timestamp = Date.now();
-        const orderNumber = `PG${timestamp.toString().slice(-6)}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-        
-        // Prepare comprehensive order data
-        const orderData = {
-            _id: timestamp.toString(),
-            numeroCommande: orderNumber,
-            client: {
-                nom: formData.get('nom').trim(),
-                prenom: formData.get('prenom').trim(),
-                email: formData.get('email').trim().toLowerCase(),
-                telephone: formData.get('telephone').trim(),
-                adresse: formData.get('adresse').trim(),
-                wilaya: formData.get('wilaya')
-            },
-            articles: app.cart.map(item => ({
-                produitId: item.id,
-                nom: item.nom,
-                prix: item.prix,
-                quantite: item.quantite,
-                image: item.image
-            })),
-            commentaires: formData.get('commentaires')?.trim() || '',
-            sousTotal: subtotal,
-            fraisLivraison: shippingCost,
-            total: total,
-            modePaiement: 'Paiement à la livraison',
-            dateCommande: new Date().toISOString(),
-            statut: 'en-attente'
-        };
-        
-        console.log('📋 Order data prepared:', {
-            orderNumber: orderData.numeroCommande,
-            total: orderData.total,
-            articlesCount: orderData.articles.length,
-            client: `${orderData.client.prenom} ${orderData.client.nom}`
-        });
-        
-        // PRIMARY: Add to admin orders (ALWAYS do this)
-        let orderSavedToAdmin = false;
-        try {
-            if (window.addOrderToDemo && typeof window.addOrderToDemo === 'function') {
-                console.log('💾 Adding order to admin demo...');
-                const createdOrder = window.addOrderToDemo(orderData);
-                if (createdOrder) {
-                    orderSavedToAdmin = true;
-                    console.log('✅ Order successfully added to admin panel');
-                } else {
-                    console.warn('⚠️ addOrderToDemo returned null/undefined');
-                }
-            } else {
-                console.warn('⚠️ addOrderToDemo function not found, using direct localStorage');
-                // Fallback: directly add to localStorage
-                let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-                adminOrders.unshift(orderData);
-                localStorage.setItem('adminOrders', JSON.stringify(adminOrders));
-                orderSavedToAdmin = true;
-                console.log('✅ Order added directly to localStorage');
-            }
-        } catch (error) {
-            console.error('❌ Error adding order to admin:', error);
-            orderSavedToAdmin = false;
-        }
-        
-        // SECONDARY: Try to send to API (optional, don't fail if this doesn't work)
-        let orderSavedToAPI = false;
-        try {
-            console.log('🌐 Attempting to send order to API...');
-            const response = await fetch(buildApiUrl('/orders'), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(orderData)
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                orderSavedToAPI = true;
-                console.log('✅ Order successfully sent to API:', result);
-            } else {
-                console.log('⚠️ API returned error status:', response.status);
-            }
-        } catch (apiError) {
-            console.log('⚠️ API unavailable:', apiError.message);
-        }
-        
-        // Store for confirmation page
-        localStorage.setItem('lastOrder', JSON.stringify(orderData));
-        
-        // Verify order was saved properly
-        if (!orderSavedToAdmin) {
-            console.error('❌ CRITICAL: Order was not saved to admin panel');
-            throw new Error('Erreur critique: la commande n\'a pas pu être enregistrée');
-        }
-        
-        // Clear cart
-        console.log('🛒 Clearing cart...');
-        app.clearCart(true);
-        
-        // Show success message
-        app.showToast('Commande créée avec succès !', 'success');
-        
-        console.log('🎉 Order submission completed successfully');
-        console.log(`📊 Summary: Admin=${orderSavedToAdmin ? 'OK' : 'FAILED'}, API=${orderSavedToAPI ? 'OK' : 'FAILED'}`);
-        
-        // Redirect to confirmation page
-        setTimeout(() => {
-            app.showPage('order-confirmation', { orderNumber: orderNumber });
-        }, 500);
-        
-    } catch (error) {
-        console.error('❌ Critical error during order submission:', error);
-        errorDiv.textContent = error.message || 'Erreur lors de la création de la commande';
-        errorDiv.classList.remove('hidden');
-        
-        // Re-enable button
-        orderButton.disabled = false;
-        orderButtonText.innerHTML = `
-            <i class="fas fa-check-circle mr-2"></i>
-            Confirmer la commande
-        `;
-        orderSpinner.classList.add('hidden');
-    }
-}
-
-// Handle checkout form submit
-function handleCheckout(event) {
-    event.preventDefault();
-    submitOrder();
-}
-
-// Export global functions
-window.submitOrder = submitOrder;
-window.validateCheckoutForm = validateCheckoutForm;
-window.handleCheckout = handleCheckout;
-
-console.log('✅ Checkout system loaded with complete order management integration');
+console.log('✅ Fixed checkout.js loaded with backend integration');
