@@ -1,680 +1,485 @@
-// Complete Authentication System for Shifa Parapharmacie
-
-// Login Page
-PharmacieGaherApp.prototype.loadLoginPage = async function() {
-    const mainContent = document.getElementById('mainContent');
+// Enhanced Authentication System for Shifa Parapharmacie
+class PharmacieGaherApp {
     
-    mainContent.innerHTML = `
-        <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-green-100 py-12 px-4 sm:px-6 lg:px-8">
-            <div class="max-w-md w-full space-y-8">
-                <div class="text-center">
-                    <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                        <i class="fas fa-seedling text-white text-3xl"></i>
-                    </div>
-                    <h2 class="text-3xl font-bold text-gray-900 mb-2">Connexion</h2>
-                    <p class="text-gray-600">Accédez à votre compte Shifa</p>
-                </div>
-                
-                <div class="bg-white rounded-2xl shadow-xl p-8 border border-emerald-100">
-                    <form id="loginForm" class="space-y-6" onsubmit="handleLogin(event)">
-                        <div>
-                            <label for="loginEmail" class="block text-sm font-medium text-gray-700 mb-2">
-                                Adresse email
-                            </label>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-envelope text-gray-400"></i>
+    // Beautiful login page matching the site's aesthetic
+    async loadLoginPage() {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center py-12">
+                <div class="container mx-auto px-4">
+                    <div class="max-w-md mx-auto">
+                        <!-- Header -->
+                        <div class="text-center mb-8">
+                            <div class="flex justify-center mb-6">
+                                <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl flex items-center justify-center shadow-2xl border-4 border-white/80">
+                                    <i class="fas fa-user text-white text-3xl"></i>
                                 </div>
-                                <input id="loginEmail" name="email" type="email" required 
-                                       class="appearance-none relative block w-full pl-10 pr-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:z-10"
-                                       placeholder="votre@email.com"
-                                       autocomplete="email">
                             </div>
+                            <h1 class="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-green-700 bg-clip-text text-transparent mb-2">
+                                Connexion
+                            </h1>
+                            <p class="text-emerald-600 text-lg">Accédez à votre compte Shifa</p>
                         </div>
                         
-                        <div>
-                            <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                                Mot de passe
-                            </label>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-lock text-gray-400"></i>
+                        <!-- Login Form -->
+                        <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 overflow-hidden">
+                            <div class="p-8">
+                                <form id="loginForm" class="space-y-6">
+                                    <div>
+                                        <label class="block text-emerald-700 font-semibold mb-2">
+                                            <i class="fas fa-envelope mr-2"></i>Email
+                                        </label>
+                                        <input type="email" name="email" required 
+                                               class="w-full px-4 py-4 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm text-lg"
+                                               placeholder="votre@email.com">
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-emerald-700 font-semibold mb-2">
+                                            <i class="fas fa-lock mr-2"></i>Mot de passe
+                                        </label>
+                                        <div class="relative">
+                                            <input type="password" name="password" required 
+                                                   class="w-full px-4 py-4 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm text-lg pr-12"
+                                                   placeholder="••••••••">
+                                            <button type="button" onclick="togglePasswordVisibility('loginForm')" 
+                                                    class="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-500 hover:text-emerald-700">
+                                                <i class="fas fa-eye" id="passwordToggleIcon"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Demo Credentials Info -->
+                                    <div class="bg-gradient-to-r from-blue-100 to-blue-50 border border-blue-200 rounded-xl p-4">
+                                        <h4 class="font-semibold text-blue-800 mb-2">
+                                            <i class="fas fa-info-circle mr-2"></i>Comptes de démonstration
+                                        </h4>
+                                        <div class="text-sm text-blue-700 space-y-2">
+                                            <div class="bg-white/60 rounded-lg p-3">
+                                                <p class="font-medium">👑 Administrateur:</p>
+                                                <p><strong>Email:</strong> pharmaciegaher@gmail.com</p>
+                                                <p><strong>Mot de passe:</strong> anesaya75</p>
+                                            </div>
+                                            <div class="bg-white/60 rounded-lg p-3">
+                                                <p class="font-medium">👤 Utilisateur test:</p>
+                                                <p><strong>Email:</strong> test@example.com</p>
+                                                <p><strong>Mot de passe:</strong> test123</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" 
+                                            class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-6 rounded-2xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-105 text-lg">
+                                        <span id="loginButtonText">
+                                            <i class="fas fa-sign-in-alt mr-2"></i>
+                                            Se connecter
+                                        </span>
+                                        <div id="loginSpinner" class="hidden">
+                                            <i class="fas fa-spinner fa-spin mr-2"></i>
+                                            Connexion...
+                                        </div>
+                                    </button>
+                                </form>
+                                
+                                <!-- Register Link -->
+                                <div class="mt-8 text-center">
+                                    <p class="text-emerald-600 mb-4">Pas encore de compte ?</p>
+                                    <button onclick="app.showPage('register')" 
+                                            class="text-emerald-600 hover:text-emerald-800 font-semibold hover:underline transition-all">
+                                        <i class="fas fa-user-plus mr-2"></i>
+                                        Créer un compte
+                                    </button>
                                 </div>
-                                <input id="loginPassword" name="password" type="password" required 
-                                       class="appearance-none relative block w-full pl-10 pr-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:z-10"
-                                       placeholder="Mot de passe"
-                                       autocomplete="current-password">
+                                
+                                <!-- Back to Home -->
+                                <div class="mt-6 text-center">
+                                    <button onclick="app.showPage('home')" 
+                                            class="text-emerald-500 hover:text-emerald-700 transition-all">
+                                        <i class="fas fa-arrow-left mr-2"></i>
+                                        Retour à l'accueil
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                        
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center">
-                                <input id="rememberMe" name="rememberMe" type="checkbox" 
-                                       class="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded">
-                                <label for="rememberMe" class="ml-2 block text-sm text-gray-900">
-                                    Se souvenir de moi
-                                </label>
-                            </div>
-                            
-                            <div class="text-sm">
-                                <a href="#" onclick="showForgotPassword()" class="font-medium text-emerald-600 hover:text-emerald-500">
-                                    Mot de passe oublié ?
-                                </a>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <button type="submit" id="loginSubmitBtn"
-                                    class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-300 shadow-lg hover:shadow-xl">
-                                <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                                    <i id="loginIcon" class="fas fa-sign-in-alt text-emerald-300 group-hover:text-emerald-200"></i>
-                                    <i id="loginSpinner" class="fas fa-spinner fa-spin text-emerald-300 hidden"></i>
-                                </span>
-                                <span id="loginText">Se connecter</span>
-                            </button>
-                        </div>
-                        
-                        <div class="text-center">
-                            <p class="text-sm text-gray-600">
-                                Pas encore de compte ? 
-                                <a href="#" onclick="app.showPage('register')" class="font-medium text-emerald-600 hover:text-emerald-500">
-                                    Créer un compte
-                                </a>
-                            </p>
-                        </div>
-                    </form>
-                </div>
-                
-                <!-- Demo Login Info -->
-                <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-6">
-                    <h4 class="text-blue-800 font-semibold mb-2">
-                        <i class="fas fa-info-circle mr-2"></i>Compte de démonstration
-                    </h4>
-                    <div class="text-blue-700 text-sm space-y-1">
-                        <p><strong>Admin:</strong> pharmaciegaher@gmail.com</p>
-                        <p><strong>Mot de passe:</strong> anesaya75</p>
                     </div>
                 </div>
             </div>
-        </div>
-    `;
-};
-
-// Register Page
-PharmacieGaherApp.prototype.loadRegisterPage = async function() {
-    const mainContent = document.getElementById('mainContent');
-    
-    mainContent.innerHTML = `
-        <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-green-100 py-12 px-4 sm:px-6 lg:px-8">
-            <div class="max-w-2xl w-full space-y-8">
-                <div class="text-center">
-                    <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                        <i class="fas fa-user-plus text-white text-3xl"></i>
-                    </div>
-                    <h2 class="text-3xl font-bold text-gray-900 mb-2">Créer un compte</h2>
-                    <p class="text-gray-600">Rejoignez la communauté Shifa</p>
-                </div>
-                
-                <div class="bg-white rounded-2xl shadow-xl p-8 border border-emerald-100">
-                    <form id="registerForm" class="space-y-6" onsubmit="handleRegister(event)">
-                        <!-- Personal Information -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label for="registerPrenom" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Prénom *
-                                </label>
-                                <input id="registerPrenom" name="prenom" type="text" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                       placeholder="Votre prénom">
-                            </div>
-                            
-                            <div>
-                                <label for="registerNom" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Nom *
-                                </label>
-                                <input id="registerNom" name="nom" type="text" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                       placeholder="Votre nom">
-                            </div>
-                        </div>
-                        
-                        <!-- Contact Information -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label for="registerEmail" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Email *
-                                </label>
-                                <input id="registerEmail" name="email" type="email" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                       placeholder="votre@email.com">
-                            </div>
-                            
-                            <div>
-                                <label for="registerTelephone" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Téléphone *
-                                </label>
-                                <input id="registerTelephone" name="telephone" type="tel" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                       placeholder="+213 XX XX XX XX XX">
-                            </div>
-                        </div>
-                        
-                        <!-- Address Information -->
-                        <div>
-                            <label for="registerAdresse" class="block text-sm font-medium text-gray-700 mb-2">
-                                Adresse *
-                            </label>
-                            <textarea id="registerAdresse" name="adresse" required rows="2"
-                                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
-                                      placeholder="Votre adresse complète"></textarea>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label for="registerWilaya" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Wilaya *
-                                </label>
-                                <select id="registerWilaya" name="wilaya" required 
-                                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                                    <option value="">Sélectionnez votre wilaya</option>
-                                    <option value="Adrar">01 - Adrar</option>
-                                    <option value="Chlef">02 - Chlef</option>
-                                    <option value="Laghouat">03 - Laghouat</option>
-                                    <option value="Oum El Bouaghi">04 - Oum El Bouaghi</option>
-                                    <option value="Batna">05 - Batna</option>
-                                    <option value="Béjaïa">06 - Béjaïa</option>
-                                    <option value="Biskra">07 - Biskra</option>
-                                    <option value="Béchar">08 - Béchar</option>
-                                    <option value="Blida">09 - Blida</option>
-                                    <option value="Bouira">10 - Bouira</option>
-                                    <option value="Tamanrasset">11 - Tamanrasset</option>
-                                    <option value="Tébessa">12 - Tébessa</option>
-                                    <option value="Tlemcen">13 - Tlemcen</option>
-                                    <option value="Tiaret">14 - Tiaret</option>
-                                    <option value="Tizi Ouzou">15 - Tizi Ouzou</option>
-                                    <option value="Alger">16 - Alger</option>
-                                    <option value="Djelfa">17 - Djelfa</option>
-                                    <option value="Jijel">18 - Jijel</option>
-                                    <option value="Sétif">19 - Sétif</option>
-                                    <option value="Saïda">20 - Saïda</option>
-                                    <option value="Skikda">21 - Skikda</option>
-                                    <option value="Sidi Bel Abbès">22 - Sidi Bel Abbès</option>
-                                    <option value="Annaba">23 - Annaba</option>
-                                    <option value="Guelma">24 - Guelma</option>
-                                    <option value="Constantine">25 - Constantine</option>
-                                    <option value="Médéa">26 - Médéa</option>
-                                    <option value="Mostaganem">27 - Mostaganem</option>
-                                    <option value="M'Sila">28 - M'Sila</option>
-                                    <option value="Mascara">29 - Mascara</option>
-                                    <option value="Ouargla">30 - Ouargla</option>
-                                    <option value="Oran">31 - Oran</option>
-                                    <option value="El Bayadh">32 - El Bayadh</option>
-                                    <option value="Illizi">33 - Illizi</option>
-                                    <option value="Bordj Bou Arréridj">34 - Bordj Bou Arréridj</option>
-                                    <option value="Boumerdès">35 - Boumerdès</option>
-                                    <option value="El Tarf">36 - El Tarf</option>
-                                    <option value="Tindouf">37 - Tindouf</option>
-                                    <option value="Tissemsilt">38 - Tissemsilt</option>
-                                    <option value="El Oued">39 - El Oued</option>
-                                    <option value="Khenchela">40 - Khenchela</option>
-                                    <option value="Souk Ahras">41 - Souk Ahras</option>
-                                    <option value="Tipaza">42 - Tipaza</option>
-                                    <option value="Mila">43 - Mila</option>
-                                    <option value="Aïn Defla">44 - Aïn Defla</option>
-                                    <option value="Naâma">45 - Naâma</option>
-                                    <option value="Aïn Témouchent">46 - Aïn Témouchent</option>
-                                    <option value="Ghardaïa">47 - Ghardaïa</option>
-                                    <option value="Relizane">48 - Relizane</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label for="registerCodePostal" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Code postal
-                                </label>
-                                <input id="registerCodePostal" name="codePostal" type="text" 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                       placeholder="Code postal (optionnel)">
-                            </div>
-                        </div>
-                        
-                        <!-- Password -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label for="registerPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Mot de passe *
-                                </label>
-                                <input id="registerPassword" name="password" type="password" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                       placeholder="Minimum 6 caractères">
-                            </div>
-                            
-                            <div>
-                                <label for="registerConfirmPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Confirmer le mot de passe *
-                                </label>
-                                <input id="registerConfirmPassword" name="confirmPassword" type="password" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                       placeholder="Confirmez votre mot de passe">
-                            </div>
-                        </div>
-                        
-                        <!-- Terms and Conditions -->
-                        <div class="flex items-center">
-                            <input id="acceptTerms" name="acceptTerms" type="checkbox" required
-                                   class="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded">
-                            <label for="acceptTerms" class="ml-2 block text-sm text-gray-900">
-                                J'accepte les <a href="#" class="text-emerald-600 hover:text-emerald-500 font-medium">conditions d'utilisation</a> 
-                                et la <a href="#" class="text-emerald-600 hover:text-emerald-500 font-medium">politique de confidentialité</a>
-                            </label>
-                        </div>
-                        
-                        <div>
-                            <button type="submit" id="registerSubmitBtn"
-                                    class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-300 shadow-lg hover:shadow-xl">
-                                <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                                    <i id="registerIcon" class="fas fa-user-plus text-emerald-300 group-hover:text-emerald-200"></i>
-                                    <i id="registerSpinner" class="fas fa-spinner fa-spin text-emerald-300 hidden"></i>
-                                </span>
-                                <span id="registerText">Créer mon compte</span>
-                            </button>
-                        </div>
-                        
-                        <div class="text-center">
-                            <p class="text-sm text-gray-600">
-                                Déjà un compte ? 
-                                <a href="#" onclick="app.showPage('login')" class="font-medium text-emerald-600 hover:text-emerald-500">
-                                    Se connecter
-                                </a>
-                            </p>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    `;
-};
-
-// Profile Page
-PharmacieGaherApp.prototype.loadProfilePage = async function() {
-    if (!this.currentUser) {
-        this.showPage('login');
-        return;
+        `;
+        
+        this.initLoginForm();
     }
     
-    const mainContent = document.getElementById('mainContent');
-    
-    mainContent.innerHTML = `
-        <div class="container mx-auto px-4 py-8 max-w-4xl">
-            <div class="text-center mb-8">
-                <h1 class="text-4xl font-bold text-gray-900 mb-4">Mon Profil</h1>
-                <p class="text-xl text-gray-600">Gérez vos informations personnelles</p>
-            </div>
-            
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Profile Info -->
-                <div class="lg:col-span-2">
-                    <div class="bg-white rounded-2xl shadow-lg p-6">
-                        <h2 class="text-2xl font-bold text-gray-900 mb-6">Informations personnelles</h2>
+    // Beautiful register page matching the site's aesthetic
+    async loadRegisterPage() {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 py-12">
+                <div class="container mx-auto px-4">
+                    <div class="max-w-2xl mx-auto">
+                        <!-- Header -->
+                        <div class="text-center mb-8">
+                            <div class="flex justify-center mb-6">
+                                <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl flex items-center justify-center shadow-2xl border-4 border-white/80">
+                                    <i class="fas fa-user-plus text-white text-3xl"></i>
+                                </div>
+                            </div>
+                            <h1 class="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-green-700 bg-clip-text text-transparent mb-2">
+                                Inscription
+                            </h1>
+                            <p class="text-emerald-600 text-lg">Rejoignez la famille Shifa dès aujourd'hui</p>
+                        </div>
                         
-                        <form id="profileForm" class="space-y-6" onsubmit="handleProfileUpdate(event)">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="profilePrenom" class="block text-sm font-medium text-gray-700 mb-2">Prénom</label>
-                                    <input type="text" id="profilePrenom" name="prenom" 
-                                           value="${this.currentUser.prenom}"
-                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                                </div>
-                                <div>
-                                    <label for="profileNom" class="block text-sm font-medium text-gray-700 mb-2">Nom</label>
-                                    <input type="text" id="profileNom" name="nom" 
-                                           value="${this.currentUser.nom}"
-                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                                </div>
+                        <!-- Register Form -->
+                        <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 overflow-hidden">
+                            <div class="bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-6">
+                                <h2 class="text-2xl font-bold text-white flex items-center">
+                                    <i class="fas fa-user-circle mr-3"></i>
+                                    Créer votre compte
+                                </h2>
+                                <p class="text-emerald-100 mt-2">Remplissez les informations ci-dessous</p>
                             </div>
                             
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="profileEmail" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                                    <input type="email" id="profileEmail" name="email" 
-                                           value="${this.currentUser.email}"
-                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50" readonly>
-                                    <p class="text-xs text-gray-500 mt-1">L'email ne peut pas être modifié</p>
+                            <div class="p-8">
+                                <form id="registerForm" class="space-y-6">
+                                    <!-- Personal Information -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label class="block text-emerald-700 font-semibold mb-2">
+                                                <i class="fas fa-user mr-2"></i>Nom *
+                                            </label>
+                                            <input type="text" name="nom" required 
+                                                   class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm"
+                                                   placeholder="Votre nom de famille">
+                                        </div>
+                                        <div>
+                                            <label class="block text-emerald-700 font-semibold mb-2">
+                                                <i class="fas fa-user mr-2"></i>Prénom *
+                                            </label>
+                                            <input type="text" name="prenom" required 
+                                                   class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm"
+                                                   placeholder="Votre prénom">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Contact Information -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label class="block text-emerald-700 font-semibold mb-2">
+                                                <i class="fas fa-envelope mr-2"></i>Email *
+                                            </label>
+                                            <input type="email" name="email" required 
+                                                   class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm"
+                                                   placeholder="votre@email.com">
+                                        </div>
+                                        <div>
+                                            <label class="block text-emerald-700 font-semibold mb-2">
+                                                <i class="fas fa-phone mr-2"></i>Téléphone *
+                                            </label>
+                                            <input type="tel" name="telephone" required 
+                                                   class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm"
+                                                   placeholder="+213 XXX XXX XXX">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Address Information -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label class="block text-emerald-700 font-semibold mb-2">
+                                                <i class="fas fa-map-marker-alt mr-2"></i>Wilaya *
+                                            </label>
+                                            <select name="wilaya" required 
+                                                    class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm">
+                                                <option value="">Sélectionnez votre wilaya</option>
+                                                ${this.getAlgerianWilayas().map(w => `<option value="${w}">${w}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-emerald-700 font-semibold mb-2">
+                                                <i class="fas fa-home mr-2"></i>Ville
+                                            </label>
+                                            <input type="text" name="ville" 
+                                                   class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm"
+                                                   placeholder="Nom de votre ville">
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-emerald-700 font-semibold mb-2">
+                                            <i class="fas fa-map mr-2"></i>Adresse complète
+                                        </label>
+                                        <textarea name="adresse" rows="2" 
+                                                  class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm resize-none"
+                                                  placeholder="Rue, quartier, numéro..."></textarea>
+                                    </div>
+                                    
+                                    <!-- Password -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label class="block text-emerald-700 font-semibold mb-2">
+                                                <i class="fas fa-lock mr-2"></i>Mot de passe *
+                                            </label>
+                                            <div class="relative">
+                                                <input type="password" name="password" required 
+                                                       class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm pr-12"
+                                                       placeholder="••••••••"
+                                                       minlength="6">
+                                                <button type="button" onclick="togglePasswordVisibility('registerForm', 'password')" 
+                                                        class="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-500 hover:text-emerald-700">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                            <p class="text-sm text-emerald-600 mt-1">Minimum 6 caractères</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-emerald-700 font-semibold mb-2">
+                                                <i class="fas fa-lock mr-2"></i>Confirmer *
+                                            </label>
+                                            <div class="relative">
+                                                <input type="password" name="confirmPassword" required 
+                                                       class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200 transition-all bg-white/80 backdrop-blur-sm pr-12"
+                                                       placeholder="••••••••">
+                                                <button type="button" onclick="togglePasswordVisibility('registerForm', 'confirmPassword')" 
+                                                        class="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-500 hover:text-emerald-700">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Terms -->
+                                    <div class="bg-gradient-to-r from-emerald-100 to-green-100 rounded-2xl p-4 border border-emerald-200">
+                                        <label class="flex items-start space-x-3">
+                                            <input type="checkbox" name="acceptTerms" required 
+                                                   class="mt-1 w-5 h-5 text-emerald-600 bg-white border-2 border-emerald-300 rounded focus:ring-emerald-500 focus:ring-2">
+                                            <span class="text-sm text-emerald-700">
+                                                J'accepte les <a href="#" class="font-semibold hover:underline">conditions d'utilisation</a> 
+                                                et la <a href="#" class="font-semibold hover:underline">politique de confidentialité</a> 
+                                                de Shifa Parapharmacie.
+                                            </span>
+                                        </label>
+                                    </div>
+                                    
+                                    <button type="submit" 
+                                            class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-6 rounded-2xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-105 text-lg">
+                                        <span id="registerButtonText">
+                                            <i class="fas fa-user-plus mr-2"></i>
+                                            Créer mon compte
+                                        </span>
+                                        <div id="registerSpinner" class="hidden">
+                                            <i class="fas fa-spinner fa-spin mr-2"></i>
+                                            Création...
+                                        </div>
+                                    </button>
+                                </form>
+                                
+                                <!-- Login Link -->
+                                <div class="mt-8 text-center">
+                                    <p class="text-emerald-600 mb-4">Déjà inscrit ?</p>
+                                    <button onclick="app.showPage('login')" 
+                                            class="text-emerald-600 hover:text-emerald-800 font-semibold hover:underline transition-all">
+                                        <i class="fas fa-sign-in-alt mr-2"></i>
+                                        Se connecter
+                                    </button>
                                 </div>
-                                <div>
-                                    <label for="profileTelephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
-                                    <input type="tel" id="profileTelephone" name="telephone" 
-                                           value="${this.currentUser.telephone}"
-                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                                
+                                <!-- Back to Home -->
+                                <div class="mt-6 text-center">
+                                    <button onclick="app.showPage('home')" 
+                                            class="text-emerald-500 hover:text-emerald-700 transition-all">
+                                        <i class="fas fa-arrow-left mr-2"></i>
+                                        Retour à l'accueil
+                                    </button>
                                 </div>
                             </div>
-                            
-                            <div>
-                                <label for="profileAdresse" class="block text-sm font-medium text-gray-700 mb-2">Adresse</label>
-                                <textarea id="profileAdresse" name="adresse" rows="3"
-                                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">${this.currentUser.adresse}</textarea>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="profileWilaya" class="block text-sm font-medium text-gray-700 mb-2">Wilaya</label>
-                                    <select id="profileWilaya" name="wilaya" 
-                                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                                        <option value="${this.currentUser.wilaya}" selected>${this.currentUser.wilaya}</option>
-                                        <!-- Add other wilayas here if needed -->
-                                    </select>
-                                </div>
-                                <div>
-                                    <label for="profileCodePostal" class="block text-sm font-medium text-gray-700 mb-2">Code postal</label>
-                                    <input type="text" id="profileCodePostal" name="codePostal" 
-                                           value="${this.currentUser.codePostal || ''}"
-                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                                </div>
-                            </div>
-                            
-                            <div class="flex justify-end">
-                                <button type="submit" id="profileSubmitBtn"
-                                        class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                                    <span id="profileSubmitText">Mettre à jour</span>
-                                    <i id="profileSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                
-                <!-- Account Actions -->
-                <div class="space-y-6">
-                    <div class="bg-white rounded-2xl shadow-lg p-6">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4">Compte</h3>
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between py-2">
-                                <span class="text-gray-600">Statut:</span>
-                                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">Actif</span>
-                            </div>
-                            <div class="flex items-center justify-between py-2">
-                                <span class="text-gray-600">Rôle:</span>
-                                <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">${this.currentUser.role === 'admin' ? 'Administrateur' : 'Client'}</span>
-                            </div>
-                            <div class="flex items-center justify-between py-2">
-                                <span class="text-gray-600">Membre depuis:</span>
-                                <span class="text-gray-900">${new Date(this.currentUser.createdAt || Date.now()).toLocaleDateString('fr-FR')}</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-2xl shadow-lg p-6">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4">Actions</h3>
-                        <div class="space-y-3">
-                            <button onclick="showChangePasswordModal()" 
-                                    class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-xl transition-all">
-                                <i class="fas fa-key mr-2"></i>Changer le mot de passe
-                            </button>
-                            <button onclick="confirmLogout()" 
-                                    class="w-full bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-4 rounded-xl transition-all">
-                                <i class="fas fa-sign-out-alt mr-2"></i>Se déconnecter
-                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    `;
-};
-
-// Authentication Functions
-async function handleLogin(event) {
-    event.preventDefault();
-    
-    const submitBtn = document.getElementById('loginSubmitBtn');
-    const submitText = document.getElementById('loginText');
-    const submitIcon = document.getElementById('loginIcon');
-    const submitSpinner = document.getElementById('loginSpinner');
-    
-    // Disable form
-    submitBtn.disabled = true;
-    submitText.textContent = 'Connexion...';
-    submitIcon.classList.add('hidden');
-    submitSpinner.classList.remove('hidden');
-    
-    try {
-        const formData = new FormData(event.target);
-        const loginData = {
-            email: formData.get('email').trim(),
-            password: formData.get('password')
-        };
+        `;
         
-        console.log('🔐 Attempting login for:', loginData.email);
+        this.initRegisterForm();
+    }
+    
+    initLoginForm() {
+        const form = document.getElementById('loginForm');
         
-        // Try to login via API
-        try {
-            const response = await apiCall('/auth/login', {
-                method: 'POST',
-                body: JSON.stringify(loginData)
-            });
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
             
-            if (response && response.token && response.user) {
-                // Save token and user data
+            const formData = new FormData(form);
+            const credentials = {
+                email: formData.get('email').trim(),
+                password: formData.get('password')
+            };
+            
+            if (!credentials.email || !credentials.password) {
+                this.showToast('Veuillez remplir tous les champs', 'error');
+                return;
+            }
+            
+            this.showLoginLoading(true);
+            
+            try {
+                console.log('🔐 Attempting login for:', credentials.email);
+                
+                const response = await apiCall('/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify(credentials)
+                });
+                
+                console.log('✅ Login successful:', response);
+                
+                // Store token and user data
                 localStorage.setItem('token', response.token);
+                this.currentUser = response.user;
+                this.updateUserUI();
                 
-                // Update app state
-                window.app.currentUser = response.user;
-                window.app.updateUserUI();
+                this.showToast(`Bienvenue ${response.user.prenom} !`, 'success');
+                this.showPage('home');
                 
-                window.app.showToast('Connexion réussie !', 'success');
-                console.log('✅ Login successful for:', response.user.email);
-                
-                // Redirect to home or intended page
-                window.app.showPage('home');
-                return;
+            } catch (error) {
+                console.error('❌ Login error:', error);
+                this.handleAuthError(error, 'login');
+            } finally {
+                this.showLoginLoading(false);
             }
-        } catch (error) {
-            console.error('❌ API login failed:', error.message);
-            
-            // Fallback: Check for demo admin account
-            if (loginData.email === 'pharmaciegaher@gmail.com' && loginData.password === 'anesaya75') {
-                console.log('🔄 Using demo admin account');
-                
-                const demoUser = {
-                    _id: 'demo-admin',
-                    email: 'pharmaciegaher@gmail.com',
-                    nom: 'Gaher',
-                    prenom: 'Parapharmacie',
-                    role: 'admin',
-                    telephone: '+213123456789',
-                    adresse: 'Tipaza, Algérie',
-                    wilaya: 'Tipaza',
-                    actif: true,
-                    createdAt: new Date().toISOString()
-                };
-                
-                // Create a demo token
-                const demoToken = 'demo-token-' + Date.now();
-                localStorage.setItem('token', demoToken);
-                
-                // Update app state
-                window.app.currentUser = demoUser;
-                window.app.updateUserUI();
-                
-                window.app.showToast('Connexion réussie (mode démonstration)', 'success');
-                window.app.showPage('home');
-                return;
-            }
-            
-            throw new Error('Email ou mot de passe incorrect');
-        }
-        
-    } catch (error) {
-        console.error('Login error:', error);
-        window.app.showToast(error.message || 'Erreur lors de la connexion', 'error');
-    } finally {
-        // Re-enable form
-        submitBtn.disabled = false;
-        submitText.textContent = 'Se connecter';
-        submitIcon.classList.remove('hidden');
-        submitSpinner.classList.add('hidden');
+        });
     }
-}
-
-async function handleRegister(event) {
-    event.preventDefault();
     
-    const submitBtn = document.getElementById('registerSubmitBtn');
-    const submitText = document.getElementById('registerText');
-    const submitIcon = document.getElementById('registerIcon');
-    const submitSpinner = document.getElementById('registerSpinner');
-    
-    // Disable form
-    submitBtn.disabled = true;
-    submitText.textContent = 'Création du compte...';
-    submitIcon.classList.add('hidden');
-    submitSpinner.classList.remove('hidden');
-    
-    try {
-        const formData = new FormData(event.target);
+    initRegisterForm() {
+        const form = document.getElementById('registerForm');
         
-        // Validate passwords match
-        const password = formData.get('password');
-        const confirmPassword = formData.get('confirmPassword');
-        
-        if (password !== confirmPassword) {
-            throw new Error('Les mots de passe ne correspondent pas');
-        }
-        
-        if (password.length < 6) {
-            throw new Error('Le mot de passe doit contenir au moins 6 caractères');
-        }
-        
-        const registerData = {
-            nom: formData.get('nom').trim(),
-            prenom: formData.get('prenom').trim(),
-            email: formData.get('email').trim(),
-            telephone: formData.get('telephone').trim(),
-            password: password,
-            adresse: formData.get('adresse').trim(),
-            wilaya: formData.get('wilaya'),
-            codePostal: formData.get('codePostal')?.trim() || ''
-        };
-        
-        console.log('📝 Attempting registration for:', registerData.email);
-        
-        // Try to register via API
-        try {
-            const response = await apiCall('/auth/register', {
-                method: 'POST',
-                body: JSON.stringify(registerData)
-            });
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
             
-            if (response && response.token && response.user) {
-                // Save token and user data
+            const formData = new FormData(form);
+            const userData = {
+                nom: formData.get('nom').trim(),
+                prenom: formData.get('prenom').trim(),
+                email: formData.get('email').trim(),
+                telephone: formData.get('telephone').trim(),
+                wilaya: formData.get('wilaya'),
+                ville: formData.get('ville').trim(),
+                adresse: formData.get('adresse').trim(),
+                password: formData.get('password'),
+                confirmPassword: formData.get('confirmPassword')
+            };
+            
+            // Validation
+            if (!userData.nom || !userData.prenom || !userData.email || !userData.telephone || !userData.password || !userData.wilaya) {
+                this.showToast('Veuillez remplir tous les champs obligatoires', 'error');
+                return;
+            }
+            
+            if (userData.password.length < 6) {
+                this.showToast('Le mot de passe doit contenir au moins 6 caractères', 'error');
+                return;
+            }
+            
+            if (userData.password !== userData.confirmPassword) {
+                this.showToast('Les mots de passe ne correspondent pas', 'error');
+                return;
+            }
+            
+            // Email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(userData.email)) {
+                this.showToast('Veuillez entrer un email valide', 'error');
+                return;
+            }
+            
+            // Phone validation
+            const phoneRegex = /^(\+213|0)[5-9]\d{8}$/;
+            if (!phoneRegex.test(userData.telephone.replace(/\s+/g, ''))) {
+                this.showToast('Veuillez entrer un numéro de téléphone algérien valide', 'error');
+                return;
+            }
+            
+            if (!formData.get('acceptTerms')) {
+                this.showToast('Veuillez accepter les conditions d\'utilisation', 'error');
+                return;
+            }
+            
+            this.showRegisterLoading(true);
+            
+            try {
+                console.log('📝 Attempting registration for:', userData.email);
+                
+                // Remove confirmPassword before sending
+                delete userData.confirmPassword;
+                
+                const response = await apiCall('/auth/register', {
+                    method: 'POST',
+                    body: JSON.stringify(userData)
+                });
+                
+                console.log('✅ Registration successful:', response);
+                
+                // Store token and user data
                 localStorage.setItem('token', response.token);
+                this.currentUser = response.user;
+                this.updateUserUI();
                 
-                // Update app state
-                window.app.currentUser = response.user;
-                window.app.updateUserUI();
+                this.showToast(`Bienvenue dans la famille Shifa, ${response.user.prenom} !`, 'success');
+                this.showPage('home');
                 
-                window.app.showToast('Compte créé avec succès !', 'success');
-                console.log('✅ Registration successful for:', response.user.email);
-                
-                // Redirect to home
-                window.app.showPage('home');
-                return;
+            } catch (error) {
+                console.error('❌ Registration error:', error);
+                this.handleAuthError(error, 'register');
+            } finally {
+                this.showRegisterLoading(false);
             }
-        } catch (error) {
-            console.error('❌ API registration failed:', error.message);
-            throw new Error(error.message || 'Erreur lors de la création du compte');
+        });
+    }
+    
+    showLoginLoading(show) {
+        const buttonText = document.getElementById('loginButtonText');
+        const spinner = document.getElementById('loginSpinner');
+        const submitBtn = document.querySelector('#loginForm button[type="submit"]');
+        
+        if (show) {
+            buttonText.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            submitBtn.disabled = true;
+        } else {
+            buttonText.classList.remove('hidden');
+            spinner.classList.add('hidden');
+            submitBtn.disabled = false;
         }
-        
-    } catch (error) {
-        console.error('Registration error:', error);
-        window.app.showToast(error.message || 'Erreur lors de la création du compte', 'error');
-    } finally {
-        // Re-enable form
-        submitBtn.disabled = false;
-        submitText.textContent = 'Créer mon compte';
-        submitIcon.classList.remove('hidden');
-        submitSpinner.classList.add('hidden');
     }
-}
-
-async function handleProfileUpdate(event) {
-    event.preventDefault();
     
-    const submitBtn = document.getElementById('profileSubmitBtn');
-    const submitText = document.getElementById('profileSubmitText');
-    const submitSpinner = document.getElementById('profileSubmitSpinner');
-    
-    submitBtn.disabled = true;
-    submitText.textContent = 'Mise à jour...';
-    submitSpinner.classList.remove('hidden');
-    
-    try {
-        const formData = new FormData(event.target);
-        const updateData = {
-            nom: formData.get('nom').trim(),
-            prenom: formData.get('prenom').trim(),
-            telephone: formData.get('telephone').trim(),
-            adresse: formData.get('adresse').trim(),
-            wilaya: formData.get('wilaya'),
-            codePostal: formData.get('codePostal')?.trim() || ''
-        };
+    showRegisterLoading(show) {
+        const buttonText = document.getElementById('registerButtonText');
+        const spinner = document.getElementById('registerSpinner');
+        const submitBtn = document.querySelector('#registerForm button[type="submit"]');
         
-        // Try to update via API
-        try {
-            const response = await apiCall('/auth/profile', {
-                method: 'PUT',
-                body: JSON.stringify(updateData)
-            });
-            
-            if (response && response.user) {
-                // Update app state
-                window.app.currentUser = response.user;
-                window.app.showToast('Profil mis à jour avec succès !', 'success');
-                return;
-            }
-        } catch (error) {
-            console.error('API profile update failed:', error.message);
-            
-            // Fallback: Update local user data
-            if (window.app.currentUser) {
-                Object.assign(window.app.currentUser, updateData);
-                window.app.showToast('Profil mis à jour localement', 'warning');
-                return;
-            }
-            
-            throw new Error('Erreur lors de la mise à jour du profil');
+        if (show) {
+            buttonText.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            submitBtn.disabled = true;
+        } else {
+            buttonText.classList.remove('hidden');
+            spinner.classList.add('hidden');
+            submitBtn.disabled = false;
         }
-        
-    } catch (error) {
-        console.error('Profile update error:', error);
-        window.app.showToast(error.message || 'Erreur lors de la mise à jour', 'error');
-    } finally {
-        submitBtn.disabled = false;
-        submitText.textContent = 'Mettre à jour';
-        submitSpinner.classList.add('hidden');
     }
 }
 
-function showForgotPassword() {
-    window.app.showToast('Fonctionnalité bientôt disponible', 'info');
-}
-
-function showChangePasswordModal() {
-    window.app.showToast('Fonctionnalité bientôt disponible', 'info');
-}
-
-function confirmLogout() {
-    if (confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
-        window.app.logout();
+// Global function to toggle password visibility
+function togglePasswordVisibility(formId, fieldName = 'password') {
+    const form = document.getElementById(formId);
+    const passwordInput = fieldName ? form[fieldName] : form.password;
+    const icon = passwordInput.parentElement.querySelector('i');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        passwordInput.type = 'password';
+        icon.className = 'fas fa-eye';
     }
 }
 
-// Export functions for global access
-window.handleLogin = handleLogin;
-window.handleRegister = handleRegister;
-window.handleProfileUpdate = handleProfileUpdate;
-window.showForgotPassword = showForgotPassword;
-window.showChangePasswordModal = showChangePasswordModal;
-window.confirmLogout = confirmLogout;
-
-console.log('✅ Complete auth.js loaded with mobile-friendly authentication');
+console.log('✅ Enhanced authentication system loaded');
