@@ -1129,4 +1129,37 @@ function debounce(func, wait) {
     };
 }
 
+// Global functions for products page
+function applyProductsFilters() {
+    if (window.app && typeof window.app.applyProductsFilters === 'function') {
+        window.app.applyProductsFilters();
+    }
+}
+
+function clearProductsFilters() {
+    document.getElementById('productsSearchInput').value = '';
+    document.getElementById('productsCategoryFilter').value = '';
+    document.getElementById('productsPriceFilter').value = '';
+    document.getElementById('productsSortFilter').value = 'newest';
+    
+    if (window.app) {
+        window.app.loadProductsGrid();
+    }
+}
+
+// Global function to toggle password visibility
+function togglePasswordVisibility(formId, fieldName = 'password') {
+    const form = document.getElementById(formId);
+    const passwordInput = fieldName ? form[fieldName] : form.password;
+    const icon = passwordInput.parentElement.querySelector('i');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        passwordInput.type = 'password';
+        icon.className = 'fas fa-eye';
+    }
+}
+
 console.log('✅ Enhanced admin system loaded');
