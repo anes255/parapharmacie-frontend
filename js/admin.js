@@ -368,10 +368,33 @@ async function testBackendConnection() {
     }
 }
 
-// Enhanced sync with backend
+// Check backend status
+async function checkBackendStatus() {
+    try {
+        // Use the same buildApiUrl function as the main app
+        const response = await fetch(buildApiUrl('/health'));
+        if (response.ok) {
+            document.getElementById('backendStatus').innerHTML = '✅ Connecté';
+            document.getElementById('backendStatus').className = 'text-green-600 text-sm';
+        } else {
+            throw new Error('Health check failed');
+        }
+    } catch (error) {
+        document.getElementById('backendStatus').innerHTML = '❌ Déconnecté';
+        document.getElementById('backendStatus').className = 'text-red-600 text-sm';
+    }
+}
+
+// Enhanced sync with backend that also updates main page
 async function syncWithBackend() {
     try {
         app.showToast('🔄 Synchronisation en cours...', 'info');
+        
+        // Check authentication first
+        const isAuthenticated = await checkAdminAuth();
+        if (!isAuthenticated) {
+            return;
+        }
         
         // Test connection first
         await adminApiCall('/health');
@@ -384,9 +407,20 @@ async function syncWithBackend() {
             // Update localStorage with backend data
             localStorage.setItem('demoProducts', JSON.stringify(data.products));
             
-            // Update the app's product cache
+            // CRITICAL: Update the main app's product cache immediately
             if (window.app) {
-                window.app.refreshProductsCache();
+                window.app.allProducts = [...data.products];
+                console.log('🔄 Main app cache updated');
+                
+                // Refresh main page if we're currently on it
+                if (window.app.currentPage === 'home') {
+                    window.app.refreshHomePage();
+                }
+                
+                // Refresh products page if we're currently on it  
+                if (window.app.currentPage === 'products') {
+                    window.app.showPage('products');
+                }
             }
             
             app.showToast(`✅ ${data.products.length} produits synchronisés depuis le serveur`, 'success');
