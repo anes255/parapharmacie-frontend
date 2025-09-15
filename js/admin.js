@@ -5,9 +5,14 @@ let adminCurrentSection = 'dashboard';
 let currentEditingProduct = null;
 let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
 
-// Helper function to make authenticated API calls
-async function adminApiCall(endpoint, options = {}) {
-    const url = buildApiUrl(endpoint);
+// API Configuration
+const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5000/api'
+    : 'https://parapharmacie-gaher.onrender.com/api';
+
+// Helper function to make API calls
+async function apiCall(endpoint, options = {}) {
+    const url = `${API_BASE_URL}${endpoint}`;
     
     const defaultOptions = {
         headers: {
@@ -30,72 +35,37 @@ async function adminApiCall(endpoint, options = {}) {
         }
     };
     
-    console.log(`📡 Admin API Call: ${finalOptions.method || 'GET'} ${url}`);
+    const response = await fetch(url, finalOptions);
     
-    try {
-        const response = await fetch(url, finalOptions);
-        
-        console.log(`📡 Response Status: ${response.status}`);
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ 
-                message: `HTTP error! status: ${response.status}` 
-            }));
-            console.log(`❌ Admin API Error: ${errorData.message}`);
-            
-            // Handle authentication errors
-            if (response.status === 401) {
-                localStorage.removeItem('token');
-                if (window.app) {
-                    window.app.currentUser = null;
-                    window.app.updateUserUI();
-                    window.app.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
-                    window.app.showPage('login');
-                }
-                throw new Error('Token invalide');
-            }
-            
-            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('✅ Admin API Success');
-        return data;
-        
-    } catch (error) {
-        console.error(`❌ Admin API Call Error:`, error);
-        throw error;
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
+        throw new Error(error.message || `HTTP error! status: ${response.status}`);
     }
+    
+    return response.json();
 }
 
 // Products Management - Add to app prototype
 PharmacieGaherApp.prototype.loadAdminProducts = async function() {
     try {
-        console.log('🔄 Loading admin products...');
-        
-        // Get products from localStorage first
+        // Get products from localStorage
         let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
-        // Try to get products from API
+        // Try to get products from API as well
         try {
-            console.log('🌐 Fetching products from API...');
-            const response = await adminApiCall('/admin/products?limit=100');
-            if (response && response.products && response.products.length > 0) {
-                console.log(`📦 API returned ${response.products.length} products`);
+            const data = await apiCall('/products');
+            if (data && data.products && data.products.length > 0) {
                 // Merge API products with local ones, avoiding duplicates
                 const localIds = products.map(p => p._id);
-                const newApiProducts = response.products.filter(p => !localIds.includes(p._id));
-                if (newApiProducts.length > 0) {
-                    products = [...products, ...newApiProducts];
-                    localStorage.setItem('demoProducts', JSON.stringify(products));
-                }
+                const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
+                products = [...products, ...newApiProducts];
+                
+                // Update localStorage with merged data
+                localStorage.setItem('demoProducts', JSON.stringify(products));
             }
         } catch (error) {
-            console.log('⚠️ Backend unavailable, loading from localStorage:', error.message);
-            // Continue with local products only
+            console.log('API unavailable, using local products only');
         }
-        
-        console.log(`✅ Total products loaded: ${products.length}`);
         
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6 mb-6">
@@ -145,14 +115,10 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
         `;
         
     } catch (error) {
-        console.error('❌ Error loading products:', error);
+        console.error('Error loading products:', error);
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-red-50 border border-red-200 rounded-xl p-6">
-                <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur de chargement des produits</h3>
-                <p class="text-red-700 mb-4">Détails: ${error.message}</p>
-                <button onclick="app.loadAdminProducts()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
-                    Réessayer
-                </button>
+                <p class="text-red-800">Erreur de chargement des produits</p>
             </div>
         `;
     }
@@ -227,31 +193,30 @@ PharmacieGaherApp.prototype.renderProductRow = function(product) {
 // Orders Management
 PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
-        console.log('🔄 Loading orders from admin panel...');
+        console.log('Loading orders from admin panel...');
         
         // Always start with localStorage orders
         let orders = [...adminOrders];
-        console.log('📦 Local orders loaded:', orders.length);
+        console.log('Local orders loaded:', orders.length);
         
         // Try to merge with API orders
         try {
-            console.log('🌐 Fetching orders from API...');
-            const response = await adminApiCall('/admin/orders');
-            if (response && response.orders && response.orders.length > 0) {
-                console.log('📦 API orders loaded:', response.orders.length);
-                const apiOrders = response.orders.filter(apiOrder => 
+            const data = await apiCall('/orders');
+            if (data && data.orders && data.orders.length > 0) {
+                console.log('API orders loaded:', data.orders.length);
+                const apiOrders = data.orders.filter(apiOrder => 
                     !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
                 );
                 orders = [...orders, ...apiOrders];
             }
         } catch (error) {
-            console.log('⚠️ API unavailable, using only local orders:', error.message);
+            console.log('API unavailable, using only local orders');
         }
         
         // Sort by date, newest first
         orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
         
-        console.log('✅ Total orders to display:', orders.length);
+        console.log('Total orders to display:', orders.length);
         
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
@@ -327,6 +292,11 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                                                         title="Confirmer">
                                                     <i class="fas fa-check"></i>
                                                 </button>
+                                                <button onclick="deleteOrder('${order._id || order.numeroCommande}')" 
+                                                        class="text-red-600 hover:text-red-800 hover:bg-red-100 p-2 rounded-lg transition-all"
+                                                        title="Supprimer">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -339,7 +309,7 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
         `;
         
     } catch (error) {
-        console.error('❌ Error loading orders:', error);
+        console.error('Error loading orders:', error);
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-red-50 border border-red-200 rounded-xl p-6">
                 <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur de chargement des commandes</h3>
@@ -363,7 +333,7 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
         
         // Try to get products from API
         try {
-            const allData = await adminApiCall('/admin/products');
+            const allData = await apiCall('/products');
             if (allData && allData.products && allData.products.length > 0) {
                 // Merge API products, avoiding duplicates
                 const localIds = localProducts.map(p => p._id);
@@ -905,8 +875,8 @@ function closeProductModal() {
     currentEditingProduct = null;
 }
 
-// FIXED function to save product directly
-async function saveProduct() {
+// New function to save product directly
+function saveProduct() {
     const form = document.getElementById('productForm');
     const isEditing = !!currentEditingProduct;
     
@@ -978,9 +948,9 @@ async function saveProduct() {
             productData.image = imageUrl;
         }
         
-        console.log('💾 Product data to save:', productData);
+        console.log('Product data to save:', productData);
         
-        // Save to localStorage first (ALWAYS WORKS)
+        // Save to localStorage first
         let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
         if (isEditing) {
@@ -998,29 +968,39 @@ async function saveProduct() {
         
         // Save back to localStorage
         localStorage.setItem('demoProducts', JSON.stringify(localProducts));
-        console.log('✅ Product saved to localStorage');
+        console.log('Product saved to localStorage');
         
         // Update the app's product cache to refresh main page immediately
         if (window.app) {
             window.app.refreshProductsCache();
         }
         
-        // Try to save to API (optional - don't fail if this doesn't work)
-        try {
-            console.log('🌐 Attempting to save to API...');
-            const endpoint = isEditing ? `/admin/products/${productData._id}` : '/admin/products';
-            const method = isEditing ? 'PUT' : 'POST';
-            
-            await adminApiCall(endpoint, {
-                method: method,
-                body: JSON.stringify(productData)
-            });
-            
-            console.log('✅ Product saved to API successfully');
-        } catch (apiError) {
-            console.log('⚠️ API save failed, but product saved locally:', apiError.message);
-            // Don't show error to user since local save worked
-        }
+        // Try to save to API (optional)
+        const saveToApi = async () => {
+            try {
+                const endpoint = isEditing ? `/products/${productData._id}` : '/products';
+                const method = isEditing ? 'PUT' : 'POST';
+                
+                const response = await fetch(buildApiUrl(endpoint), {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(productData)
+                });
+                
+                if (response.ok) {
+                    console.log('Product saved to API successfully');
+                } else {
+                    console.log('API save failed but product saved locally');
+                }
+            } catch (error) {
+                console.log('API save failed, but product saved locally:', error);
+            }
+        };
+        
+        // Save to API in background
+        saveToApi();
         
         // Show success message
         app.showToast(isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 'success');
@@ -1034,7 +1014,7 @@ async function saveProduct() {
         }
         
     } catch (error) {
-        console.error('❌ Error saving product:', error);
+        console.error('Error saving product:', error);
         app.showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
     } finally {
         // Re-enable button
@@ -1047,16 +1027,16 @@ async function saveProduct() {
 // Product operations
 async function toggleFeatured(productId, newStatus) {
     try {
-        console.log('🌟 Toggling featured status:', productId, newStatus);
+        console.log('Toggling featured status:', productId, newStatus);
         
-        // Update in localStorage first (ALWAYS WORKS)
+        // Update in localStorage first
         let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         const productIndex = localProducts.findIndex(p => p._id === productId);
         
         if (productIndex !== -1) {
             localProducts[productIndex].enVedette = newStatus;
             localStorage.setItem('demoProducts', JSON.stringify(localProducts));
-            console.log('✅ Product featured status updated locally');
+            console.log('Product featured status updated locally');
             
             // Update the app's product cache
             if (window.app) {
@@ -1064,15 +1044,15 @@ async function toggleFeatured(productId, newStatus) {
             }
         }
         
-        // Try to update via API (optional)
+        // Try to update via API
         try {
-            await adminApiCall(`/admin/products/${productId}`, {
+            await apiCall(`/products/${productId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ enVedette: newStatus })
             });
-            console.log('✅ Product featured status updated via API');
+            console.log('Product featured status updated via API');
         } catch (error) {
-            console.log('⚠️ API update failed, but local update succeeded');
+            console.log('API update failed, but local update succeeded');
         }
         
         app.showToast(`Produit ${newStatus ? 'ajouté aux' : 'retiré des'} coups de coeur`, 'success');
@@ -1084,7 +1064,7 @@ async function toggleFeatured(productId, newStatus) {
         }
         
     } catch (error) {
-        console.error('❌ Error toggling featured:', error);
+        console.error('Error toggling featured:', error);
         app.showToast('Erreur lors de la modification', 'error');
     }
 }
@@ -1092,30 +1072,30 @@ async function toggleFeatured(productId, newStatus) {
 async function deleteProduct(productId) {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
         try {
-            console.log('🗑️ Deleting product:', productId);
+            console.log('Deleting product:', productId);
             
-            // Delete from local storage first (ALWAYS WORKS)
+            // Delete from local storage first
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             const initialCount = localProducts.length;
             localProducts = localProducts.filter(p => p._id !== productId);
             localStorage.setItem('demoProducts', JSON.stringify(localProducts));
             
             const localDeleteSuccess = localProducts.length < initialCount;
-            console.log('✅ Product deleted locally:', localDeleteSuccess);
+            console.log('Product deleted locally:', localDeleteSuccess);
             
             // Update the app's product cache
             if (window.app) {
                 window.app.refreshProductsCache();
             }
             
-            // Try to delete from API (optional)
+            // Try to delete from API
             try {
-                await adminApiCall(`/admin/products/${productId}`, {
+                await apiCall(`/products/${productId}`, {
                     method: 'DELETE'
                 });
-                console.log('✅ Product deleted from API successfully');
+                console.log('Product deleted from API successfully');
             } catch (error) {
-                console.log('⚠️ API delete failed, but product deleted locally:', error);
+                console.log('API delete failed, but product deleted locally:', error);
             }
             
             // Refresh the products list
@@ -1128,7 +1108,7 @@ async function deleteProduct(productId) {
             }
             
         } catch (error) {
-            console.error('❌ Error deleting product:', error);
+            console.error('Error deleting product:', error);
             app.showToast('Erreur lors de la suppression', 'error');
         }
     }
@@ -1137,7 +1117,7 @@ async function deleteProduct(productId) {
 // Order detail modal
 async function viewOrderDetails(orderId) {
     try {
-        console.log('👁️ Viewing order details for:', orderId);
+        console.log('Viewing order details for:', orderId);
         
         // Find order in localStorage first
         let order = adminOrders.find(o => o._id === orderId || o.numeroCommande === orderId);
@@ -1233,6 +1213,10 @@ async function viewOrderDetails(orderId) {
                                     class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
                                 Fermer
                             </button>
+                            <button onclick="deleteOrder('${order._id || order.numeroCommande}')" 
+                                    class="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-lg">
+                                <i class="fas fa-trash mr-2"></i>Supprimer
+                            </button>
                             <button onclick="updateOrderStatus('${order._id || order.numeroCommande}', 'confirmée')" 
                                     class="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-lg">
                                 Confirmer la commande
@@ -1248,7 +1232,7 @@ async function viewOrderDetails(orderId) {
         }
         
     } catch (error) {
-        console.error('❌ Error viewing order details:', error);
+        console.error('Error viewing order details:', error);
         app.showToast('Erreur lors de l\'affichage des détails', 'error');
     }
 }
@@ -1263,7 +1247,7 @@ function closeOrderDetailModal() {
 
 async function updateOrderStatus(orderId, newStatus) {
     try {
-        console.log('📝 Updating order status:', orderId, 'to', newStatus);
+        console.log('Updating order status:', orderId, 'to', newStatus);
         
         // Update in localStorage
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
@@ -1276,21 +1260,21 @@ async function updateOrderStatus(orderId, newStatus) {
             }
             localStorage.setItem('adminOrders', JSON.stringify(orders));
             adminOrders = orders;
-            console.log('✅ Order status updated locally');
+            console.log('Order status updated locally');
         }
         
         // Try to update via API
         try {
-            await adminApiCall(`/admin/orders/${orderId}`, {
+            await apiCall(`/orders/${orderId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ 
                     statut: newStatus,
                     dateLivraison: newStatus === 'livrée' ? new Date().toISOString() : null
                 })
             });
-            console.log('✅ Order status updated via API');
+            console.log('Order status updated via API');
         } catch (error) {
-            console.log('⚠️ API update failed, but local update succeeded');
+            console.log('API update failed, but local update succeeded');
         }
         
         app.showToast('Statut de la commande mis à jour', 'success');
@@ -1304,8 +1288,55 @@ async function updateOrderStatus(orderId, newStatus) {
         }
         
     } catch (error) {
-        console.error('❌ Error updating order status:', error);
+        console.error('Error updating order status:', error);
         app.showToast('Erreur lors de la mise à jour du statut', 'error');
+    }
+}
+
+// NEW DELETE ORDER FUNCTION
+async function deleteOrder(orderId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ? Cette action est irréversible.')) {
+        return;
+    }
+    
+    try {
+        console.log('Deleting order:', orderId);
+        
+        // Delete from localStorage first
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const initialCount = orders.length;
+        orders = orders.filter(o => o._id !== orderId && o.numeroCommande !== orderId);
+        localStorage.setItem('adminOrders', JSON.stringify(orders));
+        
+        // Update global variable
+        adminOrders = orders;
+        
+        const localDeleteSuccess = orders.length < initialCount;
+        console.log('Order deleted locally:', localDeleteSuccess);
+        
+        // Try to delete from API
+        try {
+            await apiCall(`/orders/${orderId}`, {
+                method: 'DELETE'
+            });
+            console.log('Order deleted from API successfully');
+        } catch (error) {
+            console.log('API delete failed, but order deleted locally:', error);
+        }
+        
+        app.showToast('Commande supprimée avec succès', 'success');
+        
+        // Close modal if open
+        closeOrderDetailModal();
+        
+        // Refresh orders list
+        if (adminCurrentSection === 'orders') {
+            app.loadAdminOrders();
+        }
+        
+    } catch (error) {
+        console.error('Error deleting order:', error);
+        app.showToast('Erreur lors de la suppression de la commande', 'error');
     }
 }
 
@@ -1398,6 +1429,38 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
+// Error handling for API calls
+window.handleApiError = function(error, context = '') {
+    console.error(`❌ API Error ${context}:`, error);
+    
+    if (error.message.includes('401') || error.message.includes('Token invalide')) {
+        // Token expired or invalid
+        localStorage.removeItem('token');
+        if (window.app) {
+            window.app.currentUser = null;
+            window.app.updateUserUI();
+            window.app.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
+            window.app.showPage('login');
+        }
+    } else if (error.message.includes('403')) {
+        if (window.app) {
+            window.app.showToast('Accès refusé', 'error');
+        }
+    } else if (error.message.includes('404')) {
+        if (window.app) {
+            window.app.showToast('Ressource non trouvée', 'error');
+        }
+    } else if (error.message.includes('500')) {
+        if (window.app) {
+            window.app.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
+        }
+    } else {
+        if (window.app) {
+            window.app.showToast(error.message || 'Une erreur est survenue', 'error');
+        }
+    }
+};
+
 // Export functions for global access
 window.switchAdminSection = switchAdminSection;
 window.openAddProductModal = openAddProductModal;
@@ -1411,7 +1474,8 @@ window.validateAllProducts = validateAllProducts;
 window.clearAllProducts = clearAllProducts;
 window.viewOrderDetails = viewOrderDetails;
 window.updateOrderStatus = updateOrderStatus;
+window.deleteOrder = deleteOrder;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
-console.log('✅ Fixed Admin.js loaded with proper authentication and error handling');
+console.log('✅ Fixed Admin.js loaded with delete order functionality');
