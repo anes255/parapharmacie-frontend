@@ -15,9 +15,9 @@ class CheckoutSystem {
         this.calculateTotals();
     }
 
-    // Validate cart before checkout
+    // Validate cart before checkout - FIXED to use CartSystem
     validateCart() {
-        if (!window.app || !window.app.cart || window.app.cart.length === 0) {
+        if (!window.cartSystem || !window.cartSystem.cart || window.cartSystem.cart.length === 0) {
             console.error('Cart is empty');
             if (window.app) {
                 window.app.showToast('Votre panier est vide', 'warning');
@@ -27,7 +27,7 @@ class CheckoutSystem {
         }
 
         // Check stock availability
-        for (let item of window.app.cart) {
+        for (let item of window.cartSystem.cart) {
             if (item.stock === 0) {
                 if (window.app) {
                     window.app.showToast(`${item.nom} n'est plus en stock`, 'error');
@@ -195,7 +195,7 @@ class CheckoutSystem {
     // Calculate shipping costs
     calculateShipping() {
         const wilaya = document.getElementById('checkoutWilaya')?.value;
-        const sousTotal = window.app ? window.app.getCartTotal() : 0;
+        const sousTotal = window.cartSystem ? window.cartSystem.getTotals().sousTotal : 0;
         
         let fraisLivraison = 0;
         
@@ -239,11 +239,12 @@ class CheckoutSystem {
         }
     }
 
-    // Calculate and update totals
+    // Calculate and update totals - FIXED to use CartSystem
     calculateTotals() {
-        if (!window.app || !window.app.cart) return;
+        if (!window.cartSystem || !window.cartSystem.cart) return;
 
-        const sousTotal = window.app.getCartTotal();
+        const cartTotals = window.cartSystem.getTotals();
+        const sousTotal = cartTotals.sousTotal;
         const fraisLivraison = this.getCurrentShippingCost();
         const total = sousTotal + fraisLivraison;
 
@@ -267,7 +268,7 @@ class CheckoutSystem {
     // Get current shipping cost
     getCurrentShippingCost() {
         const wilaya = document.getElementById('checkoutWilaya')?.value;
-        const sousTotal = window.app ? window.app.getCartTotal() : 0;
+        const sousTotal = window.cartSystem ? window.cartSystem.getTotals().sousTotal : 0;
         
         if (sousTotal >= 5000) {
             return 0;
@@ -323,7 +324,7 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // Process the order - MAIN FUNCTION
+    // Process the order - MAIN FUNCTION - FIXED to use CartSystem
     async processOrder() {
         try {
             if (this.isProcessing) {
@@ -345,7 +346,7 @@ class CheckoutSystem {
             }
 
             // Disable submit button
-            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
+            const submitBtn = document.querySelector('button[onclick="processCheckoutOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
@@ -385,9 +386,9 @@ class CheckoutSystem {
                 this.saveToUserOrders(orderData);
             }
 
-            // Clear cart
-            if (window.app) {
-                window.app.clearCart();
+            // Clear cart using CartSystem
+            if (window.cartSystem) {
+                window.cartSystem.clear();
             }
 
             // Show success and redirect
@@ -406,7 +407,7 @@ class CheckoutSystem {
             }
             
             // Re-enable submit button
-            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
+            const submitBtn = document.querySelector('button[onclick="processCheckoutOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirmer la commande';
@@ -416,7 +417,7 @@ class CheckoutSystem {
         }
     }
 
-    // Gather all order data from form
+    // Gather all order data from form - FIXED to use CartSystem
     gatherOrderData() {
         // Get form values
         const prenom = document.getElementById('checkoutPrenom')?.value.trim();
@@ -428,8 +429,9 @@ class CheckoutSystem {
         const modePaiement = document.querySelector('input[name="modePaiement"]:checked')?.value || 'Paiement à la livraison';
         const commentaires = document.getElementById('checkoutCommentaires')?.value.trim() || '';
 
-        // Calculate totals
-        const sousTotal = window.app ? window.app.getCartTotal() : 0;
+        // Calculate totals using CartSystem
+        const cartTotals = window.cartSystem ? window.cartSystem.getTotals() : { sousTotal: 0 };
+        const sousTotal = cartTotals.sousTotal;
         const fraisLivraison = this.getCurrentShippingCost();
         const total = sousTotal + fraisLivraison;
 
@@ -449,7 +451,7 @@ class CheckoutSystem {
                 adresse,
                 wilaya
             },
-            articles: window.app ? window.app.cart.map(item => ({
+            articles: window.cartSystem ? window.cartSystem.cart.map(item => ({
                 productId: item.id,
                 nom: item.nom,
                 prix: item.prix,
@@ -539,7 +541,8 @@ class CheckoutSystem {
             
             // Placeholder for coupon logic
             if (code.toUpperCase() === 'WELCOME10') {
-                const discount = Math.round(window.app.getCartTotal() * 0.1);
+                const cartTotals = window.cartSystem ? window.cartSystem.getTotals() : { sousTotal: 0 };
+                const discount = Math.round(cartTotals.sousTotal * 0.1);
                 this.appliedDiscount = discount;
                 this.calculateTotals();
                 
@@ -625,4 +628,4 @@ window.processCheckoutOrder = processCheckoutOrder;
 window.applyCheckoutCoupon = applyCheckoutCoupon;
 window.removeCheckoutCoupon = removeCheckoutCoupon;
 
-console.log('✅ Checkout.js loaded successfully');
+console.log('✅ Fixed Checkout.js loaded successfully');
