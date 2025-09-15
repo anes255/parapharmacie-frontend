@@ -1,4 +1,4 @@
-// Complete Fixed PharmacieGaherApp - Full File Replacement
+// Complete Fixed PharmacieGaherApp - Updated with proper admin integration and missing methods
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -20,7 +20,7 @@ class PharmacieGaherApp {
     async init() {
         try {
             await this.checkAuth();
-            await this.loadProductsCache();
+            await this.loadProductsCache(); // Load products from localStorage/API
             this.initUI();
             await this.showPage('home');
             this.updateCartUI();
@@ -31,23 +31,28 @@ class PharmacieGaherApp {
         }
     }
     
+    // New method to load and cache products
     async loadProductsCache() {
         try {
             console.log('Loading products cache...');
             
+            // Start with localStorage products
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             this.allProducts = [...localProducts];
             
+            // Try to load from API and merge
             try {
                 const response = await fetch(buildApiUrl('/products'));
                 if (response.ok) {
                     const data = await response.json();
                     if (data && data.products && data.products.length > 0) {
+                        // Merge API products with local ones, avoiding duplicates
                         const localIds = localProducts.map(p => p._id);
                         const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
                         
                         if (newApiProducts.length > 0) {
                             this.allProducts = [...localProducts, ...newApiProducts];
+                            // Update localStorage with merged data
                             localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
                         }
                     }
@@ -64,24 +69,32 @@ class PharmacieGaherApp {
         }
     }
     
+    // New method to refresh products cache (called from admin when products are modified)
     refreshProductsCache() {
         console.log('Refreshing products cache...');
         
+        // Reload from localStorage
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         this.allProducts = [...localProducts];
         
         console.log(`Products cache refreshed: ${this.allProducts.length} products`);
         
+        // If we're on the home page, refresh the displayed products
         if (this.currentPage === 'home') {
             this.refreshHomePage();
         } else if (this.currentPage === 'products') {
+            // Refresh products page if we're on it
             this.showPage('products');
         }
     }
     
+    // New method to refresh home page content
     refreshHomePage() {
         console.log('Refreshing home page content...');
+        
+        // Refresh featured products
         this.loadFeaturedProducts();
+        // Refresh promotion products  
         this.loadPromotionProducts();
     }
     
@@ -117,7 +130,7 @@ class PharmacieGaherApp {
         }
         
         this.updateCartUI();
-        window.app = this;
+        window.app = this; // Critical: Make globally available
     }
     
     updateUserUI() {
@@ -167,6 +180,13 @@ class PharmacieGaherApp {
                     }
                     await this.loadProfilePage();
                     break;
+                case 'orders':
+                    if (!this.currentUser) {
+                        await this.showPage('login');
+                        return;
+                    }
+                    await this.loadOrdersPage();
+                    break;
                 case 'checkout':
                     await this.loadCheckoutPage();
                     break;
@@ -195,7 +215,756 @@ class PharmacieGaherApp {
             this.showToast('Erreur de chargement de la page', 'error');
         }
     }
-    
+
+    // MISSING METHOD - FIXED: Load Profile Page
+    async loadProfilePage() {
+        try {
+            const mainContent = document.getElementById('mainContent');
+            
+            // Show loading
+            mainContent.innerHTML = `
+                <div class="container mx-auto px-4 py-8">
+                    <div class="text-center py-16">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+                        <p class="text-emerald-600 mt-4">Chargement du profil...</p>
+                    </div>
+                </div>
+            `;
+            
+            // Get user profile data
+            let user = this.currentUser;
+            
+            // Try to get fresh data from API
+            try {
+                const freshUser = await apiCall('/auth/profile');
+                if (freshUser) {
+                    user = freshUser;
+                    this.currentUser = freshUser;
+                }
+            } catch (error) {
+                console.log('Using cached user data');
+            }
+            
+            if (!user) {
+                this.showToast('Erreur de chargement du profil', 'error');
+                this.showPage('login');
+                return;
+            }
+            
+            // Render profile page
+            mainContent.innerHTML = `
+                <div class="container mx-auto px-4 py-8 max-w-4xl">
+                    <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8">
+                        <div class="flex items-center space-x-6 mb-8">
+                            <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/30">
+                                <i class="fas fa-user text-white text-3xl"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-3xl font-bold text-emerald-800">Mon Profil</h1>
+                                <p class="text-emerald-600">Gérez vos informations personnelles</p>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <!-- Profile Form -->
+                            <div class="space-y-6">
+                                <h2 class="text-xl font-semibold text-emerald-800 border-b border-emerald-200 pb-2">
+                                    Informations personnelles
+                                </h2>
+                                
+                                <form id="profileForm" class="space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-emerald-700 mb-2">Prénom *</label>
+                                            <input type="text" id="profilePrenom" value="${user.prenom || ''}" 
+                                                   class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 transition-all">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-emerald-700 mb-2">Nom *</label>
+                                            <input type="text" id="profileNom" value="${user.nom || ''}" 
+                                                   class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 transition-all">
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-medium text-emerald-700 mb-2">Email</label>
+                                        <input type="email" value="${user.email || ''}" disabled 
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500">
+                                        <p class="text-xs text-gray-500 mt-1">L'email ne peut pas être modifié</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-medium text-emerald-700 mb-2">Téléphone *</label>
+                                        <input type="tel" id="profileTelephone" value="${user.telephone || ''}" 
+                                               class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 transition-all">
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-medium text-emerald-700 mb-2">Adresse</label>
+                                        <textarea id="profileAdresse" rows="2" 
+                                                  class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 transition-all resize-none">${user.adresse || ''}</textarea>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-emerald-700 mb-2">Ville</label>
+                                            <input type="text" id="profileVille" value="${user.ville || ''}" 
+                                                   class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 transition-all">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-emerald-700 mb-2">Wilaya *</label>
+                                            <select id="profileWilaya" class="w-full px-4 py-3 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 transition-all">
+                                                ${this.getWilayaOptions(user.wilaya)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex space-x-4 pt-4">
+                                        <button type="button" onclick="app.updateProfile()" 
+                                                class="flex-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg font-medium">
+                                            <i class="fas fa-save mr-2"></i>Mettre à jour
+                                        </button>
+                                        <button type="button" onclick="app.showChangePasswordModal()" 
+                                                class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg font-medium">
+                                            <i class="fas fa-lock mr-2"></i>Changer mot de passe
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <!-- Profile Info -->
+                            <div class="space-y-6">
+                                <h2 class="text-xl font-semibold text-emerald-800 border-b border-emerald-200 pb-2">
+                                    Informations du compte
+                                </h2>
+                                
+                                <div class="space-y-4">
+                                    <div class="bg-white/60 rounded-xl p-4 border border-emerald-100">
+                                        <h3 class="font-medium text-emerald-800 mb-2">Statut du compte</h3>
+                                        <div class="flex items-center space-x-2">
+                                            <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                            <span class="text-green-700 font-medium">Actif</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="bg-white/60 rounded-xl p-4 border border-emerald-100">
+                                        <h3 class="font-medium text-emerald-800 mb-2">Membre depuis</h3>
+                                        <p class="text-emerald-600">${user.dateInscription ? new Date(user.dateInscription).toLocaleDateString('fr-FR') : 'Non disponible'}</p>
+                                    </div>
+                                    
+                                    <div class="bg-white/60 rounded-xl p-4 border border-emerald-100">
+                                        <h3 class="font-medium text-emerald-800 mb-2">Dernière connexion</h3>
+                                        <p class="text-emerald-600">${user.dernierConnexion ? new Date(user.dernierConnexion).toLocaleDateString('fr-FR') : 'Première connexion'}</p>
+                                    </div>
+                                    
+                                    ${user.role === 'admin' ? `
+                                    <div class="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl p-4 border border-yellow-200">
+                                        <h3 class="font-medium text-yellow-800 mb-2">
+                                            <i class="fas fa-crown mr-2"></i>Administrateur
+                                        </h3>
+                                        <p class="text-yellow-700 text-sm">Vous avez accès aux fonctions d'administration</p>
+                                        <button onclick="app.showPage('admin')" 
+                                                class="mt-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm transition-all">
+                                            <i class="fas fa-cog mr-2"></i>Accéder à l'administration
+                                        </button>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                
+                                <!-- Quick Actions -->
+                                <div class="space-y-3">
+                                    <h3 class="font-medium text-emerald-800">Actions rapides</h3>
+                                    <div class="grid grid-cols-1 gap-3">
+                                        <button onclick="app.showPage('orders')" 
+                                                class="flex items-center justify-between p-3 bg-white/60 hover:bg-white/80 rounded-xl border border-emerald-100 transition-all">
+                                            <div class="flex items-center">
+                                                <i class="fas fa-box text-emerald-600 mr-3"></i>
+                                                <span class="text-emerald-800 font-medium">Mes commandes</span>
+                                            </div>
+                                            <i class="fas fa-chevron-right text-emerald-400"></i>
+                                        </button>
+                                        
+                                        <button onclick="app.showPage('products')" 
+                                                class="flex items-center justify-between p-3 bg-white/60 hover:bg-white/80 rounded-xl border border-emerald-100 transition-all">
+                                            <div class="flex items-center">
+                                                <i class="fas fa-shopping-bag text-emerald-600 mr-3"></i>
+                                                <span class="text-emerald-800 font-medium">Continuer mes achats</span>
+                                            </div>
+                                            <i class="fas fa-chevron-right text-emerald-400"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error loading profile page:', error);
+            const mainContent = document.getElementById('mainContent');
+            mainContent.innerHTML = `
+                <div class="container mx-auto px-4 py-8">
+                    <div class="text-center py-16">
+                        <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-red-800 mb-4">Erreur de chargement</h3>
+                        <p class="text-red-600 mb-8">Impossible de charger votre profil</p>
+                        <button onclick="app.showPage('home')" class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600">
+                            Retour à l'accueil
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // MISSING METHOD - FIXED: Load Orders Page
+    async loadOrdersPage() {
+        try {
+            const mainContent = document.getElementById('mainContent');
+            
+            // Show loading
+            mainContent.innerHTML = `
+                <div class="container mx-auto px-4 py-8">
+                    <div class="text-center py-16">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+                        <p class="text-emerald-600 mt-4">Chargement de vos commandes...</p>
+                    </div>
+                </div>
+            `;
+            
+            let orders = [];
+            
+            // Try to get orders from API
+            try {
+                const response = await apiCall('/orders/user/all');
+                if (response && response.orders) {
+                    orders = response.orders;
+                }
+            } catch (error) {
+                console.log('API unavailable, checking localStorage for orders');
+                
+                // Check localStorage for user orders
+                const userOrdersKey = `userOrders_${this.currentUser.id}`;
+                const storedOrders = localStorage.getItem(userOrdersKey);
+                if (storedOrders) {
+                    orders = JSON.parse(storedOrders);
+                }
+            }
+            
+            // Sort orders by date, newest first
+            orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
+            
+            // Render orders page
+            mainContent.innerHTML = `
+                <div class="container mx-auto px-4 py-8 max-w-6xl">
+                    <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8">
+                        <div class="flex items-center space-x-6 mb-8">
+                            <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/30">
+                                <i class="fas fa-box text-white text-3xl"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-3xl font-bold text-emerald-800">Mes Commandes</h1>
+                                <p class="text-emerald-600">${orders.length} commande(s) trouvée(s)</p>
+                            </div>
+                        </div>
+                        
+                        ${orders.length === 0 ? `
+                            <div class="text-center py-16">
+                                <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
+                                <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
+                                <p class="text-emerald-600 mb-8">Vous n'avez pas encore passé de commande</p>
+                                <button onclick="app.showPage('products')" 
+                                        class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                                    <i class="fas fa-shopping-cart mr-2"></i>Commencer mes achats
+                                </button>
+                            </div>
+                        ` : `
+                            <div class="space-y-6">
+                                ${orders.map(order => `
+                                    <div class="bg-white/60 rounded-2xl p-6 border border-emerald-100 hover:shadow-lg transition-all">
+                                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                                            <div class="flex-1">
+                                                <div class="flex items-center space-x-4 mb-3">
+                                                    <h3 class="text-xl font-bold text-emerald-800">Commande #${order.numeroCommande}</h3>
+                                                    <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold ${this.getOrderStatusColor(order.statut)}">
+                                                        ${this.getOrderStatusLabel(order.statut)}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                                    <div>
+                                                        <span class="text-emerald-600 font-medium">Date:</span>
+                                                        <p class="text-emerald-800">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span class="text-emerald-600 font-medium">Articles:</span>
+                                                        <p class="text-emerald-800">${order.articles?.length || 0} produit(s)</p>
+                                                    </div>
+                                                    <div>
+                                                        <span class="text-emerald-600 font-medium">Total:</span>
+                                                        <p class="text-emerald-800 font-bold">${order.total} DA</p>
+                                                    </div>
+                                                </div>
+                                                
+                                                ${order.articles && order.articles.length > 0 ? `
+                                                    <div class="mt-4">
+                                                        <h4 class="text-sm font-medium text-emerald-700 mb-2">Produits commandés:</h4>
+                                                        <div class="flex flex-wrap gap-2">
+                                                            ${order.articles.slice(0, 3).map(article => `
+                                                                <span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs">
+                                                                    ${article.nom} (×${article.quantite})
+                                                                </span>
+                                                            `).join('')}
+                                                            ${order.articles.length > 3 ? `
+                                                                <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
+                                                                    +${order.articles.length - 3} autre(s)
+                                                                </span>
+                                                            ` : ''}
+                                                        </div>
+                                                    </div>
+                                                ` : ''}
+                                            </div>
+                                            
+                                            <div class="flex flex-col sm:flex-row gap-2">
+                                                <button onclick="app.viewOrderDetails('${order._id || order.numeroCommande}')" 
+                                                        class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm transition-all">
+                                                    <i class="fas fa-eye mr-2"></i>Voir détails
+                                                </button>
+                                                ${order.statut === 'en-attente' ? `
+                                                    <button onclick="app.cancelOrder('${order._id || order.numeroCommande}')" 
+                                                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition-all">
+                                                        <i class="fas fa-times mr-2"></i>Annuler
+                                                    </button>
+                                                ` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error loading orders page:', error);
+            const mainContent = document.getElementById('mainContent');
+            mainContent.innerHTML = `
+                <div class="container mx-auto px-4 py-8">
+                    <div class="text-center py-16">
+                        <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-red-800 mb-4">Erreur de chargement</h3>
+                        <p class="text-red-600 mb-8">Impossible de charger vos commandes</p>
+                        <button onclick="app.showPage('profile')" class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600">
+                            Retour au profil
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // MISSING METHOD - FIXED: Load Checkout Page
+    async loadCheckoutPage() {
+        try {
+            if (this.cart.length === 0) {
+                this.showToast('Votre panier est vide', 'warning');
+                this.showPage('products');
+                return;
+            }
+
+            const mainContent = document.getElementById('mainContent');
+            
+            // Calculate totals
+            const sousTotal = this.getCartTotal();
+            const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
+            const total = sousTotal + fraisLivraison;
+            
+            mainContent.innerHTML = `
+                <div class="container mx-auto px-4 py-8 max-w-6xl">
+                    <div class="text-center mb-8">
+                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">Finaliser la commande</h1>
+                        <p class="text-xl text-emerald-600">Vérifiez vos informations et validez votre commande</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Formulaire de commande -->
+                        <div class="bg-white rounded-2xl shadow-lg p-8">
+                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Informations de livraison</h2>
+                            
+                            <form id="checkoutForm" class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
+                                        <input type="text" id="checkoutPrenom" value="${this.currentUser?.prenom || ''}" required 
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
+                                        <input type="text" id="checkoutNom" value="${this.currentUser?.nom || ''}" required 
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                                    <input type="email" id="checkoutEmail" value="${this.currentUser?.email || ''}" required 
+                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
+                                    <input type="tel" id="checkoutTelephone" value="${this.currentUser?.telephone || ''}" required 
+                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Adresse de livraison *</label>
+                                    <textarea id="checkoutAdresse" required rows="3" 
+                                              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none">${this.currentUser?.adresse || ''}</textarea>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Wilaya *</label>
+                                    <select id="checkoutWilaya" required 
+                                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                        ${this.getWilayaOptions(this.currentUser?.wilaya)}
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Mode de paiement</label>
+                                    <div class="space-y-3">
+                                        <label class="flex items-center p-3 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-emerald-400 transition-all">
+                                            <input type="radio" name="modePaiement" value="Paiement à la livraison" checked 
+                                                   class="text-emerald-600 mr-3">
+                                            <i class="fas fa-money-bill-wave text-emerald-600 mr-3"></i>
+                                            <div>
+                                                <span class="font-medium text-gray-900">Paiement à la livraison</span>
+                                                <p class="text-sm text-gray-500">Payez en espèces lors de la réception</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Commentaires (optionnel)</label>
+                                    <textarea id="checkoutCommentaires" rows="3" 
+                                              placeholder="Instructions spéciales pour la livraison..."
+                                              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"></textarea>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- Résumé de commande -->
+                        <div class="bg-white rounded-2xl shadow-lg p-8">
+                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Résumé de la commande</h2>
+                            
+                            <!-- Articles -->
+                            <div class="space-y-4 mb-6">
+                                ${this.cart.map(item => `
+                                    <div class="flex items-center space-x-4 p-4 bg-emerald-50 rounded-xl">
+                                        <img src="${item.image}" alt="${item.nom}" 
+                                             class="w-16 h-16 object-cover rounded-lg">
+                                        <div class="flex-1">
+                                            <h4 class="font-medium text-emerald-800">${item.nom}</h4>
+                                            <p class="text-sm text-emerald-600">Quantité: ${item.quantite}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-bold text-emerald-700">${item.prix * item.quantite} DA</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <!-- Totaux -->
+                            <div class="border-t-2 border-emerald-200 pt-6 space-y-3">
+                                <div class="flex justify-between text-emerald-700">
+                                    <span>Sous-total:</span>
+                                    <span>${sousTotal} DA</span>
+                                </div>
+                                <div class="flex justify-between text-emerald-700">
+                                    <span>Frais de livraison:</span>
+                                    <span>${fraisLivraison} DA</span>
+                                </div>
+                                ${sousTotal >= 5000 ? `
+                                    <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                                        <p class="text-green-700 text-sm font-medium">
+                                            <i class="fas fa-truck mr-2"></i>Livraison gratuite!
+                                        </p>
+                                    </div>
+                                ` : ''}
+                                <div class="flex justify-between text-xl font-bold text-emerald-800 border-t-2 border-emerald-200 pt-3">
+                                    <span>Total:</span>
+                                    <span>${total} DA</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Actions -->
+                            <div class="mt-8 space-y-4">
+                                <button onclick="app.processOrder()" 
+                                        class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg">
+                                    <i class="fas fa-check mr-2"></i>Confirmer la commande
+                                </button>
+                                
+                                <button onclick="app.showPage('products')" 
+                                        class="w-full bg-gray-100 text-gray-700 py-3 rounded-xl hover:bg-gray-200 transition-all font-medium">
+                                    <i class="fas fa-arrow-left mr-2"></i>Continuer mes achats
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error loading checkout page:', error);
+            this.showToast('Erreur de chargement de la page de commande', 'error');
+        }
+    }
+
+    // MISSING METHOD - FIXED: Load Order Confirmation Page
+    async loadOrderConfirmationPage(orderNumber) {
+        try {
+            const mainContent = document.getElementById('mainContent');
+            
+            mainContent.innerHTML = `
+                <div class="container mx-auto px-4 py-8 max-w-4xl">
+                    <div class="text-center">
+                        <div class="bg-gradient-to-br from-green-50 to-emerald-100 rounded-3xl p-12 shadow-2xl border border-emerald-200">
+                            <div class="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg">
+                                <i class="fas fa-check text-white text-4xl"></i>
+                            </div>
+                            
+                            <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
+                            <p class="text-xl text-emerald-600 mb-6">Merci pour votre confiance</p>
+                            
+                            <div class="bg-white/60 rounded-2xl p-6 mb-8 border border-emerald-200">
+                                <h2 class="text-2xl font-bold text-emerald-800 mb-4">Numéro de commande</h2>
+                                <p class="text-3xl font-mono font-bold text-emerald-600">#${orderNumber}</p>
+                            </div>
+                            
+                            <div class="space-y-4 text-emerald-700 mb-8">
+                                <p><i class="fas fa-envelope mr-2"></i>Un email de confirmation a été envoyé</p>
+                                <p><i class="fas fa-truck mr-2"></i>Votre commande sera traitée dans les plus brefs délais</p>
+                                <p><i class="fas fa-phone mr-2"></i>Nous vous contacterons pour confirmer la livraison</p>
+                            </div>
+                            
+                            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                                <button onclick="app.showPage('orders')" 
+                                        class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                                    <i class="fas fa-box mr-2"></i>Voir mes commandes
+                                </button>
+                                
+                                <button onclick="app.showPage('products')" 
+                                        class="bg-gray-100 text-gray-700 font-bold py-3 px-8 rounded-xl hover:bg-gray-200 transition-all">
+                                    <i class="fas fa-shopping-bag mr-2"></i>Continuer mes achats
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error loading order confirmation page:', error);
+            this.showToast('Erreur de chargement de la confirmation', 'error');
+        }
+    }
+
+    // Helper methods for profile and orders
+    getWilayaOptions(selectedWilaya = '') {
+        const wilayas = [
+            'Adrar', 'Chlef', 'Laghouat', 'Oum El Bouaghi', 'Batna', 'Béjaïa', 'Biskra', 'Béchar',
+            'Blida', 'Bouira', 'Tamanrasset', 'Tébessa', 'Tlemcen', 'Tiaret', 'Tizi Ouzou', 'Alger',
+            'Djelfa', 'Jijel', 'Sétif', 'Saïda', 'Skikda', 'Sidi Bel Abbès', 'Annaba', 'Guelma',
+            'Constantine', 'Médéa', 'Mostaganem', 'M\'Sila', 'Mascara', 'Ouargla', 'Oran', 'El Bayadh',
+            'Illizi', 'Bordj Bou Arréridj', 'Boumerdès', 'El Tarf', 'Tindouf', 'Tissemsilt', 'El Oued',
+            'Khenchela', 'Souk Ahras', 'Tipaza', 'Mila', 'Aïn Defla', 'Naâma', 'Aïn Témouchent',
+            'Ghardaïa', 'Relizane', 'Timimoun', 'Bordj Badji Mokhtar', 'Ouled Djellal', 'Béni Abbès',
+            'In Salah', 'In Guezzam', 'Touggourt', 'Djanet', 'El M\'Ghair', 'El Meniaa'
+        ];
+        
+        return wilayas.map(wilaya => 
+            `<option value="${wilaya}" ${wilaya === selectedWilaya ? 'selected' : ''}>${wilaya}</option>`
+        ).join('');
+    }
+
+    getOrderStatusColor(statut) {
+        const colors = {
+            'en-attente': 'bg-yellow-100 text-yellow-800',
+            'confirmée': 'bg-green-100 text-green-800',
+            'préparée': 'bg-blue-100 text-blue-800',
+            'expédiée': 'bg-purple-100 text-purple-800',
+            'livrée': 'bg-emerald-100 text-emerald-800',
+            'annulée': 'bg-red-100 text-red-800'
+        };
+        return colors[statut] || 'bg-gray-100 text-gray-800';
+    }
+
+    getOrderStatusLabel(statut) {
+        const labels = {
+            'en-attente': 'En attente',
+            'confirmée': 'Confirmée',
+            'préparée': 'Préparée',
+            'expédiée': 'Expédiée',
+            'livrée': 'Livrée',
+            'annulée': 'Annulée'
+        };
+        return labels[statut] || statut;
+    }
+
+    // Profile update method
+    async updateProfile() {
+        try {
+            const prenom = document.getElementById('profilePrenom').value.trim();
+            const nom = document.getElementById('profileNom').value.trim();
+            const telephone = document.getElementById('profileTelephone').value.trim();
+            const adresse = document.getElementById('profileAdresse').value.trim();
+            const ville = document.getElementById('profileVille').value.trim();
+            const wilaya = document.getElementById('profileWilaya').value;
+            
+            if (!prenom || !nom || !telephone || !wilaya) {
+                this.showToast('Veuillez remplir tous les champs obligatoires', 'error');
+                return;
+            }
+            
+            const updateData = {
+                prenom,
+                nom,
+                telephone,
+                adresse,
+                ville,
+                wilaya
+            };
+            
+            // Try to update via API
+            try {
+                const response = await apiCall('/auth/profile', {
+                    method: 'PUT',
+                    body: JSON.stringify(updateData)
+                });
+                
+                if (response) {
+                    this.currentUser = { ...this.currentUser, ...updateData };
+                    this.showToast('Profil mis à jour avec succès', 'success');
+                }
+            } catch (error) {
+                // Update locally if API fails
+                this.currentUser = { ...this.currentUser, ...updateData };
+                this.showToast('Profil mis à jour localement', 'success');
+            }
+            
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            this.showToast('Erreur lors de la mise à jour du profil', 'error');
+        }
+    }
+
+    // Process order method - FIXED
+    async processOrder() {
+        try {
+            if (this.cart.length === 0) {
+                this.showToast('Votre panier est vide', 'error');
+                return;
+            }
+            
+            // Get form data
+            const prenom = document.getElementById('checkoutPrenom').value.trim();
+            const nom = document.getElementById('checkoutNom').value.trim();
+            const email = document.getElementById('checkoutEmail').value.trim();
+            const telephone = document.getElementById('checkoutTelephone').value.trim();
+            const adresse = document.getElementById('checkoutAdresse').value.trim();
+            const wilaya = document.getElementById('checkoutWilaya').value;
+            const modePaiement = document.querySelector('input[name="modePaiement"]:checked').value;
+            const commentaires = document.getElementById('checkoutCommentaires').value.trim();
+            
+            // Validation
+            if (!prenom || !nom || !email || !telephone || !adresse || !wilaya) {
+                this.showToast('Veuillez remplir tous les champs obligatoires', 'error');
+                return;
+            }
+            
+            // Calculate totals
+            const sousTotal = this.getCartTotal();
+            const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
+            const total = sousTotal + fraisLivraison;
+            
+            // Generate order number
+            const orderNumber = 'CMD' + Date.now().toString().slice(-8);
+            
+            // Prepare order data
+            const orderData = {
+                _id: Date.now().toString(),
+                numeroCommande: orderNumber,
+                client: {
+                    userId: this.currentUser?.id || null,
+                    prenom,
+                    nom,
+                    email,
+                    telephone,
+                    adresse,
+                    wilaya
+                },
+                articles: this.cart.map(item => ({
+                    productId: item.id,
+                    nom: item.nom,
+                    prix: item.prix,
+                    quantite: item.quantite,
+                    image: item.image
+                })),
+                sousTotal,
+                fraisLivraison,
+                total,
+                statut: 'en-attente',
+                modePaiement,
+                commentaires,
+                dateCommande: new Date().toISOString()
+            };
+            
+            console.log('Processing order:', orderData);
+            
+            // Try to save to API first
+            try {
+                await apiCall('/orders', {
+                    method: 'POST',
+                    body: JSON.stringify(orderData)
+                });
+                console.log('Order saved to API successfully');
+            } catch (error) {
+                console.log('API save failed, saving locally:', error);
+            }
+            
+            // Always save locally for admin panel
+            if (window.addOrderToDemo) {
+                window.addOrderToDemo(orderData);
+            }
+            
+            // Save user orders locally
+            if (this.currentUser) {
+                const userOrdersKey = `userOrders_${this.currentUser.id}`;
+                let userOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
+                userOrders.unshift(orderData);
+                localStorage.setItem(userOrdersKey, JSON.stringify(userOrders));
+            }
+            
+            // Clear cart
+            this.clearCart();
+            
+            // Show success
+            this.showToast('Commande passée avec succès !', 'success');
+            
+            // Redirect to confirmation
+            this.showPage('order-confirmation', { orderNumber });
+            
+        } catch (error) {
+            console.error('Error processing order:', error);
+            this.showToast('Erreur lors de la validation de la commande', 'error');
+        }
+    }
+
+    // Rest of the existing methods...
     async loadHomePage() {
         const mainContent = document.getElementById('mainContent');
         mainContent.innerHTML = `
@@ -228,6 +997,7 @@ class PharmacieGaherApp {
                 <div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-50 to-transparent"></div>
             </section>
             
+            <!-- Categories Section -->
             <section class="py-16 bg-gradient-to-br from-green-50 to-emerald-100">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
@@ -235,10 +1005,12 @@ class PharmacieGaherApp {
                         <p class="text-xl text-emerald-600">Découvrez notre gamme complète de produits</p>
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="categoriesGrid">
+                        <!-- Categories will be loaded here -->
                     </div>
                 </div>
             </section>
             
+            <!-- Featured Products -->
             <section class="py-16 bg-white">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
@@ -246,10 +1018,12 @@ class PharmacieGaherApp {
                         <p class="text-xl text-emerald-600">Produits sélectionnés pour vous</p>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="featuredProducts">
+                        <!-- Featured products will be loaded here -->
                     </div>
                 </div>
             </section>
             
+            <!-- Promotions -->
             <section class="py-16 bg-gradient-to-br from-red-50 to-pink-100">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
@@ -257,6 +1031,7 @@ class PharmacieGaherApp {
                         <p class="text-xl text-red-600">Offres spéciales et réductions</p>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="promotionProducts">
+                        <!-- Promotion products will be loaded here -->
                     </div>
                 </div>
             </section>
@@ -268,6 +1043,7 @@ class PharmacieGaherApp {
     }
     
     async loadCategories() {
+        // Show all 10 categories with Vitalité first
         const mainPageCategories = [
             { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
             { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
@@ -300,6 +1076,7 @@ class PharmacieGaherApp {
     async loadFeaturedProducts() {
         console.log('Loading featured products...');
         
+        // Use cached products and filter for featured products
         const featuredProducts = this.allProducts.filter(p => p.enVedette && p.actif !== false);
         
         console.log(`Found ${featuredProducts.length} featured products`);
@@ -328,6 +1105,7 @@ class PharmacieGaherApp {
     async loadPromotionProducts() {
         console.log('Loading promotion products...');
         
+        // Use cached products and filter for promotion products
         const promotionProducts = this.allProducts.filter(p => p.enPromotion && p.actif !== false);
         
         console.log(`Found ${promotionProducts.length} promotion products`);
@@ -420,553 +1198,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // CHECKOUT PAGE - FIXED
-    async loadCheckoutPage() {
-        const mainContent = document.getElementById('mainContent');
-        
-        if (this.cart.length === 0) {
-            this.showToast('Votre panier est vide', 'warning');
-            this.showPage('home');
-            return;
-        }
-        
-        const sousTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
-        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
-        const total = sousTotal + fraisLivraison;
-        
-        mainContent.innerHTML = `
-            <div class="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 py-8">
-                <div class="container mx-auto px-4 max-w-6xl">
-                    <div class="text-center mb-8">
-                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">Finaliser votre commande</h1>
-                        <p class="text-xl text-emerald-600">Vérifiez vos informations et validez votre achat</p>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div class="lg:col-span-2">
-                            <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-6 mb-6">
-                                <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
-                                    <i class="fas fa-shopping-cart mr-3"></i>
-                                    Vos articles (${this.cart.reduce((sum, item) => sum + item.quantite, 0)})
-                                </h2>
-                                
-                                <div class="space-y-4">
-                                    ${this.cart.map(item => `
-                                        <div class="flex items-center space-x-4 p-4 bg-emerald-50 rounded-2xl">
-                                            <img src="${item.image}" alt="${item.nom}" 
-                                                 class="w-20 h-20 object-cover rounded-xl">
-                                            <div class="flex-1">
-                                                <h3 class="font-bold text-emerald-800">${item.nom}</h3>
-                                                <p class="text-emerald-600">Quantité: ${item.quantite}</p>
-                                                <p class="text-emerald-700 font-semibold">${item.prix} DA x ${item.quantite} = ${item.prix * item.quantite} DA</p>
-                                            </div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-6">
-                                <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
-                                    <i class="fas fa-truck mr-3"></i>
-                                    Informations de livraison
-                                </h2>
-                                
-                                <form id="checkoutForm" onsubmit="handleCheckout(event)" class="space-y-4">
-                                    ${this.currentUser ? `
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom complet</label>
-                                                <input type="text" name="nomComplet" 
-                                                       value="${this.currentUser.prenom} ${this.currentUser.nom}" 
-                                                       required class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-2">Téléphone</label>
-                                                <input type="tel" name="telephone" 
-                                                       value="${this.currentUser.telephone || ''}" 
-                                                       required class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                            </div>
-                                        </div>
-                                        
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
-                                            <input type="email" name="email" 
-                                                   value="${this.currentUser.email}" 
-                                                   required class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                        </div>
-                                        
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-2">Adresse de livraison</label>
-                                            <textarea name="adresse" rows="3" required 
-                                                      class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500" 
-                                                      placeholder="Adresse complète avec ville et wilaya">${this.currentUser.adresse || ''}</textarea>
-                                        </div>
-                                        
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-2">Ville</label>
-                                                <input type="text" name="ville" 
-                                                       value="${this.currentUser.ville || ''}" 
-                                                       required class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-2">Wilaya</label>
-                                                <input type="text" name="wilaya" 
-                                                       value="${this.currentUser.wilaya || ''}" 
-                                                       required class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                            </div>
-                                        </div>
-                                    ` : `
-                                        <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 text-center">
-                                            <i class="fas fa-user-plus text-yellow-600 text-3xl mb-4"></i>
-                                            <h3 class="font-bold text-yellow-800 mb-2">Connexion recommandée</h3>
-                                            <p class="text-yellow-700 mb-4">Connectez-vous pour un checkout plus rapide</p>
-                                            <button type="button" onclick="app.showPage('login')" 
-                                                    class="bg-yellow-500 text-white px-6 py-2 rounded-xl hover:bg-yellow-600 transition-all">
-                                                Se connecter
-                                            </button>
-                                        </div>
-                                        
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom complet *</label>
-                                                <input type="text" name="nomComplet" required 
-                                                       class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
-                                                <input type="tel" name="telephone" required 
-                                                       class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                            </div>
-                                        </div>
-                                        
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                                            <input type="email" name="email" required 
-                                                   class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                        </div>
-                                        
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-2">Adresse de livraison *</label>
-                                            <textarea name="adresse" rows="3" required 
-                                                      class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500" 
-                                                      placeholder="Adresse complète avec ville et wilaya"></textarea>
-                                        </div>
-                                        
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-2">Ville *</label>
-                                                <input type="text" name="ville" required 
-                                                       class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
-                                                <input type="text" name="wilaya" required 
-                                                       class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                            </div>
-                                        </div>
-                                    `}
-                                    
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Notes de commande (optionnel)</label>
-                                        <textarea name="notes" rows="2" 
-                                                  class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500" 
-                                                  placeholder="Instructions spéciales de livraison..."></textarea>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                        
-                        <div class="lg:col-span-1">
-                            <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-6 sticky top-4">
-                                <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
-                                    <i class="fas fa-receipt mr-3"></i>
-                                    Récapitulatif
-                                </h2>
-                                
-                                <div class="space-y-4 mb-6">
-                                    <div class="flex justify-between items-center text-emerald-700">
-                                        <span>Sous-total:</span>
-                                        <span class="font-semibold">${sousTotal} DA</span>
-                                    </div>
-                                    
-                                    <div class="flex justify-between items-center text-emerald-700">
-                                        <span>Frais de livraison:</span>
-                                        <span class="font-semibold ${fraisLivraison === 0 ? 'text-green-600' : ''}">${fraisLivraison} DA ${fraisLivraison === 0 ? '(Gratuite!)' : ''}</span>
-                                    </div>
-                                    
-                                    ${sousTotal < 5000 && fraisLivraison > 0 ? `
-                                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                                        <p class="text-sm text-blue-700">
-                                            <i class="fas fa-info-circle mr-2"></i>
-                                            Livraison gratuite dès 5000 DA
-                                        </p>
-                                    </div>
-                                    ` : ''}
-                                    
-                                    <hr class="border-emerald-200">
-                                    
-                                    <div class="flex justify-between items-center font-bold text-xl text-emerald-800">
-                                        <span>Total:</span>
-                                        <span>${total} DA</span>
-                                    </div>
-                                </div>
-                                
-                                <div class="space-y-4">
-                                    <button type="submit" form="checkoutForm" id="checkoutSubmitBtn"
-                                            class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 focus:ring-4 focus:ring-emerald-500/20 transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 disabled:opacity-50">
-                                        <span id="checkoutSubmitText">
-                                            <i class="fas fa-credit-card mr-2"></i>
-                                            Confirmer la commande
-                                        </span>
-                                        <div id="checkoutSpinner" class="hidden flex items-center justify-center">
-                                            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                                            Traitement...
-                                        </div>
-                                    </button>
-                                    
-                                    <button type="button" onclick="app.showPage('home')" 
-                                            class="w-full bg-gray-100 text-gray-700 font-semibold py-3 px-6 rounded-xl hover:bg-gray-200 transition-all">
-                                        <i class="fas fa-arrow-left mr-2"></i>
-                                        Continuer les achats
-                                    </button>
-                                </div>
-                                
-                                <div class="mt-6 p-4 bg-emerald-50 rounded-2xl">
-                                    <h4 class="font-semibold text-emerald-800 mb-2 flex items-center">
-                                        <i class="fas fa-shield-alt mr-2"></i>
-                                        Mode de paiement
-                                    </h4>
-                                    <p class="text-sm text-emerald-700">
-                                        Paiement à la livraison (espèces uniquement)
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    // ORDER CONFIRMATION PAGE - FIXED
-    async loadOrderConfirmationPage(orderNumber) {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center py-8">
-                <div class="max-w-2xl mx-auto px-4">
-                    <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 text-center">
-                        <div class="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <i class="fas fa-check text-white text-3xl"></i>
-                        </div>
-                        
-                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
-                        <p class="text-xl text-emerald-600 mb-6">Merci pour votre confiance</p>
-                        
-                        <div class="bg-emerald-50 rounded-2xl p-6 mb-6">
-                            <h2 class="font-bold text-emerald-800 mb-2">Numéro de commande</h2>
-                            <p class="text-2xl font-bold text-emerald-700">${orderNumber}</p>
-                        </div>
-                        
-                        <div class="space-y-4 text-left mb-8">
-                            <div class="flex items-start space-x-4">
-                                <i class="fas fa-truck text-emerald-500 mt-1"></i>
-                                <div>
-                                    <h3 class="font-semibold text-emerald-800">Livraison</h3>
-                                    <p class="text-emerald-600">Votre commande sera livrée sous 24-48h</p>
-                                </div>
-                            </div>
-                            
-                            <div class="flex items-start space-x-4">
-                                <i class="fas fa-phone text-emerald-500 mt-1"></i>
-                                <div>
-                                    <h3 class="font-semibold text-emerald-800">Contact</h3>
-                                    <p class="text-emerald-600">Nous vous contacterons pour confirmer la livraison</p>
-                                </div>
-                            </div>
-                            
-                            <div class="flex items-start space-x-4">
-                                <i class="fas fa-money-bill text-emerald-500 mt-1"></i>
-                                <div>
-                                    <h3 class="font-semibold text-emerald-800">Paiement</h3>
-                                    <p class="text-emerald-600">Paiement à la livraison (espèces)</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="flex flex-col sm:flex-row gap-4">
-                            <button onclick="app.showPage('home')" 
-                                    class="flex-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all">
-                                <i class="fas fa-home mr-2"></i>
-                                Retour à l'accueil
-                            </button>
-                            
-                            <button onclick="app.showPage('products')" 
-                                    class="flex-1 bg-white text-emerald-600 font-semibold py-3 px-6 rounded-xl border-2 border-emerald-200 hover:bg-emerald-50 transition-all">
-                                <i class="fas fa-shopping-bag mr-2"></i>
-                                Continuer les achats
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    // PRODUCTS PAGE - FIXED
-    async loadProductsPage(params = {}) {
-        const mainContent = document.getElementById('mainContent');
-        
-        this.showLoading();
-        
-        try {
-            let products = [...this.allProducts];
-            let pageTitle = 'Nos Produits';
-            let subtitle = 'Découvrez notre gamme complète';
-            
-            if (params.categorie) {
-                products = products.filter(p => p.categorie === params.categorie);
-                pageTitle = `Catégorie: ${params.categorie}`;
-                subtitle = `Produits de la catégorie ${params.categorie}`;
-            }
-            
-            if (params.search) {
-                const searchTerm = params.search.toLowerCase();
-                products = products.filter(p => 
-                    p.nom.toLowerCase().includes(searchTerm) ||
-                    p.description.toLowerCase().includes(searchTerm) ||
-                    (p.marque && p.marque.toLowerCase().includes(searchTerm))
-                );
-                pageTitle = `Recherche: "${params.search}"`;
-                subtitle = `${products.length} résultat(s) trouvé(s)`;
-            }
-            
-            products = products.filter(p => p.actif !== false);
-            
-            mainContent.innerHTML = `
-                <div class="container mx-auto px-4 py-8">
-                    <div class="text-center mb-12">
-                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">${pageTitle}</h1>
-                        <p class="text-xl text-emerald-600">${subtitle}</p>
-                    </div>
-                    
-                    <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6 mb-8">
-                        <div class="flex flex-wrap items-center justify-between gap-4">
-                            <div class="flex flex-wrap items-center gap-4">
-                                <button onclick="app.showPage('products')" 
-                                        class="px-4 py-2 rounded-xl ${!params.categorie ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-700'} hover:bg-emerald-600 hover:text-white transition-all">
-                                    Tous les produits
-                                </button>
-                                
-                                ${['Vitalité', 'Sport', 'Visage', 'Cheveux'].map(cat => `
-                                    <button onclick="app.filterByCategory('${cat}')" 
-                                            class="px-4 py-2 rounded-xl ${params.categorie === cat ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-700'} hover:bg-emerald-600 hover:text-white transition-all">
-                                        ${cat}
-                                    </button>
-                                `).join('')}
-                            </div>
-                            
-                            <div class="flex items-center space-x-2">
-                                <span class="text-emerald-600 font-semibold">${products.length} produits</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="productsGrid">
-                        ${products.length > 0 ? 
-                            products.map(product => this.createProductCard(product)).join('') :
-                            `<div class="col-span-full text-center py-16">
-                                <i class="fas fa-search text-6xl text-emerald-200 mb-6"></i>
-                                <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit trouvé</h3>
-                                <p class="text-emerald-600 mb-8">Essayez une autre recherche ou catégorie</p>
-                                <button onclick="app.showPage('products')" 
-                                        class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all">
-                                    Voir tous les produits
-                                </button>
-                            </div>`
-                        }
-                    </div>
-                </div>
-            `;
-            
-        } catch (error) {
-            console.error('Error loading products page:', error);
-            mainContent.innerHTML = `
-                <div class="container mx-auto px-4 py-8">
-                    <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-                        <h3 class="text-xl font-bold text-red-800 mb-2">Erreur de chargement</h3>
-                        <p class="text-red-600">Impossible de charger les produits</p>
-                    </div>
-                </div>
-            `;
-        } finally {
-            this.hideLoading();
-        }
-    }
-    
-    // PRODUCT DETAIL PAGE - FIXED
-    async loadProductPage(productId) {
-        const mainContent = document.getElementById('mainContent');
-        
-        this.showLoading();
-        
-        try {
-            const product = this.allProducts.find(p => p._id === productId);
-            
-            if (!product) {
-                throw new Error('Produit non trouvé');
-            }
-            
-            const isOutOfStock = product.stock === 0;
-            const hasPromotion = product.enPromotion && product.prixOriginal;
-            
-            let imageUrl;
-            if (product.image && product.image.startsWith('http')) {
-                imageUrl = product.image;
-            } else if (product.image && product.image.startsWith('data:image')) {
-                imageUrl = product.image;
-            } else {
-                const getCategoryColor = (category) => {
-                    const colors = {
-                        'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
-                        'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-                        'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
-                        'Dentaire': '6366f1'
-                    };
-                    return colors[category] || '10b981';
-                };
-                
-                const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
-                const categoryColor = getCategoryColor(product.categorie);
-                imageUrl = `https://via.placeholder.com/400x400/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
-            }
-            
-            mainContent.innerHTML = `
-                <div class="container mx-auto px-4 py-8">
-                    <div class="max-w-6xl mx-auto">
-                        <nav class="mb-8">
-                            <ol class="flex items-center space-x-2 text-sm">
-                                <li><button onclick="app.showPage('home')" class="text-emerald-600 hover:text-emerald-800">Accueil</button></li>
-                                <li><i class="fas fa-chevron-right text-gray-400 mx-2"></i></li>
-                                <li><button onclick="app.filterByCategory('${product.categorie}')" class="text-emerald-600 hover:text-emerald-800">${product.categorie}</button></li>
-                                <li><i class="fas fa-chevron-right text-gray-400 mx-2"></i></li>
-                                <li class="text-gray-500">${product.nom}</li>
-                            </ol>
-                        </nav>
-                        
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                            <div class="relative">
-                                ${hasPromotion ? `<div class="absolute top-4 left-4 z-10 badge-promotion">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
-                                ${isOutOfStock ? `
-                                    <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10 rounded-2xl">
-                                        <span class="text-white font-bold text-2xl">Rupture de stock</span>
-                                    </div>
-                                ` : ''}
-                                
-                                <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl overflow-hidden">
-                                    <img src="${imageUrl}" alt="${product.nom}" 
-                                         class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                                         onerror="this.src='https://via.placeholder.com/400x400/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
-                                </div>
-                            </div>
-                            
-                            <div class="space-y-6">
-                                <div>
-                                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">${product.nom}</h1>
-                                    <p class="text-xl text-emerald-600 mb-4">${product.description}</p>
-                                    
-                                    <div class="flex items-center space-x-4 mb-6">
-                                        <span class="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-sm font-semibold">
-                                            ${product.categorie}
-                                        </span>
-                                        ${product.marque ? `<span class="text-emerald-600">Marque: ${product.marque}</span>` : ''}
-                                    </div>
-                                </div>
-                                
-                                <div class="space-y-2">
-                                    <div class="flex items-center space-x-4">
-                                        ${hasPromotion ? `
-                                            <span class="text-2xl text-gray-400 line-through">${product.prixOriginal} DA</span>
-                                            <span class="text-4xl font-bold text-red-600">${product.prix} DA</span>
-                                        ` : `
-                                            <span class="text-4xl font-bold text-emerald-700">${product.prix} DA</span>
-                                        `}
-                                    </div>
-                                    <p class="text-emerald-600">Stock disponible: ${product.stock} unités</p>
-                                </div>
-                                
-                                ${!isOutOfStock ? `
-                                    <div class="space-y-4">
-                                        <div class="flex items-center space-x-4">
-                                            <label class="font-semibold text-emerald-800">Quantité:</label>
-                                            <div class="quantity-selector">
-                                                <button onclick="changeProductQuantity(-1)" id="decreaseBtn">-</button>
-                                                <input type="number" id="productQuantity" value="1" min="1" max="${product.stock}" 
-                                                       onchange="validateProductQuantity()">
-                                                <button onclick="changeProductQuantity(1)" id="increaseBtn">+</button>
-                                            </div>
-                                        </div>
-                                        
-                                        <button onclick="addProductToCart('${product._id}')" 
-                                                class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105">
-                                            <i class="fas fa-cart-plus mr-3"></i>
-                                            Ajouter au panier
-                                        </button>
-                                    </div>
-                                ` : `
-                                    <div class="p-4 bg-red-50 border border-red-200 rounded-xl">
-                                        <p class="text-red-800 font-semibold">Produit actuellement en rupture de stock</p>
-                                    </div>
-                                `}
-                                
-                                <div class="space-y-4">
-                                    ${product.ingredients ? `
-                                        <div>
-                                            <h3 class="font-bold text-emerald-800 mb-2">Ingrédients</h3>
-                                            <p class="text-emerald-700">${product.ingredients}</p>
-                                        </div>
-                                    ` : ''}
-                                    
-                                    ${product.modeEmploi ? `
-                                        <div>
-                                            <h3 class="font-bold text-emerald-800 mb-2">Mode d'emploi</h3>
-                                            <p class="text-emerald-700">${product.modeEmploi}</p>
-                                        </div>
-                                    ` : ''}
-                                    
-                                    ${product.precautions ? `
-                                        <div>
-                                            <h3 class="font-bold text-emerald-800 mb-2">Précautions</h3>
-                                            <p class="text-emerald-700">${product.precautions}</p>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-        } catch (error) {
-            console.error('Error loading product page:', error);
-            mainContent.innerHTML = `
-                <div class="container mx-auto px-4 py-8">
-                    <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-                        <h3 class="text-xl font-bold text-red-800 mb-2">Produit non trouvé</h3>
-                        <p class="text-red-600 mb-4">Le produit demandé n'existe pas ou n'est plus disponible</p>
-                        <button onclick="app.showPage('products')" 
-                                class="bg-emerald-500 text-white px-6 py-2 rounded-xl hover:bg-emerald-600 transition-all">
-                            Voir tous les produits
-                        </button>
-                    </div>
-                </div>
-            `;
-        } finally {
-            this.hideLoading();
-        }
-    }
-    
     async filterByCategory(category) {
         await this.showPage('products', { categorie: category });
     }
@@ -993,10 +1224,12 @@ class PharmacieGaherApp {
         }
     }
     
+    // ADD TO CART FUNCTIONALITY - FIXED
     async addToCart(productId, quantity = 1) {
         try {
             console.log('Adding to cart:', productId, quantity);
             
+            // Find product in our cached products
             const product = this.allProducts.find(p => p._id === productId);
             
             if (!product) {
@@ -1013,6 +1246,7 @@ class PharmacieGaherApp {
                 return;
             }
             
+            // Generate image URL
             const getCategoryColor = (category) => {
                 const colors = {
                     'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
@@ -1035,6 +1269,7 @@ class PharmacieGaherApp {
                 imageUrl = `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
             }
             
+            // Check if product already in cart
             const existingIndex = this.cart.findIndex(item => item.id === productId);
             
             if (existingIndex > -1) {
@@ -1289,7 +1524,7 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ADMIN PAGE - FIXED
+    // ADMIN METHODS - These need to be part of the main app class
     async loadAdminPage() {
         if (!this.currentUser || this.currentUser.role !== 'admin') {
             this.showToast('Accès refusé - Droits administrateur requis', 'error');
@@ -1301,6 +1536,7 @@ class PharmacieGaherApp {
         
         mainContent.innerHTML = `
             <div class="container mx-auto px-4 py-8">
+                <!-- Admin Header -->
                 <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                         <div>
@@ -1320,6 +1556,7 @@ class PharmacieGaherApp {
                     </div>
                 </div>
                 
+                <!-- Navigation Admin -->
                 <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 mb-8 overflow-hidden">
                     <nav class="flex flex-wrap">
                         <button onclick="switchAdminSection('dashboard')" 
@@ -1345,7 +1582,9 @@ class PharmacieGaherApp {
                     </nav>
                 </div>
                 
+                <!-- Admin Content -->
                 <div id="adminContent" class="min-h-96">
+                    <!-- Content will be loaded here -->
                 </div>
             </div>
         `;
@@ -1355,6 +1594,7 @@ class PharmacieGaherApp {
     
     async loadAdminDashboard() {
         try {
+            // Get stats from localStorage and cached products
             const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
             const products = this.allProducts;
             
@@ -1376,6 +1616,7 @@ class PharmacieGaherApp {
             }
             
             document.getElementById('adminContent').innerHTML = `
+                <!-- Statistics -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-6 shadow-lg">
                         <div class="flex items-center justify-between">
@@ -1430,6 +1671,7 @@ class PharmacieGaherApp {
                     </div>
                 </div>
                 
+                <!-- Quick Actions -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('products')">
                         <i class="fas fa-plus-circle text-4xl mb-4"></i>
@@ -1467,443 +1709,437 @@ class PharmacieGaherApp {
         }
     }
     
-    // ADMIN PRODUCTS MANAGEMENT
-    async loadAdminProducts() {
-        const adminContent = document.getElementById('adminContent');
+    // Missing pages loading methods - FIXED
+    async loadLoginPage() {
+        const mainContent = document.getElementById('mainContent');
         
-        const products = this.allProducts;
-        const totalProducts = products.length;
-        const activeProducts = products.filter(p => p.actif !== false).length;
-        const inactiveProducts = totalProducts - activeProducts;
-        
-        adminContent.innerHTML = `
-            <div class="space-y-8">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-semibold text-blue-600 uppercase">Total Produits</p>
-                                <p class="text-3xl font-bold text-blue-800">${totalProducts}</p>
-                            </div>
-                            <i class="fas fa-boxes text-blue-500 text-2xl"></i>
-                        </div>
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-md">
+                <div class="bg-white rounded-2xl shadow-lg p-8">
+                    <div class="text-center mb-8">
+                        <h1 class="text-3xl font-bold text-emerald-800 mb-2">Connexion</h1>
+                        <p class="text-emerald-600">Accédez à votre compte</p>
                     </div>
                     
-                    <div class="bg-green-50 border border-green-200 rounded-2xl p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-semibold text-green-600 uppercase">Actifs</p>
-                                <p class="text-3xl font-bold text-green-800">${activeProducts}</p>
-                            </div>
-                            <i class="fas fa-check-circle text-green-500 text-2xl"></i>
+                    <form id="loginForm" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                            <input type="email" id="loginEmail" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                   placeholder="votre@email.com">
                         </div>
-                    </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
+                            <input type="password" id="loginPassword" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                   placeholder="Votre mot de passe">
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all font-medium">
+                            Se connecter
+                        </button>
+                    </form>
                     
-                    <div class="bg-red-50 border border-red-200 rounded-2xl p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-semibold text-red-600 uppercase">Inactifs</p>
-                                <p class="text-3xl font-bold text-red-800">${inactiveProducts}</p>
-                            </div>
-                            <i class="fas fa-times-circle text-red-500 text-2xl"></i>
-                        </div>
+                    <div class="text-center mt-6">
+                        <p class="text-gray-600">Pas encore de compte ?</p>
+                        <button onclick="app.showPage('register')" class="text-emerald-600 hover:text-emerald-700 font-medium">
+                            Créer un compte
+                        </button>
                     </div>
                 </div>
+            </div>
+        `;
+        
+        // Add login form handler
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!email || !password) {
+                this.showToast('Veuillez remplir tous les champs', 'error');
+                return;
+            }
+            
+            try {
+                const response = await apiCall('/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password })
+                });
                 
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <h2 class="text-2xl font-bold text-emerald-800">Gestion des produits</h2>
-                        <div class="flex flex-wrap gap-3">
-                            <button onclick="app.refreshProductsCache()" 
-                                    class="bg-orange-500 text-white px-6 py-2 rounded-xl hover:bg-orange-600 transition-all font-semibold">
-                                <i class="fas fa-sync mr-2"></i>Actualiser
+                if (response.token) {
+                    localStorage.setItem('token', response.token);
+                    this.currentUser = response.user;
+                    this.updateUserUI();
+                    this.showToast('Connexion réussie', 'success');
+                    this.showPage('home');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                this.showToast(error.message || 'Erreur de connexion', 'error');
+            }
+        });
+    }
+    
+    async loadRegisterPage() {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-2xl">
+                <div class="bg-white rounded-2xl shadow-lg p-8">
+                    <div class="text-center mb-8">
+                        <h1 class="text-3xl font-bold text-emerald-800 mb-2">Inscription</h1>
+                        <p class="text-emerald-600">Créez votre compte</p>
+                    </div>
+                    
+                    <form id="registerForm" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
+                                <input type="text" id="registerPrenom" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
+                                <input type="text" id="registerNom" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                            <input type="email" id="registerEmail" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
+                            <input type="tel" id="registerTelephone" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe *</label>
+                            <input type="password" id="registerPassword" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Adresse</label>
+                            <textarea id="registerAdresse" rows="2" 
+                                      class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Wilaya *</label>
+                            <select id="registerWilaya" required 
+                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                ${this.getWilayaOptions()}
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all font-medium">
+                            Créer mon compte
+                        </button>
+                    </form>
+                    
+                    <div class="text-center mt-6">
+                        <p class="text-gray-600">Déjà un compte ?</p>
+                        <button onclick="app.showPage('login')" class="text-emerald-600 hover:text-emerald-700 font-medium">
+                            Se connecter
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add register form handler
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                prenom: document.getElementById('registerPrenom').value.trim(),
+                nom: document.getElementById('registerNom').value.trim(),
+                email: document.getElementById('registerEmail').value.trim(),
+                telephone: document.getElementById('registerTelephone').value.trim(),
+                password: document.getElementById('registerPassword').value,
+                adresse: document.getElementById('registerAdresse').value.trim(),
+                wilaya: document.getElementById('registerWilaya').value
+            };
+            
+            if (!formData.prenom || !formData.nom || !formData.email || !formData.telephone || !formData.password || !formData.wilaya) {
+                this.showToast('Veuillez remplir tous les champs obligatoires', 'error');
+                return;
+            }
+            
+            try {
+                const response = await apiCall('/auth/register', {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+                
+                if (response.token) {
+                    localStorage.setItem('token', response.token);
+                    this.currentUser = response.user;
+                    this.updateUserUI();
+                    this.showToast('Inscription réussie', 'success');
+                    this.showPage('home');
+                }
+            } catch (error) {
+                console.error('Register error:', error);
+                this.showToast(error.message || 'Erreur lors de l\'inscription', 'error');
+            }
+        });
+    }
+
+    // Missing methods for order management
+    async viewOrderDetails(orderId) {
+        try {
+            // Find order in localStorage or API
+            let order = null;
+            
+            // Check localStorage first
+            const userOrdersKey = `userOrders_${this.currentUser.id}`;
+            const userOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
+            order = userOrders.find(o => o._id === orderId || o.numeroCommande === orderId);
+            
+            if (!order) {
+                try {
+                    order = await apiCall(`/orders/${orderId}`);
+                } catch (error) {
+                    console.log('Order not found in API');
+                }
+            }
+            
+            if (!order) {
+                this.showToast('Commande non trouvée', 'error');
+                return;
+            }
+            
+            // Create modal for order details
+            document.body.insertAdjacentHTML('beforeend', `
+                <div id="orderDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                            <h3 class="text-2xl font-bold text-emerald-800">Commande #${order.numeroCommande}</h3>
+                            <button onclick="this.closeOrderModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="p-6 overflow-y-auto max-h-[75vh]">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                                <div>
+                                    <h4 class="font-semibold text-emerald-800 mb-4">Informations de livraison</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <p><strong>Nom:</strong> ${order.client?.prenom} ${order.client?.nom}</p>
+                                        <p><strong>Email:</strong> ${order.client?.email}</p>
+                                        <p><strong>Téléphone:</strong> ${order.client?.telephone}</p>
+                                        <p><strong>Adresse:</strong> ${order.client?.adresse}</p>
+                                        <p><strong>Wilaya:</strong> ${order.client?.wilaya}</p>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-emerald-800 mb-4">Détails commande</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <p><strong>Date:</strong> ${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</p>
+                                        <p><strong>Statut:</strong> <span class="px-2 py-1 rounded text-xs ${this.getOrderStatusColor(order.statut)}">${this.getOrderStatusLabel(order.statut)}</span></p>
+                                        <p><strong>Paiement:</strong> ${order.modePaiement}</p>
+                                        ${order.commentaires ? `<p><strong>Commentaires:</strong> ${order.commentaires}</p>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-6">
+                                <h4 class="font-semibold text-emerald-800 mb-4">Articles commandés</h4>
+                                <div class="space-y-3">
+                                    ${order.articles?.map(article => `
+                                        <div class="flex items-center space-x-4 p-4 bg-emerald-50 rounded-xl">
+                                            <img src="${article.image || 'https://via.placeholder.com/64x64/10b981/ffffff?text=' + encodeURIComponent((article.nom || '').substring(0, 2))}" 
+                                                 alt="${article.nom}" 
+                                                 class="w-16 h-16 object-cover rounded-lg">
+                                            <div class="flex-1">
+                                                <h5 class="font-medium text-emerald-800">${article.nom}</h5>
+                                                <p class="text-sm text-emerald-600">Quantité: ${article.quantite} × ${article.prix} DA</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="font-medium text-emerald-800">${(article.quantite || 0) * (article.prix || 0)} DA</p>
+                                            </div>
+                                        </div>
+                                    `).join('') || '<p class="text-gray-500">Aucun article</p>'}
+                                </div>
+                            </div>
+                            
+                            <div class="border-t border-emerald-200 pt-4">
+                                <div class="space-y-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-emerald-600">Sous-total:</span>
+                                        <span class="text-emerald-800">${order.sousTotal || 0} DA</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-emerald-600">Frais de livraison:</span>
+                                        <span class="text-emerald-800">${order.fraisLivraison || 0} DA</span>
+                                    </div>
+                                    <div class="flex justify-between text-lg font-semibold border-t border-emerald-200 pt-2">
+                                        <span class="text-emerald-800">Total:</span>
+                                        <span class="text-emerald-600">${order.total || 0} DA</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-4 p-6 border-t border-gray-200">
+                            <button onclick="this.closeOrderModal()" 
+                                    class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
+                                Fermer
                             </button>
                         </div>
                     </div>
                 </div>
-                
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 overflow-hidden">
-                    <div class="p-6 border-b border-emerald-100">
-                        <h3 class="text-xl font-bold text-emerald-800">Liste des produits</h3>
-                    </div>
-                    
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-emerald-50">
-                                <tr>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-emerald-800">Produit</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-emerald-800">Catégorie</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-emerald-800">Prix</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-emerald-800">Stock</th>
-                                    <th class="px-6 py-4 text-left text-sm font-semibold text-emerald-800">Statut</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-emerald-100">
-                                ${products.length > 0 ? products.map(product => `
-                                    <tr class="hover:bg-emerald-50 transition-colors">
-                                        <td class="px-6 py-4">
-                                            <div class="flex items-center space-x-3">
-                                                <img src="${product.image || 'https://via.placeholder.com/40x40/10b981/ffffff?text=' + encodeURIComponent(product.nom.substring(0, 2))}" 
-                                                     alt="${product.nom}" class="w-10 h-10 rounded-lg object-cover">
-                                                <div>
-                                                    <p class="font-semibold text-emerald-800">${product.nom}</p>
-                                                    <p class="text-sm text-emerald-600">${product.marque || 'Aucune marque'}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <span class="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-full text-sm">
-                                                ${product.categorie}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <div>
-                                                <span class="font-semibold text-emerald-800">${product.prix} DA</span>
-                                                ${product.enPromotion && product.prixOriginal ? 
-                                                    `<br><span class="text-sm text-gray-400 line-through">${product.prixOriginal} DA</span>` : 
-                                                    ''
-                                                }
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <span class="font-semibold ${product.stock > 10 ? 'text-green-600' : product.stock > 0 ? 'text-orange-600' : 'text-red-600'}">
-                                                ${product.stock}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <div class="flex flex-col space-y-1">
-                                                <span class="px-2 py-1 text-xs rounded-full ${product.actif !== false ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                                                    ${product.actif !== false ? 'Actif' : 'Inactif'}
-                                                </span>
-                                                ${product.enVedette ? '<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Vedette</span>' : ''}
-                                                ${product.enPromotion ? '<span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Promo</span>' : ''}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                `).join('') : `
-                                    <tr>
-                                        <td colspan="5" class="px-6 py-12 text-center text-emerald-600">
-                                            <i class="fas fa-box-open text-4xl mb-4"></i>
-                                            <p class="text-lg font-semibold">Aucun produit</p>
-                                        </td>
-                                    </tr>
-                                `}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        `;
+            `);
+            
+            document.body.style.overflow = 'hidden';
+            
+            // Add close function to the modal
+            const modal = document.getElementById('orderDetailModal');
+            modal.closeOrderModal = function() {
+                this.remove();
+                document.body.style.overflow = 'auto';
+            };
+            
+        } catch (error) {
+            console.error('Error viewing order details:', error);
+            this.showToast('Erreur lors de l\'affichage des détails', 'error');
+        }
     }
-    
-    // ADMIN ORDERS MANAGEMENT
-    async loadAdminOrders() {
-        const adminContent = document.getElementById('adminContent');
+
+    async cancelOrder(orderId) {
+        if (!confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
+            return;
+        }
         
-        const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        const totalOrders = orders.length;
-        const pendingOrders = orders.filter(o => o.statut === 'en-attente').length;
-        const completedOrders = orders.filter(o => o.statut === 'livree').length;
-        
-        adminContent.innerHTML = `
-            <div class="space-y-8">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-semibold text-blue-600 uppercase">Total Commandes</p>
-                                <p class="text-3xl font-bold text-blue-800">${totalOrders}</p>
-                            </div>
-                            <i class="fas fa-shopping-bag text-blue-500 text-2xl"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-orange-50 border border-orange-200 rounded-2xl p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-semibold text-orange-600 uppercase">En Attente</p>
-                                <p class="text-3xl font-bold text-orange-800">${pendingOrders}</p>
-                            </div>
-                            <i class="fas fa-clock text-orange-500 text-2xl"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-green-50 border border-green-200 rounded-2xl p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-semibold text-green-600 uppercase">Livrées</p>
-                                <p class="text-3xl font-bold text-green-800">${completedOrders}</p>
-                            </div>
-                            <i class="fas fa-check-circle text-green-500 text-2xl"></i>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 overflow-hidden">
-                    <div class="p-6 border-b border-emerald-100">
-                        <h3 class="text-xl font-bold text-emerald-800">Commandes récentes</h3>
-                    </div>
-                    
-                    ${orders.length > 0 ? `
-                        <div class="divide-y divide-emerald-100">
-                            ${orders.slice(0, 20).map(order => `
-                                <div class="p-6 hover:bg-emerald-50 transition-colors">
-                                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                                        <div class="flex-1">
-                                            <div class="flex items-center space-x-4 mb-2">
-                                                <h4 class="font-bold text-emerald-800">${order.numeroCommande}</h4>
-                                                <span class="px-3 py-1 text-xs rounded-full ${
-                                                    order.statut === 'en-attente' ? 'bg-orange-100 text-orange-800' :
-                                                    order.statut === 'confirmee' ? 'bg-blue-100 text-blue-800' :
-                                                    order.statut === 'expediee' ? 'bg-purple-100 text-purple-800' :
-                                                    order.statut === 'livree' ? 'bg-green-100 text-green-800' :
-                                                    'bg-red-100 text-red-800'
-                                                }">
-                                                    ${order.statut.replace('-', ' ').toUpperCase()}
-                                                </span>
-                                            </div>
-                                            
-                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-emerald-600">
-                                                <div>
-                                                    <p><strong>Client:</strong> ${order.nomComplet}</p>
-                                                    <p><strong>Téléphone:</strong> ${order.telephone}</p>
-                                                    <p><strong>Email:</strong> ${order.email}</p>
-                                                </div>
-                                                <div>
-                                                    <p><strong>Adresse:</strong> ${order.adresse}</p>
-                                                    <p><strong>Ville:</strong> ${order.ville}, ${order.wilaya}</p>
-                                                    <p><strong>Date:</strong> ${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</p>
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="mt-3">
-                                                <p class="text-sm text-emerald-600">
-                                                    <strong>Articles:</strong> ${order.articles.map(a => `${a.nom} (x${a.quantite})`).join(', ')}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="flex flex-col lg:items-end space-y-2">
-                                            <div class="text-right">
-                                                <p class="text-2xl font-bold text-emerald-800">${order.total} DA</p>
-                                                <p class="text-sm text-emerald-600">${order.articles.reduce((sum, a) => sum + a.quantite, 0)} articles</p>
-                                            </div>
-                                            
-                                            <div class="flex space-x-2">
-                                                <select onchange="updateOrderStatus('${order.numeroCommande}', this.value)" 
-                                                        class="text-sm px-3 py-1 border border-emerald-200 rounded-lg focus:ring-2 focus:ring-emerald-500">
-                                                    <option value="en-attente" ${order.statut === 'en-attente' ? 'selected' : ''}>En attente</option>
-                                                    <option value="confirmee" ${order.statut === 'confirmee' ? 'selected' : ''}>Confirmée</option>
-                                                    <option value="expediee" ${order.statut === 'expediee' ? 'selected' : ''}>Expédiée</option>
-                                                    <option value="livree" ${order.statut === 'livree' ? 'selected' : ''}>Livrée</option>
-                                                    <option value="annulee" ${order.statut === 'annulee' ? 'selected' : ''}>Annulée</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : `
-                        <div class="p-12 text-center text-emerald-600">
-                            <i class="fas fa-shopping-bag text-4xl mb-4"></i>
-                            <p class="text-lg font-semibold">Aucune commande</p>
-                        </div>
-                    `}
-                </div>
-            </div>
-        `;
+        try {
+            // Update locally
+            const userOrdersKey = `userOrders_${this.currentUser.id}`;
+            let userOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
+            const orderIndex = userOrders.findIndex(o => o._id === orderId || o.numeroCommande === orderId);
+            
+            if (orderIndex > -1) {
+                userOrders[orderIndex].statut = 'annulée';
+                localStorage.setItem(userOrdersKey, JSON.stringify(userOrders));
+            }
+            
+            // Try to update via API
+            try {
+                await apiCall(`/orders/${orderId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ statut: 'annulée' })
+                });
+            } catch (error) {
+                console.log('API update failed, but local update succeeded');
+            }
+            
+            this.showToast('Commande annulée', 'success');
+            this.loadOrdersPage(); // Refresh orders page
+            
+        } catch (error) {
+            console.error('Error canceling order:', error);
+            this.showToast('Erreur lors de l\'annulation', 'error');
+        }
     }
-    
-    // ADMIN FEATURED PRODUCTS
-    async loadAdminFeatured() {
-        const adminContent = document.getElementById('adminContent');
-        
-        const products = this.allProducts;
-        const featuredProducts = products.filter(p => p.enVedette);
-        
-        adminContent.innerHTML = `
-            <div class="space-y-8">
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-2xl font-bold text-emerald-800">Produits Coups de Cœur</h2>
-                            <p class="text-emerald-600">Gérez les produits mis en avant sur la page d'accueil</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-3xl font-bold text-emerald-800">${featuredProducts.length}</p>
-                            <p class="text-sm text-emerald-600">Produits en vedette</p>
-                        </div>
+
+    // Password change modal
+    showChangePasswordModal() {
+        document.body.insertAdjacentHTML('beforeend', `
+            <div id="changePasswordModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl max-w-md w-full">
+                    <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                        <h3 class="text-xl font-bold text-emerald-800">Changer le mot de passe</h3>
+                        <button onclick="this.closePasswordModal()" class="text-gray-400 hover:text-gray-600 text-xl">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    ${featuredProducts.map(product => `
-                        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 overflow-hidden">
-                            <div class="relative">
-                                <img src="${product.image || 'https://via.placeholder.com/300x200/10b981/ffffff?text=' + encodeURIComponent(product.nom.substring(0, 2))}" 
-                                     alt="${product.nom}" class="w-full h-48 object-cover">
-                                <div class="absolute top-2 left-2">
-                                    <span class="bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                                        <i class="fas fa-star mr-1"></i>Vedette
-                                    </span>
-                                </div>
+                    
+                    <div class="p-6">
+                        <form id="changePasswordForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe actuel</label>
+                                <input type="password" id="currentPassword" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
                             </div>
-                            <div class="p-4">
-                                <h3 class="font-bold text-emerald-800 mb-2">${product.nom}</h3>
-                                <p class="text-sm text-emerald-600 mb-3">${product.categorie} - ${product.prix} DA</p>
-                                <button onclick="toggleProductFeatured('${product._id}', false)" 
-                                        class="w-full bg-red-500 text-white py-2 px-4 rounded-xl hover:bg-red-600 transition-all font-semibold">
-                                    <i class="fas fa-star-of-life mr-2"></i>Retirer de la vedette
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Nouveau mot de passe</label>
+                                <input type="password" id="newPassword" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Confirmer le nouveau mot de passe</label>
+                                <input type="password" id="confirmPassword" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                            </div>
+                            
+                            <div class="flex space-x-4 pt-4">
+                                <button type="button" onclick="this.closePasswordModal()" 
+                                        class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl hover:bg-gray-200 transition-all">
+                                    Annuler
+                                </button>
+                                <button type="submit" 
+                                        class="flex-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all">
+                                    Modifier
                                 </button>
                             </div>
-                        </div>
-                    `).join('')}
-                    
-                    ${featuredProducts.length === 0 ? `
-                        <div class="col-span-full bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-12 text-center">
-                            <i class="fas fa-star text-6xl text-emerald-200 mb-6"></i>
-                            <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit en vedette</h3>
-                            <p class="text-emerald-600 mb-6">Sélectionnez des produits à mettre en avant sur la page d'accueil</p>
-                        </div>
-                    ` : ''}
-                </div>
-                
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50">
-                    <div class="p-6 border-b border-emerald-100">
-                        <h3 class="text-xl font-bold text-emerald-800">Ajouter des produits en vedette</h3>
-                    </div>
-                    <div class="p-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            ${products.filter(p => !p.enVedette && p.actif !== false).slice(0, 12).map(product => `
-                                <div class="border border-emerald-200 rounded-xl p-3 hover:bg-emerald-50 transition-colors">
-                                    <div class="flex items-center space-x-3">
-                                        <img src="${product.image || 'https://via.placeholder.com/40x40/10b981/ffffff?text=' + encodeURIComponent(product.nom.substring(0, 2))}" 
-                                             alt="${product.nom}" class="w-12 h-12 rounded-lg object-cover">
-                                        <div class="flex-1 min-w-0">
-                                            <p class="font-semibold text-emerald-800 truncate">${product.nom}</p>
-                                            <p class="text-xs text-emerald-600">${product.prix} DA</p>
-                                        </div>
-                                        <button onclick="toggleProductFeatured('${product._id}', true)" 
-                                                class="text-yellow-500 hover:text-yellow-600 p-2 hover:bg-yellow-50 rounded-lg transition-all" 
-                                                title="Mettre en vedette">
-                                            <i class="fas fa-star"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
+                        </form>
                     </div>
                 </div>
             </div>
-        `;
-    }
-    
-    // ADMIN CLEANUP
-    async loadAdminCleanup() {
-        const adminContent = document.getElementById('adminContent');
+        `);
         
-        const products = this.allProducts;
-        const inactiveProducts = products.filter(p => p.actif === false);
-        const emptyStockProducts = products.filter(p => p.stock === 0);
+        document.body.style.overflow = 'hidden';
         
-        adminContent.innerHTML = `
-            <div class="space-y-8">
-                <div class="bg-red-50 border-2 border-red-200 rounded-2xl p-6">
-                    <div class="flex items-center space-x-4">
-                        <i class="fas fa-exclamation-triangle text-red-500 text-3xl"></i>
-                        <div>
-                            <h2 class="text-2xl font-bold text-red-800">Zone de Nettoyage</h2>
-                            <p class="text-red-600">Actions irréversibles - Utilisez avec précaution</p>
-                        </div>
-                    </div>
-                </div>
+        // Add close function and form handler
+        const modal = document.getElementById('changePasswordModal');
+        modal.closePasswordModal = function() {
+            this.remove();
+            document.body.style.overflow = 'auto';
+        };
+        
+        // Form handler
+        document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (newPassword !== confirmPassword) {
+                this.showToast('Les mots de passe ne correspondent pas', 'error');
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                this.showToast('Le mot de passe doit contenir au moins 6 caractères', 'error');
+                return;
+            }
+            
+            try {
+                await apiCall('/auth/change-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ currentPassword, newPassword })
+                });
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-xl font-bold text-emerald-800">Produits Inactifs</h3>
-                            <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full font-bold">${inactiveProducts.length}</span>
-                        </div>
-                        
-                        <p class="text-emerald-600 mb-4">Produits marqués comme inactifs</p>
-                        
-                        <div class="space-y-3 mb-6">
-                            ${inactiveProducts.slice(0, 3).map(product => `
-                                <div class="flex items-center space-x-3 text-sm">
-                                    <img src="${product.image || 'https://via.placeholder.com/30x30/10b981/ffffff?text=' + encodeURIComponent(product.nom.substring(0, 2))}" 
-                                         alt="${product.nom}" class="w-8 h-8 rounded object-cover">
-                                    <span class="text-emerald-700">${product.nom}</span>
-                                </div>
-                            `).join('')}
-                            ${inactiveProducts.length > 3 ? `<p class="text-sm text-emerald-600">... et ${inactiveProducts.length - 3} autres</p>` : ''}
-                        </div>
-                        
-                        <button onclick="cleanupInactiveProducts()" 
-                                class="w-full bg-red-500 text-white py-3 px-4 rounded-xl hover:bg-red-600 transition-all font-bold" 
-                                ${inactiveProducts.length === 0 ? 'disabled' : ''}>
-                            <i class="fas fa-trash mr-2"></i>Supprimer tous les inactifs
-                        </button>
-                    </div>
-                    
-                    <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-xl font-bold text-emerald-800">Stock Épuisé</h3>
-                            <span class="bg-orange-100 text-orange-800 px-3 py-1 rounded-full font-bold">${emptyStockProducts.length}</span>
-                        </div>
-                        
-                        <p class="text-emerald-600 mb-4">Produits avec stock à zéro</p>
-                        
-                        <div class="space-y-3 mb-6">
-                            ${emptyStockProducts.slice(0, 3).map(product => `
-                                <div class="flex items-center space-x-3 text-sm">
-                                    <img src="${product.image || 'https://via.placeholder.com/30x30/10b981/ffffff?text=' + encodeURIComponent(product.nom.substring(0, 2))}" 
-                                         alt="${product.nom}" class="w-8 h-8 rounded object-cover">
-                                    <span class="text-emerald-700">${product.nom}</span>
-                                </div>
-                            `).join('')}
-                            ${emptyStockProducts.length > 3 ? `<p class="text-sm text-emerald-600">... et ${emptyStockProducts.length - 3} autres</p>` : ''}
-                        </div>
-                        
-                        <button onclick="cleanupEmptyStockProducts()" 
-                                class="w-full bg-orange-500 text-white py-3 px-4 rounded-xl hover:bg-orange-600 transition-all font-bold" 
-                                ${emptyStockProducts.length === 0 ? 'disabled' : ''}>
-                            <i class="fas fa-boxes mr-2"></i>Supprimer stock épuisé
-                        </button>
-                    </div>
-                </div>
+                this.showToast('Mot de passe modifié avec succès', 'success');
+                modal.closePasswordModal();
                 
-                <div class="bg-red-900 text-white rounded-2xl p-6">
-                    <div class="text-center">
-                        <i class="fas fa-skull-crossbones text-4xl mb-4"></i>
-                        <h3 class="text-2xl font-bold mb-4">Réinitialisation Complète</h3>
-                        <p class="mb-6">Supprime TOUS les produits. Cette action est irréversible !</p>
-                        <button onclick="confirmCompleteReset()" 
-                                class="bg-red-700 text-white py-3 px-8 rounded-xl hover:bg-red-600 transition-all font-bold border-2 border-red-500">
-                            <i class="fas fa-nuclear mr-2"></i>TOUT SUPPRIMER
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadLoginPage() {
-        if (typeof window.authUI !== 'undefined' && window.authUI.createLoginPage) {
-            const mainContent = document.getElementById('mainContent');
-            mainContent.innerHTML = window.authUI.createLoginPage();
-        } else {
-            console.error('Auth UI not available');
-        }
-    }
-    
-    async loadRegisterPage() {
-        if (typeof window.authUI !== 'undefined' && window.authUI.createRegisterPage) {
-            const mainContent = document.getElementById('mainContent');
-            mainContent.innerHTML = window.authUI.createRegisterPage();
-        } else {
-            console.error('Auth UI not available');
-        }
+            } catch (error) {
+                console.error('Password change error:', error);
+                this.showToast(error.message || 'Erreur lors du changement de mot de passe', 'error');
+            }
+        });
     }
     
     showLoading() {
@@ -1961,6 +2197,7 @@ class PharmacieGaherApp {
         return icons[type] || icons.info;
     }
     
+    // Method to check if user is authenticated for protected actions
     requireAuth() {
         if (!this.currentUser) {
             this.showToast('Veuillez vous connecter pour continuer', 'warning');
@@ -1970,6 +2207,7 @@ class PharmacieGaherApp {
         return true;
     }
     
+    // Method to check if user is admin
     requireAdmin() {
         if (!this.currentUser || this.currentUser.role !== 'admin') {
             this.showToast('Accès administrateur requis', 'error');
@@ -1979,10 +2217,12 @@ class PharmacieGaherApp {
         return true;
     }
     
+    // Enhanced error handling for authentication
     handleAuthError(error, context = '') {
         console.error(`Auth Error ${context}:`, error);
         
         if (error.message.includes('401') || error.message.includes('Token invalide')) {
+            // Token expired or invalid
             localStorage.removeItem('token');
             this.currentUser = null;
             this.updateUserUI();
@@ -2000,7 +2240,7 @@ class PharmacieGaherApp {
     }
 }
 
-// GLOBAL FUNCTIONS - OUTSIDE THE CLASS
+// Global functions - CRITICAL FIXES
 function addToCartFromCard(productId, quantity = 1) {
     console.log('Add to cart from card called:', productId);
     if (window.app && typeof window.app.addToCart === 'function') {
@@ -2081,220 +2321,6 @@ function logout() {
     }
 }
 
-// CHECKOUT HANDLER
-async function handleCheckout(event) {
-    event.preventDefault();
-    
-    const submitBtn = document.getElementById('checkoutSubmitBtn');
-    const submitText = document.getElementById('checkoutSubmitText');
-    const spinner = document.getElementById('checkoutSpinner');
-    
-    const formData = new FormData(event.target);
-    const orderData = {
-        nomComplet: formData.get('nomComplet'),
-        telephone: formData.get('telephone'),
-        email: formData.get('email'),
-        adresse: formData.get('adresse'),
-        ville: formData.get('ville'),
-        wilaya: formData.get('wilaya'),
-        notes: formData.get('notes') || '',
-        articles: window.app.cart,
-        sousTotal: window.app.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0),
-        fraisLivraison: window.app.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0) >= 5000 ? 0 : 300
-    };
-    
-    orderData.total = orderData.sousTotal + orderData.fraisLivraison;
-    
-    submitBtn.disabled = true;
-    submitText.classList.add('hidden');
-    spinner.classList.remove('hidden');
-    
-    try {
-        const orderNumber = 'CMD' + Date.now().toString().slice(-8);
-        
-        let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        const newOrder = {
-            numeroCommande: orderNumber,
-            ...orderData,
-            statut: 'en-attente',
-            dateCommande: new Date().toISOString(),
-            userId: window.app.currentUser ? window.app.currentUser.id : null
-        };
-        
-        adminOrders.unshift(newOrder);
-        localStorage.setItem('adminOrders', JSON.stringify(adminOrders));
-        
-        window.app.clearCart();
-        window.app.showToast('Commande confirmée avec succès !', 'success');
-        
-        setTimeout(() => {
-            window.app.showPage('order-confirmation', { orderNumber });
-        }, 1500);
-        
-    } catch (error) {
-        console.error('Checkout error:', error);
-        window.app.showToast('Erreur lors de la commande. Veuillez réessayer.', 'error');
-    } finally {
-        submitBtn.disabled = false;
-        submitText.classList.remove('hidden');
-        spinner.classList.add('hidden');
-    }
-}
-
-// PRODUCT QUANTITY FUNCTIONS
-function changeProductQuantity(change) {
-    const quantityInput = document.getElementById('productQuantity');
-    if (quantityInput) {
-        const currentValue = parseInt(quantityInput.value) || 1;
-        const maxValue = parseInt(quantityInput.max);
-        const newValue = Math.max(1, Math.min(maxValue, currentValue + change));
-        quantityInput.value = newValue;
-        
-        document.getElementById('decreaseBtn').disabled = newValue <= 1;
-        document.getElementById('increaseBtn').disabled = newValue >= maxValue;
-    }
-}
-
-function validateProductQuantity() {
-    const quantityInput = document.getElementById('productQuantity');
-    if (quantityInput) {
-        const value = parseInt(quantityInput.value) || 1;
-        const maxValue = parseInt(quantityInput.max);
-        
-        if (value < 1) quantityInput.value = 1;
-        if (value > maxValue) quantityInput.value = maxValue;
-        
-        document.getElementById('decreaseBtn').disabled = value <= 1;
-        document.getElementById('increaseBtn').disabled = value >= maxValue;
-    }
-}
-
-function addProductToCart(productId) {
-    const quantityInput = document.getElementById('productQuantity');
-    const quantity = quantityInput ? parseInt(quantityInput.value) || 1 : 1;
-    
-    if (window.app) {
-        window.app.addToCart(productId, quantity);
-    }
-}
-
-// ADMIN FUNCTIONS
-function switchAdminSection(section) {
-    console.log('Switching to admin section:', section);
-    
-    document.querySelectorAll('.admin-nav-btn').forEach(btn => {
-        btn.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
-        btn.classList.add('text-emerald-700', 'hover:bg-emerald-50');
-    });
-    
-    const activeBtn = document.querySelector(`.admin-nav-btn.${section}`);
-    if (activeBtn) {
-        activeBtn.classList.remove('text-emerald-700', 'hover:bg-emerald-50');
-        activeBtn.classList.add('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
-    }
-    
-    switch (section) {
-        case 'dashboard':
-            if (window.app) window.app.loadAdminDashboard();
-            break;
-        case 'products':
-            if (window.app) window.app.loadAdminProducts();
-            break;
-        case 'orders':
-            if (window.app) window.app.loadAdminOrders();
-            break;
-        case 'featured':
-            if (window.app) window.app.loadAdminFeatured();
-            break;
-        case 'cleanup':
-            if (window.app) window.app.loadAdminCleanup();
-            break;
-        default:
-            console.error('Unknown admin section:', section);
-    }
-}
-
-function toggleProductFeatured(productId, featured) {
-    if (!window.app) return;
-    
-    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    const productIndex = products.findIndex(p => p._id === productId);
-    
-    if (productIndex > -1) {
-        products[productIndex].enVedette = featured;
-        localStorage.setItem('demoProducts', JSON.stringify(products));
-        
-        window.app.refreshProductsCache();
-        window.app.loadAdminFeatured();
-        
-        const message = featured ? 'Produit ajouté aux coups de cœur' : 'Produit retiré des coups de cœur';
-        window.app.showToast(message, 'success');
-    }
-}
-
-function updateOrderStatus(orderNumber, newStatus) {
-    const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-    const orderIndex = orders.findIndex(o => o.numeroCommande === orderNumber);
-    
-    if (orderIndex > -1) {
-        orders[orderIndex].statut = newStatus;
-        localStorage.setItem('adminOrders', JSON.stringify(orders));
-        
-        if (window.app) {
-            window.app.showToast('Statut de commande mis à jour', 'success');
-        }
-    }
-}
-
-function cleanupInactiveProducts() {
-    if (confirm('Êtes-vous sûr de vouloir supprimer tous les produits inactifs ? Cette action est irréversible.')) {
-        const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        const activeProducts = products.filter(p => p.actif !== false);
-        
-        localStorage.setItem('demoProducts', JSON.stringify(activeProducts));
-        
-        if (window.app) {
-            window.app.refreshProductsCache();
-            window.app.loadAdminCleanup();
-            window.app.showToast('Produits inactifs supprimés', 'success');
-        }
-    }
-}
-
-function cleanupEmptyStockProducts() {
-    if (confirm('Êtes-vous sûr de vouloir supprimer tous les produits en rupture de stock ?')) {
-        const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        const stockedProducts = products.filter(p => p.stock > 0);
-        
-        localStorage.setItem('demoProducts', JSON.stringify(stockedProducts));
-        
-        if (window.app) {
-            window.app.refreshProductsCache();
-            window.app.loadAdminCleanup();
-            window.app.showToast('Produits en rupture supprimés', 'success');
-        }
-    }
-}
-
-function confirmCompleteReset() {
-    const confirmation = prompt('Tapez "SUPPRIMER TOUT" pour confirmer la suppression complète :');
-    
-    if (confirmation === 'SUPPRIMER TOUT') {
-        localStorage.setItem('demoProducts', JSON.stringify([]));
-        localStorage.setItem('adminOrders', JSON.stringify([]));
-        
-        if (window.app) {
-            window.app.refreshProductsCache();
-            window.app.loadAdminCleanup();
-            window.app.showToast('Toutes les données ont été supprimées', 'success');
-        }
-    } else {
-        if (window.app) {
-            window.app.showToast('Suppression annulée', 'info');
-        }
-    }
-}
-
 // Initialize app
 let app;
 document.addEventListener('DOMContentLoaded', () => {
@@ -2304,16 +2330,4 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('App initialized and made globally available');
 });
 
-// Global assignments
-window.switchAdminSection = switchAdminSection;
-window.toggleProductFeatured = toggleProductFeatured;
-window.updateOrderStatus = updateOrderStatus;
-window.cleanupInactiveProducts = cleanupInactiveProducts;
-window.cleanupEmptyStockProducts = cleanupEmptyStockProducts;
-window.confirmCompleteReset = confirmCompleteReset;
-window.handleCheckout = handleCheckout;
-window.changeProductQuantity = changeProductQuantity;
-window.validateProductQuantity = validateProductQuantity;
-window.addProductToCart = addProductToCart;
-
-console.log('✅ Complete Fixed app.js loaded with full checkout and admin functionality');
+console.log('✅ Fixed app.js loaded with proper admin integration and all missing methods');
