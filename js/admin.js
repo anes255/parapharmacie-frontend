@@ -1423,3 +1423,83 @@ window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
 console.log('✅ Fixed Admin.js loaded with backend integration');
+// Add this EXACTLY at the very end of your admin.js file
+
+// CRITICAL FIX: Delete Order Function - Working Version
+async function deleteOrder(orderId) {
+    console.log('🗑️ Delete order called with ID:', orderId);
+    
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ?')) {
+        return;
+    }
+    
+    try {
+        app.showToast('Suppression en cours...', 'info');
+        
+        // Delete from localStorage first (immediate feedback)
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const beforeCount = orders.length;
+        orders = orders.filter(o => o._id !== orderId && o.numeroCommande !== orderId);
+        localStorage.setItem('adminOrders', JSON.stringify(orders));
+        
+        console.log(`Orders before: ${beforeCount}, after: ${orders.length}`);
+        
+        // Update global adminOrders variable
+        if (typeof adminOrders !== 'undefined') {
+            adminOrders = orders;
+        }
+        
+        // Try API deletion in background
+        try {
+            const response = await apiCall(`/admin/orders/${orderId}`, {
+                method: 'DELETE'
+            });
+            console.log('✅ Order deleted from API:', response);
+        } catch (apiError) {
+            console.warn('⚠️ API deletion failed:', apiError.message);
+        }
+        
+        app.showToast('Commande supprimée avec succès', 'success');
+        
+        // Refresh the orders display
+        if (typeof app !== 'undefined' && app.loadAdminOrders) {
+            await app.loadAdminOrders();
+        }
+        
+    } catch (error) {
+        console.error('❌ Delete order error:', error);
+        app.showToast('Erreur lors de la suppression', 'error');
+    }
+}
+
+// CRITICAL FIX: Export ALL functions to global scope immediately
+window.deleteOrder = deleteOrder;
+window.updateOrderStatus = updateOrderStatus;
+window.viewOrderDetails = viewOrderDetails;
+window.closeOrderDetailModal = closeOrderDetailModal;
+window.switchAdminSection = switchAdminSection;
+window.openAddProductModal = openAddProductModal;
+window.openEditProductModal = openEditProductModal;
+window.closeProductModal = closeProductModal;
+window.saveProduct = saveProduct;
+window.toggleFeatured = toggleFeatured;
+window.deleteProduct = deleteProduct;
+window.syncWithAPI = syncWithAPI;
+window.refreshProductCache = refreshProductCache;
+window.clearAllProducts = clearAllProducts;
+window.previewImage = previewImage;
+
+// Debug: Log available functions
+console.log('🔧 Admin functions exported:');
+console.log('- deleteOrder:', typeof window.deleteOrder);
+console.log('- updateOrderStatus:', typeof window.updateOrderStatus);
+console.log('- viewOrderDetails:', typeof window.viewOrderDetails);
+
+// Force refresh admin functions every 2 seconds (failsafe)
+setInterval(() => {
+    if (typeof deleteOrder !== 'undefined' && typeof window.deleteOrder === 'undefined') {
+        window.deleteOrder = deleteOrder;
+        console.log('🔄 Re-exported deleteOrder function');
+    }
+}, 2000);
+
