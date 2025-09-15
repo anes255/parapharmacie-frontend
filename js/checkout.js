@@ -1,442 +1,628 @@
-// Fixed Checkout functionality with proper API integration
+// Fixed Checkout System for Shifa Parapharmacie
 
-PharmacieGaherApp.prototype.loadCheckoutPage = async function() {
-    if (this.cart.length === 0) {
-        this.showToast('Votre panier est vide', 'warning');
-        this.showPage('products');
-        return;
+class CheckoutSystem {
+    constructor() {
+        this.currentStep = 1;
+        this.orderData = {};
+        this.isProcessing = false;
     }
-    
-    const mainContent = document.getElementById('mainContent');
-    
-    // Calculate totals
-    const sousTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
-    const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
-    const total = sousTotal + fraisLivraison;
-    
-    mainContent.innerHTML = `
-        <div class="container mx-auto px-4 py-8">
-            <div class="max-w-6xl mx-auto">
-                <h1 class="text-3xl font-bold text-emerald-800 mb-8 text-center">Finaliser votre commande</h1>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <!-- Order Form -->
-                    <div class="bg-white rounded-2xl shadow-lg p-8">
-                        <h2 class="text-2xl font-bold text-emerald-800 mb-6">Informations de livraison</h2>
-                        
-                        <form id="checkoutForm" class="space-y-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
-                                    <input type="text" id="prenom" name="prenom" required 
-                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
-                                    <input type="text" id="nom" name="nom" required 
-                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                                <input type="email" id="email" name="email" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
-                                <input type="tel" id="telephone" name="telephone" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                       placeholder="+213 123 456 789">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Adresse complète *</label>
-                                <textarea id="adresse" name="adresse" required rows="3" 
-                                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
-                                          placeholder="Adresse complète avec détails"></textarea>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Wilaya *</label>
-                                <select id="wilaya" name="wilaya" required 
-                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                                    <option value="">Sélectionnez votre wilaya</option>
-                                    <option value="Adrar">01 - Adrar</option>
-                                    <option value="Chlef">02 - Chlef</option>
-                                    <option value="Laghouat">03 - Laghouat</option>
-                                    <option value="Oum El Bouaghi">04 - Oum El Bouaghi</option>
-                                    <option value="Batna">05 - Batna</option>
-                                    <option value="Béjaïa">06 - Béjaïa</option>
-                                    <option value="Biskra">07 - Biskra</option>
-                                    <option value="Béchar">08 - Béchar</option>
-                                    <option value="Blida">09 - Blida</option>
-                                    <option value="Bouira">10 - Bouira</option>
-                                    <option value="Tamanrasset">11 - Tamanrasset</option>
-                                    <option value="Tébessa">12 - Tébessa</option>
-                                    <option value="Tlemcen">13 - Tlemcen</option>
-                                    <option value="Tiaret">14 - Tiaret</option>
-                                    <option value="Tizi Ouzou">15 - Tizi Ouzou</option>
-                                    <option value="Alger">16 - Alger</option>
-                                    <option value="Djelfa">17 - Djelfa</option>
-                                    <option value="Jijel">18 - Jijel</option>
-                                    <option value="Sétif">19 - Sétif</option>
-                                    <option value="Saïda">20 - Saïda</option>
-                                    <option value="Skikda">21 - Skikda</option>
-                                    <option value="Sidi Bel Abbès">22 - Sidi Bel Abbès</option>
-                                    <option value="Annaba">23 - Annaba</option>
-                                    <option value="Guelma">24 - Guelma</option>
-                                    <option value="Constantine">25 - Constantine</option>
-                                    <option value="Médéa">26 - Médéa</option>
-                                    <option value="Mostaganem">27 - Mostaganem</option>
-                                    <option value="M'Sila">28 - M'Sila</option>
-                                    <option value="Mascara">29 - Mascara</option>
-                                    <option value="Ouargla">30 - Ouargla</option>
-                                    <option value="Oran">31 - Oran</option>
-                                    <option value="El Bayadh">32 - El Bayadh</option>
-                                    <option value="Illizi">33 - Illizi</option>
-                                    <option value="Bordj Bou Arréridj">34 - Bordj Bou Arréridj</option>
-                                    <option value="Boumerdès">35 - Boumerdès</option>
-                                    <option value="El Tarf">36 - El Tarf</option>
-                                    <option value="Tindouf">37 - Tindouf</option>
-                                    <option value="Tissemsilt">38 - Tissemsilt</option>
-                                    <option value="El Oued">39 - El Oued</option>
-                                    <option value="Khenchela">40 - Khenchela</option>
-                                    <option value="Souk Ahras">41 - Souk Ahras</option>
-                                    <option value="Tipaza" selected>42 - Tipaza</option>
-                                    <option value="Mila">43 - Mila</option>
-                                    <option value="Aïn Defla">44 - Aïn Defla</option>
-                                    <option value="Naâma">45 - Naâma</option>
-                                    <option value="Aïn Témouchent">46 - Aïn Témouchent</option>
-                                    <option value="Ghardaïa">47 - Ghardaïa</option>
-                                    <option value="Relizane">48 - Relizane</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Commentaires</label>
-                                <textarea id="commentaires" name="commentaires" rows="3" 
-                                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
-                                          placeholder="Instructions spéciales pour la livraison (optionnel)"></textarea>
-                            </div>
-                            
-                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-                                <h3 class="font-semibold text-emerald-800 mb-2">Mode de paiement</h3>
-                                <div class="flex items-center">
-                                    <input type="radio" id="paiementLivraison" name="modePaiement" value="Paiement à la livraison" checked 
-                                           class="text-emerald-600 mr-3">
-                                    <label for="paiementLivraison" class="text-emerald-700">
-                                        <i class="fas fa-truck mr-2"></i>Paiement à la livraison
-                                    </label>
-                                </div>
-                                <p class="text-sm text-emerald-600 mt-2">Payez en espèces lors de la réception de votre commande</p>
-                            </div>
-                        </form>
-                    </div>
-                    
-                    <!-- Order Summary -->
-                    <div class="bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl shadow-lg p-8">
-                        <h2 class="text-2xl font-bold text-emerald-800 mb-6">Récapitulatif de commande</h2>
-                        
-                        <div class="space-y-4 mb-6">
-                            ${this.cart.map(item => `
-                                <div class="flex items-center space-x-3 bg-white/70 rounded-lg p-4">
-                                    <img src="${item.image}" alt="${item.nom}" 
-                                         class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200">
-                                    <div class="flex-1">
-                                        <h4 class="font-medium text-emerald-800">${item.nom}</h4>
-                                        <p class="text-sm text-emerald-600">${item.quantite} × ${item.prix} DA</p>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="font-semibold text-emerald-800">${item.quantite * item.prix} DA</p>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        
-                        <div class="border-t border-emerald-200 pt-6 space-y-3">
-                            <div class="flex justify-between text-emerald-700">
-                                <span>Sous-total:</span>
-                                <span class="font-medium">${sousTotal} DA</span>
-                            </div>
-                            <div class="flex justify-between text-emerald-700">
-                                <span>Frais de livraison:</span>
-                                <span class="font-medium">${fraisLivraison} DA</span>
-                            </div>
-                            ${sousTotal >= 5000 ? `
-                                <div class="bg-green-100 border border-green-300 rounded-lg p-3">
-                                    <p class="text-green-800 text-sm font-medium">
-                                        <i class="fas fa-gift mr-2"></i>Livraison gratuite pour les commandes ≥ 5000 DA
-                                    </p>
-                                </div>
-                            ` : ''}
-                            <div class="flex justify-between text-xl font-bold text-emerald-800 border-t border-emerald-300 pt-3">
-                                <span>Total:</span>
-                                <span>${total} DA</span>
-                            </div>
-                        </div>
-                        
-                        <button onclick="submitOrder()" id="submitOrderBtn" 
-                                class="w-full mt-8 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg">
-                            <span id="submitOrderText">
-                                <i class="fas fa-check-circle mr-2"></i>Confirmer la commande
-                            </span>
-                            <i id="submitOrderSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
-                        </button>
-                        
-                        <div class="mt-4 text-center">
-                            <button onclick="app.showPage('products')" 
-                                    class="text-emerald-600 hover:text-emerald-700 font-medium">
-                                <i class="fas fa-arrow-left mr-2"></i>Continuer mes achats
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Pre-fill form if user is logged in
-    if (this.currentUser) {
-        setTimeout(() => {
-            document.getElementById('prenom').value = this.currentUser.prenom || '';
-            document.getElementById('nom').value = this.currentUser.nom || '';
-            document.getElementById('email').value = this.currentUser.email || '';
-            document.getElementById('telephone').value = this.currentUser.telephone || '';
-            document.getElementById('adresse').value = this.currentUser.adresse || '';
-            document.getElementById('wilaya').value = this.currentUser.wilaya || '';
-        }, 100);
-    }
-};
 
-PharmacieGaherApp.prototype.loadOrderConfirmationPage = async function(orderNumber) {
-    const mainContent = document.getElementById('mainContent');
-    
-    mainContent.innerHTML = `
-        <div class="container mx-auto px-4 py-8">
-            <div class="max-w-2xl mx-auto text-center">
-                <div class="bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl shadow-xl p-12">
-                    <div class="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg">
-                        <i class="fas fa-check text-white text-4xl"></i>
-                    </div>
-                    
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
-                    <p class="text-xl text-emerald-600 mb-6">Merci pour votre confiance</p>
-                    
-                    <div class="bg-white/70 rounded-xl p-6 mb-8">
-                        <h2 class="text-2xl font-bold text-emerald-800 mb-4">Numéro de commande</h2>
-                        <p class="text-3xl font-bold text-emerald-600">#${orderNumber}</p>
-                    </div>
-                    
-                    <div class="text-left bg-white/50 rounded-xl p-6 mb-8">
-                        <h3 class="text-lg font-semibold text-emerald-800 mb-4">Prochaines étapes :</h3>
-                        <div class="space-y-3">
-                            <div class="flex items-center">
-                                <div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center mr-4">
-                                    <i class="fas fa-clock text-white text-sm"></i>
-                                </div>
-                                <span class="text-emerald-700">Confirmation de votre commande sous 24h</span>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-4">
-                                    <i class="fas fa-box text-white text-sm"></i>
-                                </div>
-                                <span class="text-emerald-700">Préparation et emballage de votre commande</span>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center mr-4">
-                                    <i class="fas fa-truck text-white text-sm"></i>
-                                </div>
-                                <span class="text-emerald-700">Livraison à votre adresse sous 2-3 jours</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                        <button onclick="app.showPage('products')" 
-                                class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-8 py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg font-bold">
-                            <i class="fas fa-shopping-bag mr-2"></i>Continuer mes achats
-                        </button>
-                        <button onclick="app.showPage('home')" 
-                                class="bg-white text-emerald-600 border-2 border-emerald-600 px-8 py-3 rounded-xl hover:bg-emerald-50 transition-all font-bold">
-                            <i class="fas fa-home mr-2"></i>Retour à l'accueil
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-};
-
-// FIXED ORDER SUBMISSION WITH PROPER API INTEGRATION
-async function submitOrder() {
-    const form = document.getElementById('checkoutForm');
-    const submitBtn = document.getElementById('submitOrderBtn');
-    const submitText = document.getElementById('submitOrderText');
-    const submitSpinner = document.getElementById('submitOrderSpinner');
-    
-    // Validate form
-    if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
+    // Initialize checkout process
+    init() {
+        console.log('Initializing checkout system...');
+        this.validateCart();
+        this.setupEventListeners();
+        this.calculateTotals();
     }
-    
-    // Disable button and show loading
-    submitBtn.disabled = true;
-    submitText.classList.add('hidden');
-    submitSpinner.classList.remove('hidden');
-    
-    try {
-        // Get form data
-        const formData = new FormData(form);
-        const clientData = {
-            prenom: formData.get('prenom').trim(),
-            nom: formData.get('nom').trim(),
-            email: formData.get('email').trim(),
-            telephone: formData.get('telephone').trim(),
-            adresse: formData.get('adresse').trim(),
-            wilaya: formData.get('wilaya'),
-            commentaires: formData.get('commentaires').trim()
+
+    // Validate cart before checkout
+    validateCart() {
+        if (!window.app || !window.app.cart || window.app.cart.length === 0) {
+            console.error('Cart is empty');
+            if (window.app) {
+                window.app.showToast('Votre panier est vide', 'warning');
+                window.app.showPage('products');
+            }
+            return false;
+        }
+
+        // Check stock availability
+        for (let item of window.app.cart) {
+            if (item.stock === 0) {
+                if (window.app) {
+                    window.app.showToast(`${item.nom} n'est plus en stock`, 'error');
+                }
+                return false;
+            }
+            if (item.quantite > item.stock) {
+                if (window.app) {
+                    window.app.showToast(`Stock insuffisant pour ${item.nom}`, 'error');
+                }
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Setup form event listeners
+    setupEventListeners() {
+        // Real-time form validation
+        const inputs = document.querySelectorAll('#checkoutForm input, #checkoutForm select, #checkoutForm textarea');
+        inputs.forEach(input => {
+            input.addEventListener('blur', () => this.validateField(input));
+            input.addEventListener('input', () => this.clearFieldError(input));
+        });
+
+        // Payment method selection
+        const paymentInputs = document.querySelectorAll('input[name="modePaiement"]');
+        paymentInputs.forEach(input => {
+            input.addEventListener('change', () => this.handlePaymentMethodChange(input.value));
+        });
+
+        // Wilaya change for shipping calculation
+        const wilayaSelect = document.getElementById('checkoutWilaya');
+        if (wilayaSelect) {
+            wilayaSelect.addEventListener('change', () => this.calculateShipping());
+        }
+    }
+
+    // Validate individual form field
+    validateField(field) {
+        const value = field.value.trim();
+        let isValid = true;
+        let errorMessage = '';
+
+        switch (field.id) {
+            case 'checkoutPrenom':
+            case 'checkoutNom':
+                if (!value) {
+                    isValid = false;
+                    errorMessage = 'Ce champ est requis';
+                } else if (value.length < 2) {
+                    isValid = false;
+                    errorMessage = 'Minimum 2 caractères';
+                }
+                break;
+
+            case 'checkoutEmail':
+                if (!value) {
+                    isValid = false;
+                    errorMessage = 'Email requis';
+                } else if (!this.validateEmail(value)) {
+                    isValid = false;
+                    errorMessage = 'Format d\'email invalide';
+                }
+                break;
+
+            case 'checkoutTelephone':
+                if (!value) {
+                    isValid = false;
+                    errorMessage = 'Téléphone requis';
+                } else if (!this.validatePhone(value)) {
+                    isValid = false;
+                    errorMessage = 'Format de téléphone invalide';
+                }
+                break;
+
+            case 'checkoutAdresse':
+                if (!value) {
+                    isValid = false;
+                    errorMessage = 'Adresse requise';
+                } else if (value.length < 10) {
+                    isValid = false;
+                    errorMessage = 'Adresse trop courte';
+                }
+                break;
+
+            case 'checkoutWilaya':
+                if (!value) {
+                    isValid = false;
+                    errorMessage = 'Wilaya requise';
+                }
+                break;
+        }
+
+        this.displayFieldValidation(field, isValid, errorMessage);
+        return isValid;
+    }
+
+    // Display field validation result
+    displayFieldValidation(field, isValid, errorMessage) {
+        // Remove existing validation classes
+        field.classList.remove('border-red-400', 'border-green-400');
+        
+        // Remove existing error message
+        const existingError = field.parentNode.querySelector('.field-error');
+        if (existingError) {
+            existingError.remove();
+        }
+
+        if (!isValid) {
+            field.classList.add('border-red-400');
+            
+            // Add error message
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'field-error text-red-500 text-sm mt-1';
+            errorDiv.textContent = errorMessage;
+            field.parentNode.appendChild(errorDiv);
+        } else if (field.value.trim()) {
+            field.classList.add('border-green-400');
+        }
+    }
+
+    // Clear field error styling
+    clearFieldError(field) {
+        field.classList.remove('border-red-400');
+        const existingError = field.parentNode.querySelector('.field-error');
+        if (existingError) {
+            existingError.remove();
+        }
+    }
+
+    // Handle payment method change
+    handlePaymentMethodChange(method) {
+        console.log('Payment method changed to:', method);
+        
+        // Update UI based on payment method
+        const paymentInfo = document.getElementById('paymentMethodInfo');
+        if (paymentInfo) {
+            switch (method) {
+                case 'Paiement à la livraison':
+                    paymentInfo.innerHTML = `
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
+                            <p class="text-green-700 text-sm">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                Vous paierez en espèces lors de la réception de votre commande.
+                            </p>
+                        </div>
+                    `;
+                    break;
+                case 'Carte bancaire':
+                    paymentInfo.innerHTML = `
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
+                            <p class="text-blue-700 text-sm">
+                                <i class="fas fa-credit-card mr-2"></i>
+                                Paiement sécurisé par carte bancaire (bientôt disponible).
+                            </p>
+                        </div>
+                    `;
+                    break;
+            }
+        }
+    }
+
+    // Calculate shipping costs
+    calculateShipping() {
+        const wilaya = document.getElementById('checkoutWilaya')?.value;
+        const sousTotal = window.app ? window.app.getCartTotal() : 0;
+        
+        let fraisLivraison = 0;
+        
+        // Free shipping for orders over 5000 DA
+        if (sousTotal >= 5000) {
+            fraisLivraison = 0;
+        } else {
+            // Different shipping costs by wilaya
+            const shippingRates = {
+                'Alger': 250,
+                'Blida': 250,
+                'Boumerdès': 250,
+                'Tipaza': 200,
+                'Médéa': 300,
+                // Default rate for other wilayas
+                'default': 350
+            };
+            
+            fraisLivraison = shippingRates[wilaya] || shippingRates.default;
+        }
+
+        this.updateShippingDisplay(fraisLivraison);
+        this.calculateTotals();
+        
+        return fraisLivraison;
+    }
+
+    // Update shipping display
+    updateShippingDisplay(fraisLivraison) {
+        const shippingElement = document.getElementById('shippingCost');
+        if (shippingElement) {
+            shippingElement.textContent = `${fraisLivraison} DA`;
+            
+            if (fraisLivraison === 0) {
+                shippingElement.classList.add('text-green-600', 'font-semibold');
+                shippingElement.classList.remove('text-gray-700');
+            } else {
+                shippingElement.classList.remove('text-green-600', 'font-semibold');
+                shippingElement.classList.add('text-gray-700');
+            }
+        }
+    }
+
+    // Calculate and update totals
+    calculateTotals() {
+        if (!window.app || !window.app.cart) return;
+
+        const sousTotal = window.app.getCartTotal();
+        const fraisLivraison = this.getCurrentShippingCost();
+        const total = sousTotal + fraisLivraison;
+
+        // Update display
+        const elements = {
+            sousTotal: document.getElementById('checkoutSousTotal'),
+            fraisLivraison: document.getElementById('checkoutFraisLivraison'),
+            total: document.getElementById('checkoutTotal')
+        };
+
+        if (elements.sousTotal) elements.sousTotal.textContent = `${sousTotal} DA`;
+        if (elements.fraisLivraison) elements.fraisLivraison.textContent = `${fraisLivraison} DA`;
+        if (elements.total) elements.total.textContent = `${total} DA`;
+
+        // Show free shipping message
+        if (sousTotal >= 5000) {
+            this.showFreeShippingMessage();
+        }
+    }
+
+    // Get current shipping cost
+    getCurrentShippingCost() {
+        const wilaya = document.getElementById('checkoutWilaya')?.value;
+        const sousTotal = window.app ? window.app.getCartTotal() : 0;
+        
+        if (sousTotal >= 5000) {
+            return 0;
+        }
+        
+        const shippingRates = {
+            'Alger': 250,
+            'Blida': 250,
+            'Boumerdès': 250,
+            'Tipaza': 200,
+            'Médéa': 300,
+            'default': 350
         };
         
+        return shippingRates[wilaya] || shippingRates.default;
+    }
+
+    // Show free shipping message
+    showFreeShippingMessage() {
+        const container = document.getElementById('shippingMessage');
+        if (container) {
+            container.innerHTML = `
+                <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p class="text-green-700 text-sm font-medium">
+                        <i class="fas fa-truck mr-2"></i>
+                        Félicitations ! Livraison gratuite pour cette commande.
+                    </p>
+                </div>
+            `;
+        }
+    }
+
+    // Validate entire form
+    validateForm() {
+        const requiredFields = [
+            'checkoutPrenom',
+            'checkoutNom', 
+            'checkoutEmail',
+            'checkoutTelephone',
+            'checkoutAdresse',
+            'checkoutWilaya'
+        ];
+
+        let isValid = true;
+
+        for (let fieldId of requiredFields) {
+            const field = document.getElementById(fieldId);
+            if (field && !this.validateField(field)) {
+                isValid = false;
+            }
+        }
+
+        return isValid;
+    }
+
+    // Process the order - MAIN FUNCTION
+    async processOrder() {
+        try {
+            if (this.isProcessing) {
+                console.log('Order already being processed');
+                return;
+            }
+
+            console.log('🛒 Starting order processing...');
+            this.isProcessing = true;
+
+            // Validate cart
+            if (!this.validateCart()) {
+                throw new Error('Panier invalide');
+            }
+
+            // Validate form
+            if (!this.validateForm()) {
+                throw new Error('Veuillez corriger les erreurs dans le formulaire');
+            }
+
+            // Disable submit button
+            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
+            }
+
+            // Gather form data
+            const orderData = this.gatherOrderData();
+            
+            console.log('Order data prepared:', orderData);
+
+            // Try to submit to API first
+            let orderSaved = false;
+            try {
+                const response = await apiCall('/orders', {
+                    method: 'POST',
+                    body: JSON.stringify(orderData)
+                });
+                
+                if (response) {
+                    console.log('✅ Order saved to API successfully');
+                    orderSaved = true;
+                }
+            } catch (apiError) {
+                console.log('⚠️ API save failed, will save locally:', apiError.message);
+            }
+
+            // Always save locally for admin panel
+            if (window.addOrderToDemo) {
+                const localOrder = window.addOrderToDemo(orderData);
+                if (localOrder) {
+                    console.log('✅ Order saved locally for admin panel');
+                }
+            }
+
+            // Save to user's order history
+            if (window.app && window.app.currentUser) {
+                this.saveToUserOrders(orderData);
+            }
+
+            // Clear cart
+            if (window.app) {
+                window.app.clearCart();
+            }
+
+            // Show success and redirect
+            if (window.app) {
+                window.app.showToast('Commande passée avec succès !', 'success');
+                window.app.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
+            }
+
+            console.log('✅ Order processing completed successfully');
+
+        } catch (error) {
+            console.error('❌ Error processing order:', error);
+            
+            if (window.app) {
+                window.app.showToast(error.message || 'Erreur lors de la validation de la commande', 'error');
+            }
+            
+            // Re-enable submit button
+            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirmer la commande';
+            }
+        } finally {
+            this.isProcessing = false;
+        }
+    }
+
+    // Gather all order data from form
+    gatherOrderData() {
+        // Get form values
+        const prenom = document.getElementById('checkoutPrenom')?.value.trim();
+        const nom = document.getElementById('checkoutNom')?.value.trim();
+        const email = document.getElementById('checkoutEmail')?.value.trim();
+        const telephone = document.getElementById('checkoutTelephone')?.value.trim();
+        const adresse = document.getElementById('checkoutAdresse')?.value.trim();
+        const wilaya = document.getElementById('checkoutWilaya')?.value;
+        const modePaiement = document.querySelector('input[name="modePaiement"]:checked')?.value || 'Paiement à la livraison';
+        const commentaires = document.getElementById('checkoutCommentaires')?.value.trim() || '';
+
         // Calculate totals
-        const sousTotal = app.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
-        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
+        const sousTotal = window.app ? window.app.getCartTotal() : 0;
+        const fraisLivraison = this.getCurrentShippingCost();
         const total = sousTotal + fraisLivraison;
-        
+
         // Generate order number
-        const orderNumber = 'CMD' + Date.now();
-        
+        const orderNumber = this.generateOrderNumber();
+
         // Prepare order data
         const orderData = {
+            _id: Date.now().toString(),
             numeroCommande: orderNumber,
-            client: clientData,
-            articles: app.cart.map(item => ({
-                id: item.id,
+            client: {
+                userId: window.app?.currentUser?.id || null,
+                prenom,
+                nom,
+                email: email.toLowerCase(),
+                telephone: telephone.replace(/\s+/g, ''),
+                adresse,
+                wilaya
+            },
+            articles: window.app ? window.app.cart.map(item => ({
+                productId: item.id,
                 nom: item.nom,
                 prix: item.prix,
                 quantite: item.quantite,
-                image: item.image,
-                categorie: item.categorie
-            })),
-            sousTotal: sousTotal,
-            fraisLivraison: fraisLivraison,
-            total: total,
+                image: item.image
+            })) : [],
+            sousTotal,
+            fraisLivraison,
+            total,
             statut: 'en-attente',
-            modePaiement: formData.get('modePaiement'),
-            dateCommande: new Date().toISOString(),
-            commentaires: clientData.commentaires
+            modePaiement,
+            commentaires,
+            dateCommande: new Date().toISOString()
         };
-        
-        console.log('🚀 Submitting order to API:', orderData);
-        
-        let apiSuccess = false;
-        let savedOrder = null;
-        
-        // Try to save to API first - CRITICAL FIX
+
+        return orderData;
+    }
+
+    // Save order to user's order history
+    saveToUserOrders(orderData) {
+        if (!window.app?.currentUser?.id) return;
+
         try {
-            console.log('📡 Calling API /orders...');
-            const response = await apiCall('/orders', {
-                method: 'POST',
-                body: JSON.stringify(orderData)
-            });
+            const userOrdersKey = `userOrders_${window.app.currentUser.id}`;
+            let userOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
             
-            if (response && response.success) {
-                savedOrder = response.order;
-                apiSuccess = true;
-                console.log('✅ Order saved to API successfully:', savedOrder._id);
-            } else {
-                throw new Error('API response unsuccessful');
+            // Add new order to the beginning
+            userOrders.unshift(orderData);
+            
+            // Keep only last 50 orders
+            if (userOrders.length > 50) {
+                userOrders = userOrders.slice(0, 50);
             }
+            
+            localStorage.setItem(userOrdersKey, JSON.stringify(userOrders));
+            console.log('✅ Order saved to user history');
+            
         } catch (error) {
-            console.error('❌ API save failed:', error.message);
-            
-            // Show user the error but continue with local storage
-            app.showToast('Connexion limitée - commande sauvée localement', 'warning');
+            console.error('Error saving to user orders:', error);
         }
-        
-        // Always save to localStorage as backup
-        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        
-        // Use API data if available, otherwise use local data
-        const finalOrderData = savedOrder || { ...orderData, _id: Date.now().toString() };
-        
-        // Check for duplicates
-        const existingIndex = orders.findIndex(o => o.numeroCommande === finalOrderData.numeroCommande);
-        if (existingIndex > -1) {
-            orders[existingIndex] = finalOrderData;
-        } else {
-            orders.unshift(finalOrderData);
-        }
-        
-        localStorage.setItem('adminOrders', JSON.stringify(orders));
-        console.log('✅ Order saved to localStorage');
-        
-        // Update stock for products
-        await updateProductStock(orderData.articles);
-        
-        // Clear cart
-        app.clearCart();
-        
-        // Show success message
-        app.showToast(
-            `Commande ${orderNumber} ${apiSuccess ? 'confirmée' : 'enregistrée'}!`, 
-            'success'
-        );
-        
-        // Redirect to confirmation page
-        app.showPage('order-confirmation', { orderNumber: orderNumber });
-        
-    } catch (error) {
-        console.error('💥 Order submission failed:', error);
-        app.showToast('Erreur lors de la commande. Veuillez réessayer.', 'error');
-        
-        // Re-enable button
-        submitBtn.disabled = false;
-        submitText.classList.remove('hidden');
-        submitSpinner.classList.add('hidden');
     }
-}
 
-// Function to update product stock after order
-async function updateProductStock(articles) {
-    try {
-        for (const article of articles) {
-            // Update in localStorage
-            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            const productIndex = localProducts.findIndex(p => p._id === article.id);
-            
-            if (productIndex !== -1) {
-                localProducts[productIndex].stock = Math.max(0, localProducts[productIndex].stock - article.quantite);
-                localStorage.setItem('demoProducts', JSON.stringify(localProducts));
-            }
-            
-            // Try to update via API
-            try {
-                await apiCall(`/products/${article.id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        stock: Math.max(0, (localProducts[productIndex]?.stock || 0))
-                    })
-                });
-                console.log(`✅ Stock updated for product ${article.id}`);
-            } catch (error) {
-                console.warn(`⚠️ API stock update failed for ${article.id}:`, error.message);
-            }
-        }
+    // Generate unique order number
+    generateOrderNumber() {
+        const prefix = 'CMD';
+        const timestamp = Date.now().toString().slice(-8);
+        const random = Math.random().toString(36).substring(2, 4).toUpperCase();
+        return `${prefix}${timestamp}${random}`;
+    }
+
+    // Email validation
+    validateEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+
+    // Phone validation (Algerian format)
+    validatePhone(phone) {
+        const cleanPhone = phone.replace(/\s+/g, '');
+        const phoneRegex = /^(\+213|0)[5-9]\d{8}$/;
+        return phoneRegex.test(cleanPhone);
+    }
+
+    // Update order progress
+    updateProgress(step) {
+        this.currentStep = step;
         
-        // Refresh app product cache
+        const steps = document.querySelectorAll('.checkout-step');
+        steps.forEach((stepEl, index) => {
+            if (index < step) {
+                stepEl.classList.add('completed');
+                stepEl.classList.remove('active');
+            } else if (index === step - 1) {
+                stepEl.classList.add('active');
+                stepEl.classList.remove('completed');
+            } else {
+                stepEl.classList.remove('active', 'completed');
+            }
+        });
+    }
+
+    // Apply coupon code
+    async applyCoupon(code) {
+        try {
+            // This would normally call an API to validate the coupon
+            console.log('Applying coupon:', code);
+            
+            // Placeholder for coupon logic
+            if (code.toUpperCase() === 'WELCOME10') {
+                const discount = Math.round(window.app.getCartTotal() * 0.1);
+                this.appliedDiscount = discount;
+                this.calculateTotals();
+                
+                if (window.app) {
+                    window.app.showToast(`Coupon appliqué ! Réduction de ${discount} DA`, 'success');
+                }
+                return true;
+            } else {
+                throw new Error('Code coupon invalide');
+            }
+            
+        } catch (error) {
+            if (window.app) {
+                window.app.showToast(error.message, 'error');
+            }
+            return false;
+        }
+    }
+
+    // Remove applied coupon
+    removeCoupon() {
+        this.appliedDiscount = 0;
+        this.calculateTotals();
+        
         if (window.app) {
-            window.app.refreshProductsCache();
+            window.app.showToast('Coupon retiré', 'info');
         }
-        
-    } catch (error) {
-        console.error('Error updating product stock:', error);
     }
 }
 
-// Export functions
-window.submitOrder = submitOrder;
+// Global checkout system instance
+let checkoutSystem;
 
-console.log('✅ Fixed Checkout.js loaded with proper API integration');
+// Initialize checkout when page loads
+function initCheckout() {
+    checkoutSystem = new CheckoutSystem();
+    checkoutSystem.init();
+    window.checkoutSystem = checkoutSystem;
+    console.log('✅ Checkout system initialized');
+}
+
+// Global functions for checkout
+function validateCheckoutField(field) {
+    if (checkoutSystem) {
+        return checkoutSystem.validateField(field);
+    }
+}
+
+function processCheckoutOrder() {
+    if (checkoutSystem) {
+        return checkoutSystem.processOrder();
+    }
+}
+
+function applyCheckoutCoupon() {
+    const couponInput = document.getElementById('couponCode');
+    if (couponInput && checkoutSystem) {
+        const code = couponInput.value.trim();
+        if (code) {
+            checkoutSystem.applyCoupon(code);
+        }
+    }
+}
+
+function removeCheckoutCoupon() {
+    if (checkoutSystem) {
+        checkoutSystem.removeCoupon();
+    }
+}
+
+// Auto-initialize if DOM is already loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCheckout);
+} else {
+    initCheckout();
+}
+
+// Export for global access
+window.initCheckout = initCheckout;
+window.checkoutSystem = checkoutSystem;
+window.validateCheckoutField = validateCheckoutField;
+window.processCheckoutOrder = processCheckoutOrder;
+window.applyCheckoutCoupon = applyCheckoutCoupon;
+window.removeCheckoutCoupon = removeCheckoutCoupon;
+
+console.log('✅ Checkout.js loaded successfully');
