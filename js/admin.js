@@ -43,7 +43,7 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
                         <button onclick="openAddProductModal()" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
                             <i class="fas fa-plus mr-2"></i>Nouveau produit
                         </button>
-                        <button onclick="syncProductsWithAPI()" class="bg-blue-500 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-600 transition-all shadow-lg">
+                        <button onclick="syncWithAPI()" class="bg-blue-500 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-600 transition-all shadow-lg">
                             <i class="fas fa-sync mr-2"></i>Synchroniser
                         </button>
                     </div>
@@ -502,6 +502,11 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                                                         title="Confirmer">
                                                     <i class="fas fa-check"></i>
                                                 </button>
+                                                <button onclick="deleteOrder('${order._id || order.numeroCommande}')" 
+                                                        class="text-red-600 hover:text-red-800 hover:bg-red-100 p-2 rounded-lg transition-all"
+                                                        title="Supprimer">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -588,35 +593,97 @@ window.addOrderToDemo = async function(orderData) {
     }
 };
 
-// Sync function to push local data to API
-async function syncProductsWithAPI() {
+// Enhanced sync function to push local changes to API
+async function syncWithAPI() {
     try {
         app.showToast('Synchronisation en cours...', 'info');
         
+        let syncErrors = [];
+        let syncSuccesses = 0;
+        
+        // Sync products
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
-        if (localProducts.length === 0) {
-            app.showToast('Aucun produit local à synchroniser', 'warning');
-            return;
-        }
-        
-        let syncCount = 0;
         for (const product of localProducts) {
             try {
-                const response = await apiCall('/admin/products', {
-                    method: 'POST',
+                // Try to update/create each product in API
+                const response = await apiCall(`/admin/products/${product._id}`, {
+                    method: 'PUT',
                     body: JSON.stringify(product)
                 });
-                if (response) syncCount++;
+                
+                if (response && response.success) {
+                    syncSuccesses++;
+                } else {
+                    // If PUT fails, try POST (create new)
+                    const createResponse = await apiCall('/admin/products', {
+                        method: 'POST',
+                        body: JSON.stringify(product)
+                    });
+                    
+                    if (createResponse && createResponse.success) {
+                        syncSuccesses++;
+                    }
+                }
             } catch (error) {
-                console.warn('Failed to sync product:', product.nom, error.message);
+                syncErrors.push(`Produit ${product.nom}: ${error.message}`);
             }
         }
         
-        app.showToast(`${syncCount}/${localProducts.length} produits synchronisés`, 'success');
+        // Sync orders
+        const localOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         
-        // Reload products from API
-        app.loadAdminProducts();
+        for (const order of localOrders) {
+            try {
+                // Check if order exists in API
+                const checkResponse = await apiCall(`/admin/orders/${order._id || order.numeroCommande}`);
+                
+                if (!checkResponse) {
+                    // Order doesn't exist, create it
+                    const createResponse = await apiCall('/orders', {
+                        method: 'POST',
+                        body: JSON.stringify(order)
+                    });
+                    
+                    if (createResponse && createResponse.success) {
+                        syncSuccesses++;
+                    }
+                }
+            } catch (error) {
+                // If 404, try to create the order
+                if (error.message.includes('404')) {
+                    try {
+                        const createResponse = await apiCall('/orders', {
+                            method: 'POST',
+                            body: JSON.stringify(order)
+                        });
+                        
+                        if (createResponse && createResponse.success) {
+                            syncSuccesses++;
+                        }
+                    } catch (createError) {
+                        syncErrors.push(`Commande ${order.numeroCommande}: ${createError.message}`);
+                    }
+                } else {
+                    syncErrors.push(`Commande ${order.numeroCommande}: ${error.message}`);
+                }
+            }
+        }
+        
+        // Show sync results
+        if (syncErrors.length === 0) {
+            app.showToast(`Synchronisation réussie! ${syncSuccesses} éléments synchronisés`, 'success');
+        } else {
+            app.showToast(`Synchronisation partielle: ${syncSuccesses} réussis, ${syncErrors.length} erreurs`, 'warning');
+            console.warn('Sync errors:', syncErrors);
+        }
+        
+        // Refresh current admin section
+        if (adminCurrentSection === 'products') {
+            app.loadAdminProducts();
+        } else if (adminCurrentSection === 'orders') {
+            app.loadAdminOrders();
+        }
         
     } catch (error) {
         console.error('Sync error:', error);
@@ -780,7 +847,7 @@ PharmacieGaherApp.prototype.loadCleanupSection = async function() {
                 <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
                     <h3 class="text-lg font-semibold text-blue-800 mb-4">Actions de maintenance</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button onclick="syncProductsWithAPI()" 
+                        <button onclick="syncWithAPI()" 
                                 class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl">
                             <i class="fas fa-sync mr-2"></i>Synchroniser avec l'API
                         </button>
@@ -1093,9 +1160,131 @@ function previewImage(input) {
     }
 }
 
-// Order detail functions (keep existing)
+// Order detail modal with delete functionality
 async function viewOrderDetails(orderId) {
-    // [Keep existing function - same implementation]
+    try {
+        console.log('Viewing order details for:', orderId);
+        
+        // Find order in localStorage first
+        let order = adminOrders.find(o => o._id === orderId || o.numeroCommande === orderId);
+        
+        if (!order) {
+            // Try to get from API
+            try {
+                const response = await apiCall(`/admin/orders/${orderId}`);
+                if (response && response.order) {
+                    order = response.order;
+                }
+            } catch (error) {
+                console.log('Order not found in API');
+            }
+        }
+        
+        if (order) {
+            // Create detailed order modal
+            document.body.insertAdjacentHTML('beforeend', `
+                <div id="orderDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                            <h3 class="text-2xl font-bold text-emerald-800">Commande #${order.numeroCommande}</h3>
+                            <button onclick="closeOrderDetailModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="p-6 overflow-y-auto max-h-[75vh]">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                                <div>
+                                    <h4 class="font-semibold text-emerald-800 mb-4">Informations client</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <p><strong>Nom:</strong> ${order.client?.prenom} ${order.client?.nom}</p>
+                                        <p><strong>Email:</strong> ${order.client?.email}</p>
+                                        <p><strong>Téléphone:</strong> ${order.client?.telephone}</p>
+                                        <p><strong>Adresse:</strong> ${order.client?.adresse}</p>
+                                        <p><strong>Wilaya:</strong> ${order.client?.wilaya}</p>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-emerald-800 mb-4">Détails commande</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <p><strong>Date:</strong> ${new Date(order.dateCommande).toLocaleDateString('fr-FR')} à ${new Date(order.dateCommande).toLocaleTimeString('fr-FR')}</p>
+                                        <p><strong>Statut:</strong> <span class="px-2 py-1 rounded text-xs ${getStatusColor(order.statut)}">${getStatusLabel(order.statut)}</span></p>
+                                        <p><strong>Paiement:</strong> ${order.modePaiement}</p>
+                                        ${order.commentaires ? `<p><strong>Commentaires:</strong> ${order.commentaires}</p>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-6">
+                                <h4 class="font-semibold text-emerald-800 mb-4">Articles commandés</h4>
+                                <div class="space-y-3">
+                                    ${order.articles?.map(article => `
+                                        <div class="flex items-center space-x-4 p-4 bg-emerald-50/50 rounded-xl border border-emerald-200/50">
+                                            <img src="${article.image || 'https://via.placeholder.com/64x64/10b981/ffffff?text=' + encodeURIComponent((article.nom || '').substring(0, 2))}" 
+                                                 alt="${article.nom}" 
+                                                 class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200">
+                                            <div class="flex-1">
+                                                <h5 class="font-medium text-emerald-800">${article.nom}</h5>
+                                                <p class="text-sm text-emerald-600">Quantité: ${article.quantite} × ${article.prix} DA</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="font-medium text-emerald-800">${(article.quantite || 0) * (article.prix || 0)} DA</p>
+                                            </div>
+                                        </div>
+                                    `).join('') || '<p class="text-gray-500">Aucun article</p>'}
+                                </div>
+                            </div>
+                            
+                            <div class="border-t border-emerald-200 pt-4">
+                                <div class="space-y-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-emerald-600">Sous-total:</span>
+                                        <span class="text-emerald-800">${order.sousTotal || 0} DA</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-emerald-600">Frais de livraison:</span>
+                                        <span class="text-emerald-800">${order.fraisLivraison || 0} DA</span>
+                                    </div>
+                                    <div class="flex justify-between text-lg font-semibold border-t border-emerald-200 pt-2">
+                                        <span class="text-emerald-800">Total:</span>
+                                        <span class="text-emerald-600">${order.total || 0} DA</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between space-x-4 p-6 border-t border-gray-200">
+                            <div class="flex space-x-4">
+                                <button onclick="closeOrderDetailModal()" 
+                                        class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
+                                    Fermer
+                                </button>
+                            </div>
+                            <div class="flex space-x-4">
+                                <button onclick="deleteOrder('${order._id || order.numeroCommande}'); closeOrderDetailModal();" 
+                                        class="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-lg">
+                                    <i class="fas fa-trash mr-2"></i>Supprimer
+                                </button>
+                                <button onclick="updateOrderStatus('${order._id || order.numeroCommande}', 'confirmée')" 
+                                        class="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-lg">
+                                    <i class="fas fa-check mr-2"></i>Confirmer la commande
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `);
+            
+            document.body.style.overflow = 'hidden';
+        } else {
+            app.showToast('Commande non trouvée', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error viewing order details:', error);
+        app.showToast('Erreur lors de l\'affichage des détails', 'error');
+    }
 }
 
 function closeOrderDetailModal() {
@@ -1224,7 +1413,8 @@ window.closeProductModal = closeProductModal;
 window.saveProduct = saveProduct;
 window.toggleFeatured = toggleFeatured;
 window.deleteProduct = deleteProduct;
-window.syncProductsWithAPI = syncProductsWithAPI;
+window.deleteOrder = deleteOrder;
+window.syncWithAPI = syncWithAPI;
 window.refreshProductCache = refreshProductCache;
 window.clearAllProducts = clearAllProducts;
 window.viewOrderDetails = viewOrderDetails;
