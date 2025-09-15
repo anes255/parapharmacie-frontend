@@ -1,4 +1,4 @@
-// Clean PharmacieGaherApp - Updated with proper cart integration
+// Complete PharmacieGaherApp - Updated with all missing pages
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -495,6 +495,409 @@ class PharmacieGaherApp {
         return 0;
     }
     
+    // LOGIN PAGE
+    async loadLoginPage() {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-16">
+                <div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8">
+                    <div class="text-center mb-8">
+                        <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-sign-in-alt text-white text-2xl"></i>
+                        </div>
+                        <h1 class="text-3xl font-bold text-emerald-800 mb-2">Connexion</h1>
+                        <p class="text-emerald-600">Accédez à votre compte</p>
+                    </div>
+                    
+                    <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-6">
+                        <div>
+                            <label for="loginEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                            <input type="email" id="loginEmail" name="email" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                   placeholder="votre@email.com">
+                        </div>
+                        
+                        <div>
+                            <label for="loginPassword" class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe</label>
+                            <input type="password" id="loginPassword" name="password" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                   placeholder="••••••••">
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-sign-in-alt mr-2"></i>Se connecter
+                        </button>
+                    </form>
+                    
+                    <div class="text-center mt-6">
+                        <p class="text-gray-600">Pas encore de compte ?</p>
+                        <button onclick="app.showPage('register')" class="text-emerald-600 hover:text-emerald-700 font-semibold">
+                            Créer un compte
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // REGISTER PAGE
+    async loadRegisterPage() {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-16">
+                <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+                    <div class="text-center mb-8">
+                        <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-user-plus text-white text-2xl"></i>
+                        </div>
+                        <h1 class="text-3xl font-bold text-emerald-800 mb-2">Inscription</h1>
+                        <p class="text-emerald-600">Créez votre compte gratuitement</p>
+                    </div>
+                    
+                    <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="registerPrenom" class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
+                                <input type="text" id="registerPrenom" name="prenom" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                       placeholder="Votre prénom">
+                            </div>
+                            
+                            <div>
+                                <label for="registerNom" class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
+                                <input type="text" id="registerNom" name="nom" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                       placeholder="Votre nom">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="registerEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
+                                <input type="email" id="registerEmail" name="email" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                       placeholder="votre@email.com">
+                            </div>
+                            
+                            <div>
+                                <label for="registerTelephone" class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
+                                <input type="tel" id="registerTelephone" name="telephone" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                       placeholder="05XXXXXXXX">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="registerPassword" class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe *</label>
+                            <input type="password" id="registerPassword" name="password" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                   placeholder="••••••••">
+                        </div>
+                        
+                        <div>
+                            <label for="registerAdresse" class="block text-sm font-semibold text-gray-700 mb-2">Adresse</label>
+                            <textarea id="registerAdresse" name="adresse" rows="2" 
+                                      class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                      placeholder="Votre adresse complète"></textarea>
+                        </div>
+                        
+                        <div>
+                            <label for="registerWilaya" class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
+                            <select id="registerWilaya" name="wilaya" required 
+                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                <option value="">Sélectionnez votre wilaya</option>
+                                <option value="Alger">Alger</option>
+                                <option value="Blida">Blida</option>
+                                <option value="Tipaza">Tipaza</option>
+                                <option value="Boumerdès">Boumerdès</option>
+                                <option value="Médéa">Médéa</option>
+                                <option value="Bouira">Bouira</option>
+                                <option value="Tizi Ouzou">Tizi Ouzou</option>
+                                <option value="Béjaïa">Béjaïa</option>
+                                <option value="Setif">Setif</option>
+                                <option value="Constantine">Constantine</option>
+                                <option value="Oran">Oran</option>
+                                <option value="Annaba">Annaba</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-user-plus mr-2"></i>Créer mon compte
+                        </button>
+                    </form>
+                    
+                    <div class="text-center mt-6">
+                        <p class="text-gray-600">Déjà un compte ?</p>
+                        <button onclick="app.showPage('login')" class="text-emerald-600 hover:text-emerald-700 font-semibold">
+                            Se connecter
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // CHECKOUT PAGE
+    async loadCheckoutPage() {
+        // Validate cart first
+        if (!window.cartSystem || window.cartSystem.cart.length === 0) {
+            this.showToast('Votre panier est vide', 'warning');
+            this.showPage('products');
+            return;
+        }
+        
+        const mainContent = document.getElementById('mainContent');
+        const cartTotals = window.cartSystem.getTotals();
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-6xl mx-auto">
+                    <div class="text-center mb-8">
+                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">Finaliser votre commande</h1>
+                        <p class="text-xl text-emerald-600">${cartTotals.itemCount} article(s) dans votre panier</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                        <!-- Order Form -->
+                        <div class="bg-white rounded-2xl shadow-xl p-8">
+                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Informations de livraison</h2>
+                            
+                            <form id="checkoutForm" class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label for="checkoutPrenom" class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
+                                        <input type="text" id="checkoutPrenom" name="prenom" required 
+                                               value="${this.currentUser?.prenom || ''}"
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="checkoutNom" class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
+                                        <input type="text" id="checkoutNom" name="nom" required 
+                                               value="${this.currentUser?.nom || ''}"
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label for="checkoutEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
+                                        <input type="email" id="checkoutEmail" name="email" required 
+                                               value="${this.currentUser?.email || ''}"
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="checkoutTelephone" class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
+                                        <input type="tel" id="checkoutTelephone" name="telephone" required 
+                                               value="${this.currentUser?.telephone || ''}"
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label for="checkoutAdresse" class="block text-sm font-semibold text-gray-700 mb-2">Adresse complète *</label>
+                                    <textarea id="checkoutAdresse" name="adresse" required rows="3" 
+                                              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                              placeholder="Votre adresse complète de livraison">${this.currentUser?.adresse || ''}</textarea>
+                                </div>
+                                
+                                <div>
+                                    <label for="checkoutWilaya" class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
+                                    <select id="checkoutWilaya" name="wilaya" required 
+                                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                        <option value="">Sélectionnez votre wilaya</option>
+                                        <option value="Alger" ${this.currentUser?.wilaya === 'Alger' ? 'selected' : ''}>Alger</option>
+                                        <option value="Blida" ${this.currentUser?.wilaya === 'Blida' ? 'selected' : ''}>Blida</option>
+                                        <option value="Tipaza" ${this.currentUser?.wilaya === 'Tipaza' ? 'selected' : ''}>Tipaza</option>
+                                        <option value="Boumerdès" ${this.currentUser?.wilaya === 'Boumerdès' ? 'selected' : ''}>Boumerdès</option>
+                                        <option value="Médéa" ${this.currentUser?.wilaya === 'Médéa' ? 'selected' : ''}>Médéa</option>
+                                        <option value="Bouira" ${this.currentUser?.wilaya === 'Bouira' ? 'selected' : ''}>Bouira</option>
+                                        <option value="Tizi Ouzou" ${this.currentUser?.wilaya === 'Tizi Ouzou' ? 'selected' : ''}>Tizi Ouzou</option>
+                                        <option value="Béjaïa" ${this.currentUser?.wilaya === 'Béjaïa' ? 'selected' : ''}>Béjaïa</option>
+                                        <option value="Setif" ${this.currentUser?.wilaya === 'Setif' ? 'selected' : ''}>Setif</option>
+                                        <option value="Constantine" ${this.currentUser?.wilaya === 'Constantine' ? 'selected' : ''}>Constantine</option>
+                                        <option value="Oran" ${this.currentUser?.wilaya === 'Oran' ? 'selected' : ''}>Oran</option>
+                                        <option value="Annaba" ${this.currentUser?.wilaya === 'Annaba' ? 'selected' : ''}>Annaba</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Payment Method -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-4">Mode de paiement *</label>
+                                    <div class="space-y-3">
+                                        <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-emerald-400 transition-all">
+                                            <input type="radio" name="modePaiement" value="Paiement à la livraison" checked 
+                                                   class="text-emerald-600 mr-3">
+                                            <div class="flex items-center">
+                                                <i class="fas fa-money-bill text-emerald-600 mr-3"></i>
+                                                <div>
+                                                    <p class="font-semibold text-gray-800">Paiement à la livraison</p>
+                                                    <p class="text-sm text-gray-600">Payez en espèces lors de la réception</p>
+                                                </div>
+                                            </div>
+                                        </label>
+                                        
+                                        <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-emerald-400 transition-all opacity-50">
+                                            <input type="radio" name="modePaiement" value="Carte bancaire" disabled 
+                                                   class="text-emerald-600 mr-3">
+                                            <div class="flex items-center">
+                                                <i class="fas fa-credit-card text-emerald-600 mr-3"></i>
+                                                <div>
+                                                    <p class="font-semibold text-gray-800">Carte bancaire</p>
+                                                    <p class="text-sm text-gray-600">Bientôt disponible</p>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <div id="paymentMethodInfo"></div>
+                                </div>
+                                
+                                <!-- Comments -->
+                                <div>
+                                    <label for="checkoutCommentaires" class="block text-sm font-semibold text-gray-700 mb-2">Commentaires (optionnel)</label>
+                                    <textarea id="checkoutCommentaires" name="commentaires" rows="3" 
+                                              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                              placeholder="Instructions spéciales pour la livraison..."></textarea>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- Order Summary -->
+                        <div class="bg-white rounded-2xl shadow-xl p-8">
+                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Résumé de la commande</h2>
+                            
+                            <!-- Cart Items -->
+                            <div class="space-y-4 mb-6">
+                                ${window.cartSystem.cart.map(item => `
+                                    <div class="flex items-center space-x-4 p-4 bg-emerald-50/50 rounded-xl">
+                                        <img src="${item.image}" alt="${item.nom}" 
+                                             class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200">
+                                        <div class="flex-1">
+                                            <h4 class="font-semibold text-emerald-800">${item.nom}</h4>
+                                            <p class="text-sm text-emerald-600">Quantité: ${item.quantite} × ${item.prix} DA</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-semibold text-emerald-700">${item.prix * item.quantite} DA</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <!-- Shipping Progress -->
+                            <div id="shippingMessage" class="mb-6"></div>
+                            
+                            <!-- Totals -->
+                            <div class="border-t-2 border-emerald-200 pt-6 space-y-3">
+                                <div class="flex justify-between text-emerald-700">
+                                    <span>Sous-total:</span>
+                                    <span id="checkoutSousTotal">${cartTotals.sousTotal} DA</span>
+                                </div>
+                                <div class="flex justify-between text-emerald-700">
+                                    <span>Frais de livraison:</span>
+                                    <span id="checkoutFraisLivraison">300 DA</span>
+                                </div>
+                                <div class="flex justify-between text-xl font-bold text-emerald-800 border-t-2 border-emerald-200 pt-3">
+                                    <span>Total:</span>
+                                    <span id="checkoutTotal">${cartTotals.sousTotal + 300} DA</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Submit Button -->
+                            <button onclick="processCheckoutOrder()" 
+                                    class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 mt-6">
+                                <i class="fas fa-check mr-2"></i>Confirmer la commande
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Initialize checkout system
+        if (window.initCheckout) {
+            window.initCheckout();
+        }
+    }
+    
+    // ORDER CONFIRMATION PAGE
+    async loadOrderConfirmationPage(orderNumber) {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-16">
+                <div class="max-w-2xl mx-auto text-center">
+                    <div class="mb-8">
+                        <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <i class="fas fa-check-circle text-green-500 text-4xl"></i>
+                        </div>
+                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
+                        <p class="text-xl text-emerald-600">Merci pour votre commande</p>
+                    </div>
+                    
+                    <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+                        <h2 class="text-2xl font-bold text-emerald-800 mb-6">Détails de votre commande</h2>
+                        
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Numéro de commande:</span>
+                                <span class="font-bold text-emerald-800">#${orderNumber}</span>
+                            </div>
+                            
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Date:</span>
+                                <span class="font-medium text-gray-800">${new Date().toLocaleDateString('fr-FR')}</span>
+                            </div>
+                            
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Statut:</span>
+                                <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">En attente</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-8">
+                        <h3 class="text-lg font-bold text-blue-800 mb-4">Que se passe-t-il maintenant ?</h3>
+                        <div class="text-left space-y-3 text-blue-700">
+                            <div class="flex items-center">
+                                <i class="fas fa-check-circle text-blue-500 mr-3"></i>
+                                <span>Nous avons reçu votre commande</span>
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-clock text-blue-500 mr-3"></i>
+                                <span>Nous préparons votre commande</span>
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-shipping-fast text-blue-500 mr-3"></i>
+                                <span>Livraison sous 24-48h</span>
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-phone text-blue-500 mr-3"></i>
+                                <span>Notre livreur vous contactera</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <button onclick="app.showPage('home')" 
+                                class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-home mr-2"></i>Retour à l'accueil
+                        </button>
+                        
+                        <div class="mt-4">
+                            <button onclick="app.showPage('products')" 
+                                    class="text-emerald-600 hover:text-emerald-700 font-semibold">
+                                Continuer mes achats
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
     logout() {
         localStorage.removeItem('token');
         this.currentUser = null;
@@ -937,4 +1340,4 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('App initialized and made globally available');
 });
 
-console.log('✅ Fixed app.js loaded with proper cart integration');
+console.log('✅ Complete app.js loaded with all pages');
