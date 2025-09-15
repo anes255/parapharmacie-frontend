@@ -975,7 +975,7 @@ function saveProduct() {
             window.app.refreshProductsCache();
         }
         
-        // Try to save to API (optional)
+        // Try to save to API (optional) - KEEP YOUR ORIGINAL API LOGIC
         const saveToApi = async () => {
             try {
                 const endpoint = isEditing ? `/products/${productData._id}` : '/products';
@@ -1293,7 +1293,7 @@ async function updateOrderStatus(orderId, newStatus) {
     }
 }
 
-// NEW DELETE ORDER FUNCTION
+// NEW DELETE ORDER FUNCTION - THIS IS THE ONLY NEW FUNCTION ADDED
 async function deleteOrder(orderId) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ? Cette action est irréversible.')) {
         return;
@@ -1474,7 +1474,7 @@ window.validateAllProducts = validateAllProducts;
 window.clearAllProducts = clearAllProducts;
 window.viewOrderDetails = viewOrderDetails;
 window.updateOrderStatus = updateOrderStatus;
-window.deleteOrder = deleteOrder;
+window.deleteOrder = deleteOrder; // NEW EXPORT ADDED
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
