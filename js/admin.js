@@ -10,6 +10,11 @@ const API_BASE_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:5000/api'
     : 'https://parapharmacie-gaher.onrender.com/api';
 
+// Helper function to build API URLs
+function buildApiUrl(endpoint) {
+    return `${API_BASE_URL}${endpoint}`;
+}
+
 // Helper function to make API calls
 async function apiCall(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
@@ -587,7 +592,8 @@ async function openEditProductModal(productId) {
             try {
                 const response = await fetch(buildApiUrl(`/products/${productId}`));
                 if (response.ok) {
-                    product = await response.json();
+                    const data = await response.json();
+                    product = data.product || data;
                 }
             } catch (error) {
                 console.log('API unavailable, unable to find product');
@@ -875,7 +881,7 @@ function closeProductModal() {
     currentEditingProduct = null;
 }
 
-// New function to save product directly
+// Fixed saveProduct function
 function saveProduct() {
     const form = document.getElementById('productForm');
     const isEditing = !!currentEditingProduct;
@@ -975,7 +981,7 @@ function saveProduct() {
             window.app.refreshProductsCache();
         }
         
-        // Try to save to API (optional) - KEEP YOUR ORIGINAL API LOGIC
+        // Try to save to API (optional)
         const saveToApi = async () => {
             try {
                 const endpoint = isEditing ? `/products/${productData._id}` : '/products';
@@ -984,7 +990,8 @@ function saveProduct() {
                 const response = await fetch(buildApiUrl(endpoint), {
                     method: method,
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'x-auth-token': localStorage.getItem('token') || ''
                     },
                     body: JSON.stringify(productData)
                 });
@@ -1293,7 +1300,7 @@ async function updateOrderStatus(orderId, newStatus) {
     }
 }
 
-// NEW DELETE ORDER FUNCTION - THIS IS THE ONLY NEW FUNCTION ADDED
+// NEW DELETE ORDER FUNCTION
 async function deleteOrder(orderId) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ? Cette action est irréversible.')) {
         return;
@@ -1474,8 +1481,8 @@ window.validateAllProducts = validateAllProducts;
 window.clearAllProducts = clearAllProducts;
 window.viewOrderDetails = viewOrderDetails;
 window.updateOrderStatus = updateOrderStatus;
-window.deleteOrder = deleteOrder; // NEW EXPORT ADDED
+window.deleteOrder = deleteOrder;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
-console.log('✅ Fixed Admin.js loaded with delete order functionality');
+console.log('✅ Fixed Admin.js loaded with working API calls');
