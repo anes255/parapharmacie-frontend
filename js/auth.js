@@ -389,4 +389,4 @@ window.validatePassword = validatePassword;
 window.validateEmail = validateEmail;
 window.validatePhone = validatePhone;
 
-console.log('✅ Auth.js loaded successfully');
+console.log('✅ Fixed Auth.js loaded successfully');
