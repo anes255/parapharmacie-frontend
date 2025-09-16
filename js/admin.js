@@ -209,32 +209,44 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         console.log(`📦 Local orders loaded: ${orders.length}`);
         
-        // Try to merge with API orders if available
-        try {
-            console.log('🌐 Attempting API call to /orders...');
-            const data = await apiCall('/orders');
-            
-            if (data && data.orders && Array.isArray(data.orders)) {
-                console.log(`📡 API orders loaded: ${data.orders.length}`);
+        // Try to merge with API orders if available and user is properly authenticated
+        const token = localStorage.getItem('token');
+        if (token && !token.startsWith('demo-token')) {
+            // Only try API if we have a real token (not demo token)
+            try {
+                console.log('🌐 Attempting API call to /orders...');
+                const data = await apiCall('/orders');
                 
-                // Merge API orders with local ones, avoiding duplicates
-                const localOrderNumbers = orders.map(o => o.numeroCommande);
-                const newApiOrders = data.orders.filter(apiOrder => 
-                    !localOrderNumbers.includes(apiOrder.numeroCommande)
-                );
-                
-                if (newApiOrders.length > 0) {
-                    console.log(`➕ Adding ${newApiOrders.length} new API orders`);
-                    orders = [...orders, ...newApiOrders];
+                if (data && data.orders && Array.isArray(data.orders)) {
+                    console.log(`📡 API orders loaded: ${data.orders.length}`);
                     
-                    // Update localStorage with merged data
-                    localStorage.setItem('adminOrders', JSON.stringify(orders));
-                    adminOrders = orders;
+                    // Merge API orders with local ones, avoiding duplicates
+                    const localOrderNumbers = orders.map(o => o.numeroCommande);
+                    const newApiOrders = data.orders.filter(apiOrder => 
+                        !localOrderNumbers.includes(apiOrder.numeroCommande)
+                    );
+                    
+                    if (newApiOrders.length > 0) {
+                        console.log(`➕ Adding ${newApiOrders.length} new API orders`);
+                        orders = [...orders, ...newApiOrders];
+                        
+                        // Update localStorage with merged data
+                        localStorage.setItem('adminOrders', JSON.stringify(orders));
+                        adminOrders = orders;
+                    }
+                }
+            } catch (apiError) {
+                console.warn('⚠️ API call failed, using only local orders:', apiError.message);
+                
+                // If it's a 404 or 401/403, it's expected for demo mode
+                if (apiError.message.includes('404') || 
+                    apiError.message.includes('401') || 
+                    apiError.message.includes('403')) {
+                    console.log('📝 This is normal in demo mode - using local orders only');
                 }
             }
-        } catch (apiError) {
-            console.warn('⚠️ API call failed, using only local orders:', apiError.message);
-            // This is OK - we'll use only local orders
+        } else {
+            console.log('🎭 Demo mode detected - using local orders only');
         }
         
         // Sort by date, newest first
@@ -265,13 +277,19 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                         <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
                         <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
                         <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées par les clients</p>
-                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto mb-6">
                             <h4 class="font-semibold text-blue-800 mb-2">Comment ça marche :</h4>
                             <ul class="text-sm text-blue-700 text-left space-y-1">
                                 <li>• Les clients passent commande via le site</li>
                                 <li>• Les commandes apparaissent automatiquement ici</li>
                                 <li>• Vous pouvez voir les détails et gérer les statuts</li>
                             </ul>
+                        </div>
+                        <div class="space-y-2">
+                            <button onclick="createDemoOrders()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-all">
+                                <i class="fas fa-plus mr-2"></i>Créer des commandes de test
+                            </button>
+                            <p class="text-xs text-gray-500">Pour voir un exemple de fonctionnement</p>
                         </div>
                     </div>
                 ` : `
@@ -1376,6 +1394,133 @@ async function clearOrdersCache() {
     }
 }
 
+// NEW: Create demo orders for testing
+async function createDemoOrders() {
+    try {
+        console.log('Creating demo orders...');
+        
+        const demoOrders = [
+            {
+                _id: 'demo-order-1',
+                numeroCommande: 'CMD20241' + Math.random().toString().slice(-3),
+                client: {
+                    prenom: 'Ahmed',
+                    nom: 'Benali',
+                    email: 'ahmed.benali@email.com',
+                    telephone: '0555123456',
+                    adresse: 'Cité des 1000 logements, Bt A, App 15',
+                    wilaya: 'Alger'
+                },
+                articles: [
+                    {
+                        productId: 'demo-prod-1',
+                        nom: 'Vitamines Multi-Complex',
+                        prix: 2500,
+                        quantite: 2,
+                        image: 'https://via.placeholder.com/64x64/10b981/ffffff?text=VM'
+                    },
+                    {
+                        productId: 'demo-prod-2',
+                        nom: 'Crème Hydratante Visage',
+                        prix: 1800,
+                        quantite: 1,
+                        image: 'https://via.placeholder.com/64x64/ec4899/ffffff?text=CH'
+                    }
+                ],
+                sousTotal: 6800,
+                fraisLivraison: 300,
+                total: 7100,
+                statut: 'en-attente',
+                modePaiement: 'Paiement à la livraison',
+                dateCommande: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+                commentaires: 'Livraison préférée en matinée'
+            },
+            {
+                _id: 'demo-order-2',
+                numeroCommande: 'CMD20241' + Math.random().toString().slice(-3),
+                client: {
+                    prenom: 'Fatima',
+                    nom: 'Zahra',
+                    email: 'fatima.zahra@email.com',
+                    telephone: '0661789012',
+                    adresse: 'Hay Essalam, Rue des Roses, N°25',
+                    wilaya: 'Blida'
+                },
+                articles: [
+                    {
+                        productId: 'demo-prod-3',
+                        nom: 'Shampoing Anti-Chute',
+                        prix: 3200,
+                        quantite: 1,
+                        image: 'https://via.placeholder.com/64x64/f59e0b/ffffff?text=SA'
+                    }
+                ],
+                sousTotal: 3200,
+                fraisLivraison: 250,
+                total: 3450,
+                statut: 'confirmée',
+                modePaiement: 'Paiement à la livraison',
+                dateCommande: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
+                commentaires: ''
+            },
+            {
+                _id: 'demo-order-3',
+                numeroCommande: 'CMD20241' + Math.random().toString().slice(-3),
+                client: {
+                    prenom: 'Mohammed',
+                    nom: 'Kader',
+                    email: 'mohammed.kader@email.com',
+                    telephone: '0770345678',
+                    adresse: 'Centre-ville, Avenue de l\'Indépendance, Immeuble El Baraka',
+                    wilaya: 'Tipaza'
+                },
+                articles: [
+                    {
+                        productId: 'demo-prod-4',
+                        nom: 'Complément Sport Énergie',
+                        prix: 4500,
+                        quantite: 1,
+                        image: 'https://via.placeholder.com/64x64/f43f5e/ffffff?text=CS'
+                    },
+                    {
+                        productId: 'demo-prod-5',
+                        nom: 'Protéine Whey Vanille',
+                        prix: 8900,
+                        quantite: 1,
+                        image: 'https://via.placeholder.com/64x64/f43f5e/ffffff?text=PW'
+                    }
+                ],
+                sousTotal: 13400,
+                fraisLivraison: 0, // Free shipping over 5000 DA
+                total: 13400,
+                statut: 'livrée',
+                modePaiement: 'Paiement à la livraison',
+                dateCommande: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), // 2 days ago
+                commentaires: 'Client régulier, livraison rapide souhaitée'
+            }
+        ];
+        
+        // Add demo orders to localStorage
+        let existingOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        
+        // Filter out existing demo orders and add new ones
+        existingOrders = existingOrders.filter(o => !o._id.startsWith('demo-order-'));
+        existingOrders = [...demoOrders, ...existingOrders];
+        
+        localStorage.setItem('adminOrders', JSON.stringify(existingOrders));
+        adminOrders = existingOrders;
+        
+        app.showToast('✅ Commandes de démonstration créées !', 'success');
+        
+        // Reload the orders section
+        app.loadAdminOrders();
+        
+    } catch (error) {
+        console.error('Error creating demo orders:', error);
+        app.showToast('Erreur lors de la création des commandes de test', 'error');
+    }
+}
+
 // Section switching
 function switchAdminSection(section) {
     document.querySelectorAll('.admin-nav-btn').forEach(btn => {
@@ -1481,9 +1626,10 @@ window.refreshProductCache = refreshProductCache;
 window.validateAllProducts = validateAllProducts;
 window.clearAllProducts = clearAllProducts;
 window.clearOrdersCache = clearOrdersCache;
+window.createDemoOrders = createDemoOrders;
 window.viewOrderDetails = viewOrderDetails;
 window.updateOrderStatus = updateOrderStatus;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
-console.log('✅ Fixed Admin.js loaded with proper orders management and app integration');
+console.log('✅ Fixed Admin.js loaded with proper orders management and demo data creation');
