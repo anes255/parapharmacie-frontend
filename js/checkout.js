@@ -1,4 +1,4 @@
-// Complete Fixed Checkout System for Shifa Parapharmacie
+// Fixed Checkout System for Shifa Parapharmacie with "Order was sent" message
 
 class CheckoutSystem {
     constructor() {
@@ -9,17 +9,16 @@ class CheckoutSystem {
 
     // Initialize checkout process
     init() {
-        console.log('🛒 Initializing checkout system...');
+        console.log('Initializing checkout system...');
         this.validateCart();
         this.setupEventListeners();
         this.calculateTotals();
-        console.log('✅ Checkout system initialized');
     }
 
     // Validate cart before checkout
     validateCart() {
         if (!window.app || !window.app.cart || window.app.cart.length === 0) {
-            console.error('❌ Cart is empty');
+            console.error('Cart is empty');
             if (window.app) {
                 window.app.showToast('Votre panier est vide', 'warning');
                 window.app.showPage('products');
@@ -66,8 +65,6 @@ class CheckoutSystem {
         if (wilayaSelect) {
             wilayaSelect.addEventListener('change', () => this.calculateShipping());
         }
-        
-        console.log('✅ Event listeners setup complete');
     }
 
     // Validate individual form field
@@ -104,7 +101,7 @@ class CheckoutSystem {
                     errorMessage = 'Téléphone requis';
                 } else if (!this.validatePhone(value)) {
                     isValid = false;
-                    errorMessage = 'Format de téléphone invalide (algérien requis)';
+                    errorMessage = 'Format de téléphone invalide';
                 }
                 break;
 
@@ -114,7 +111,7 @@ class CheckoutSystem {
                     errorMessage = 'Adresse requise';
                 } else if (value.length < 10) {
                     isValid = false;
-                    errorMessage = 'Adresse trop courte (minimum 10 caractères)';
+                    errorMessage = 'Adresse trop courte';
                 }
                 break;
 
@@ -165,8 +162,9 @@ class CheckoutSystem {
 
     // Handle payment method change
     handlePaymentMethodChange(method) {
-        console.log('💳 Payment method changed to:', method);
+        console.log('Payment method changed to:', method);
         
+        // Update UI based on payment method
         const paymentInfo = document.getElementById('paymentMethodInfo');
         if (paymentInfo) {
             switch (method) {
@@ -222,14 +220,12 @@ class CheckoutSystem {
         this.updateShippingDisplay(fraisLivraison);
         this.calculateTotals();
         
-        console.log(`📦 Shipping calculated: ${fraisLivraison} DA for ${wilaya}`);
-        
         return fraisLivraison;
     }
 
     // Update shipping display
     updateShippingDisplay(fraisLivraison) {
-        const shippingElement = document.getElementById('checkoutFraisLivraison');
+        const shippingElement = document.getElementById('shippingCost');
         if (shippingElement) {
             shippingElement.textContent = `${fraisLivraison} DA`;
             
@@ -327,23 +323,16 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // MAIN FUNCTION: Process the order
+    // MAIN PROCESS ORDER FUNCTION WITH "ORDER WAS SENT" MESSAGE
     async processOrder() {
         try {
             if (this.isProcessing) {
-                console.log('⏳ Order already being processed');
+                console.log('Order already being processed');
                 return;
             }
 
             console.log('🛒 Starting order processing...');
             this.isProcessing = true;
-
-            // Show loading on submit button
-            const submitBtn = document.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
-            }
 
             // Validate cart
             if (!this.validateCart()) {
@@ -355,41 +344,53 @@ class CheckoutSystem {
                 throw new Error('Veuillez corriger les erreurs dans le formulaire');
             }
 
+            // Disable submit button and show processing
+            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `
+                    <i class="fas fa-spinner fa-spin mr-2"></i>
+                    <span>Envoi de la commande...</span>
+                `;
+            }
+
+            // Show immediate "sending" feedback
+            if (window.app) {
+                window.app.showToast('📦 Envoi de votre commande en cours...', 'info');
+            }
+
             // Gather form data
             const orderData = this.gatherOrderData();
             
-            console.log('📝 Order data prepared:', orderData);
+            console.log('Order data prepared:', orderData);
 
             // Try to submit to API first
             let orderSaved = false;
             try {
-                console.log('📡 Attempting to save order to API...');
                 const response = await apiCall('/orders', {
                     method: 'POST',
                     body: JSON.stringify(orderData)
                 });
                 
                 if (response) {
-                    console.log('✅ Order saved to API successfully:', response);
+                    console.log('✅ Order saved to API successfully');
                     orderSaved = true;
                 }
             } catch (apiError) {
                 console.log('⚠️ API save failed, will save locally:', apiError.message);
             }
 
-            // Always save locally for admin panel and user history
-            try {
-                // Save to admin orders (for admin panel)
-                this.saveToAdminOrders(orderData);
-                
-                // Save to user's order history if logged in
-                if (window.app && window.app.currentUser) {
-                    this.saveToUserOrders(orderData);
+            // Always save locally for admin panel
+            if (window.addOrderToDemo) {
+                const localOrder = window.addOrderToDemo(orderData);
+                if (localOrder) {
+                    console.log('✅ Order saved locally for admin panel');
                 }
-                
-                console.log('✅ Order saved locally');
-            } catch (localError) {
-                console.error('❌ Local save error:', localError);
+            }
+
+            // Save to user's order history
+            if (window.app && window.app.currentUser) {
+                this.saveToUserOrders(orderData);
             }
 
             // Clear cart
@@ -397,9 +398,12 @@ class CheckoutSystem {
                 window.app.clearCart();
             }
 
-            // Show success and redirect
+            // SUCCESS MESSAGE - This is the key addition
             if (window.app) {
-                window.app.showToast('Commande passée avec succès !', 'success');
+                // Show success toast with "order was sent" message
+                window.app.showToast('✅ Votre commande a été envoyée avec succès !', 'success');
+                
+                // Navigate to confirmation page with success message
                 window.app.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
             }
 
@@ -409,17 +413,17 @@ class CheckoutSystem {
             console.error('❌ Error processing order:', error);
             
             if (window.app) {
-                window.app.showToast(error.message || 'Erreur lors de la validation de la commande', 'error');
+                window.app.showToast(`❌ ${error.message || 'Erreur lors de l\'envoi de la commande'}`, 'error');
             }
-        } finally {
-            this.isProcessing = false;
             
             // Re-enable submit button
-            const submitBtn = document.querySelector('button[type="submit"]');
+            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirmer la commande';
             }
+        } finally {
+            this.isProcessing = false;
         }
     }
 
@@ -475,27 +479,6 @@ class CheckoutSystem {
         return orderData;
     }
 
-    // Save order to admin orders (for admin panel)
-    saveToAdminOrders(orderData) {
-        try {
-            let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-            
-            // Add new order to the beginning
-            adminOrders.unshift(orderData);
-            
-            // Keep only last 100 orders
-            if (adminOrders.length > 100) {
-                adminOrders = adminOrders.slice(0, 100);
-            }
-            
-            localStorage.setItem('adminOrders', JSON.stringify(adminOrders));
-            console.log('✅ Order saved to admin orders');
-            
-        } catch (error) {
-            console.error('❌ Error saving to admin orders:', error);
-        }
-    }
-
     // Save order to user's order history
     saveToUserOrders(orderData) {
         if (!window.app?.currentUser?.id) return;
@@ -516,7 +499,7 @@ class CheckoutSystem {
             console.log('✅ Order saved to user history');
             
         } catch (error) {
-            console.error('❌ Error saving to user orders:', error);
+            console.error('Error saving to user orders:', error);
         }
     }
 
@@ -541,10 +524,29 @@ class CheckoutSystem {
         return phoneRegex.test(cleanPhone);
     }
 
+    // Update order progress
+    updateProgress(step) {
+        this.currentStep = step;
+        
+        const steps = document.querySelectorAll('.checkout-step');
+        steps.forEach((stepEl, index) => {
+            if (index < step) {
+                stepEl.classList.add('completed');
+                stepEl.classList.remove('active');
+            } else if (index === step - 1) {
+                stepEl.classList.add('active');
+                stepEl.classList.remove('completed');
+            } else {
+                stepEl.classList.remove('active', 'completed');
+            }
+        });
+    }
+
     // Apply coupon code
     async applyCoupon(code) {
         try {
-            console.log('🎟️ Applying coupon:', code);
+            // This would normally call an API to validate the coupon
+            console.log('Applying coupon:', code);
             
             // Placeholder for coupon logic
             if (code.toUpperCase() === 'WELCOME10') {
@@ -584,10 +586,10 @@ let checkoutSystem;
 
 // Initialize checkout when page loads
 function initCheckout() {
-    console.log('🛒 Initializing checkout...');
     checkoutSystem = new CheckoutSystem();
     checkoutSystem.init();
     window.checkoutSystem = checkoutSystem;
+    console.log('✅ Checkout system initialized');
 }
 
 // Global functions for checkout
@@ -600,6 +602,11 @@ function validateCheckoutField(field) {
 function processCheckoutOrder() {
     if (checkoutSystem) {
         return checkoutSystem.processOrder();
+    } else {
+        console.error('Checkout system not available');
+        if (window.app) {
+            window.app.showToast('Système de commande non disponible', 'error');
+        }
     }
 }
 
@@ -623,7 +630,7 @@ function removeCheckoutCoupon() {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCheckout);
 } else {
-    // Don't auto-initialize - let app.js handle it when checkout page loads
+    initCheckout();
 }
 
 // Export for global access
@@ -634,4 +641,4 @@ window.processCheckoutOrder = processCheckoutOrder;
 window.applyCheckoutCoupon = applyCheckoutCoupon;
 window.removeCheckoutCoupon = removeCheckoutCoupon;
 
-console.log('✅ Complete Fixed checkout.js loaded successfully');
+console.log('✅ Fixed Checkout.js loaded with "order was sent" message');
