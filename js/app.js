@@ -1,4 +1,4 @@
-// Complete PharmacieGaherApp - Full Implementation
+// Complete PharmacieGaherApp - Full Implementation with ALL Features
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -169,6 +169,13 @@ class PharmacieGaherApp {
                         return;
                     }
                     await this.loadProfilePage();
+                    break;
+                case 'orders':
+                    if (!this.currentUser) {
+                        await this.showPage('login');
+                        return;
+                    }
+                    await this.loadOrdersPage();
                     break;
                 case 'checkout':
                     await this.loadCheckoutPage();
@@ -744,6 +751,185 @@ class PharmacieGaherApp {
             </script>
         `;
     }
+
+    async loadOrdersPage() {
+        if (!this.currentUser) {
+            this.showPage('login');
+            return;
+        }
+
+        const mainContent = document.getElementById('mainContent');
+        
+        // Get user's orders from localStorage
+        const allOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const userOrders = allOrders.filter(order => 
+            order.client.email === this.currentUser.email
+        );
+
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+                <div class="text-center mb-8">
+                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">Mes Commandes</h1>
+                    <p class="text-xl text-emerald-600">Suivez l'état de vos commandes</p>
+                </div>
+
+                <div class="space-y-6">
+                    ${userOrders.length === 0 ? `
+                        <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-emerald-200/50 p-12 text-center">
+                            <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
+                            <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
+                            <p class="text-emerald-600 mb-8">Vous n'avez pas encore passé de commande.</p>
+                            <button onclick="app.showPage('products')" 
+                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                                <i class="fas fa-shopping-cart mr-2"></i>Commencer mes achats
+                            </button>
+                        </div>
+                    ` : userOrders.map(order => `
+                        <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-emerald-200/50 p-8">
+                            <!-- Order Header -->
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 pb-6 border-b border-emerald-200">
+                                <div>
+                                    <h3 class="text-2xl font-bold text-emerald-800 mb-2">Commande ${order.numeroCommande}</h3>
+                                    <p class="text-emerald-600">Passée le ${new Date(order.dateCommande).toLocaleDateString('fr-FR', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })}</p>
+                                </div>
+                                <div class="mt-4 md:mt-0">
+                                    <span class="px-4 py-2 rounded-full text-sm font-semibold ${this.getOrderStatusClass(order.statut)}">
+                                        ${this.getOrderStatusText(order.statut)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Order Items -->
+                            <div class="mb-6">
+                                <h4 class="text-lg font-semibold text-emerald-800 mb-4">Articles commandés</h4>
+                                <div class="space-y-3">
+                                    ${order.articles.map(article => `
+                                        <div class="flex items-center justify-between p-4 bg-emerald-50 rounded-xl">
+                                            <div class="flex-1">
+                                                <h5 class="font-semibold text-emerald-800">${article.nom}</h5>
+                                                <p class="text-emerald-600 text-sm">Quantité: ${article.quantite}</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="font-bold text-emerald-700">${article.prix} DA × ${article.quantite}</p>
+                                                <p class="text-sm text-emerald-600">= ${article.prix * article.quantite} DA</p>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <!-- Order Summary -->
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                                <div class="mb-4 md:mb-0">
+                                    <p class="text-emerald-700 mb-2">
+                                        <i class="fas fa-truck mr-2"></i>
+                                        Livraison à: ${order.livraison.adresse}, ${order.livraison.wilaya}
+                                    </p>
+                                    <p class="text-emerald-600 text-sm">
+                                        <i class="fas fa-credit-card mr-2"></i>
+                                        Paiement à la livraison
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-emerald-700 mb-1">Sous-total: ${order.sousTotal} DA</p>
+                                    <p class="text-emerald-700 mb-1">Livraison: ${order.fraisLivraison} DA</p>
+                                    <p class="text-xl font-bold text-emerald-800">Total: ${order.total} DA</p>
+                                </div>
+                            </div>
+
+                            <!-- Order Actions -->
+                            <div class="mt-6 pt-6 border-t border-emerald-200">
+                                <div class="flex flex-wrap gap-3">
+                                    ${order.statut === 'en-attente' ? `
+                                        <button onclick="app.cancelOrder('${order.numeroCommande}')" 
+                                                class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors">
+                                            <i class="fas fa-times mr-2"></i>Annuler
+                                        </button>
+                                    ` : ''}
+                                    <button onclick="app.contactSupport('${order.numeroCommande}')" 
+                                            class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                                        <i class="fas fa-headset mr-2"></i>Contacter le support
+                                    </button>
+                                    <button onclick="app.reorderItems('${order.numeroCommande}')" 
+                                            class="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors">
+                                        <i class="fas fa-redo mr-2"></i>Recommander
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    getOrderStatusClass(status) {
+        const statusClasses = {
+            'en-attente': 'bg-yellow-100 text-yellow-800',
+            'confirmee': 'bg-blue-100 text-blue-800',
+            'en-preparation': 'bg-orange-100 text-orange-800',
+            'expedier': 'bg-purple-100 text-purple-800',
+            'livree': 'bg-green-100 text-green-800',
+            'annulee': 'bg-red-100 text-red-800'
+        };
+        return statusClasses[status] || 'bg-gray-100 text-gray-800';
+    }
+
+    getOrderStatusText(status) {
+        const statusTexts = {
+            'en-attente': 'En attente',
+            'confirmee': 'Confirmée',
+            'en-preparation': 'En préparation',
+            'expedier': 'Expédiée',
+            'livree': 'Livrée',
+            'annulee': 'Annulée'
+        };
+        return statusTexts[status] || 'Inconnu';
+    }
+
+    cancelOrder(orderNumber) {
+        if (confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
+            const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            const orderIndex = orders.findIndex(o => o.numeroCommande === orderNumber);
+            
+            if (orderIndex > -1 && orders[orderIndex].statut === 'en-attente') {
+                orders[orderIndex].statut = 'annulee';
+                localStorage.setItem('adminOrders', JSON.stringify(orders));
+                this.showToast('Commande annulée avec succès', 'success');
+                this.loadOrdersPage(); // Refresh the page
+            } else {
+                this.showToast('Impossible d\'annuler cette commande', 'error');
+            }
+        }
+    }
+
+    contactSupport(orderNumber) {
+        this.showToast('Redirection vers le support...', 'info');
+        // Here you could implement a contact form or redirect to support
+        this.showPage('contact');
+    }
+
+    reorderItems(orderNumber) {
+        const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const order = orders.find(o => o.numeroCommande === orderNumber);
+        
+        if (order) {
+            // Add all items from the order back to cart
+            order.articles.forEach(article => {
+                const product = this.allProducts.find(p => p.nom === article.nom);
+                if (product) {
+                    this.addToCart(product._id, article.quantite);
+                }
+            });
+            this.showToast('Articles ajoutés au panier', 'success');
+        }
+    }
     
     async loadHomePage() {
         const mainContent = document.getElementById('mainContent');
@@ -895,6 +1081,232 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
+    }
+
+    async loadProductPage(productId) {
+        const mainContent = document.getElementById('mainContent');
+        
+        // Find product in cached products
+        const product = this.allProducts.find(p => p._id === productId);
+        
+        if (!product) {
+            mainContent.innerHTML = `
+                <div class="container mx-auto px-4 py-8 text-center">
+                    <i class="fas fa-exclamation-triangle text-6xl text-red-400 mb-6"></i>
+                    <h1 class="text-3xl font-bold text-red-800 mb-4">Produit non trouvé</h1>
+                    <p class="text-red-600 mb-8">Le produit que vous cherchez n'existe pas ou a été supprimé.</p>
+                    <button onclick="app.showPage('products')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl">
+                        <i class="fas fa-arrow-left mr-2"></i>Retour aux produits
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        // Generate image URL
+        const getCategoryColor = (category) => {
+            const colors = {
+                'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
+                'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                'Dentaire': '6366f1'
+            };
+            return colors[category] || '10b981';
+        };
+        
+        const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+        const categoryColor = getCategoryColor(product.categorie);
+        let imageUrl;
+        
+        if (product.image && product.image.startsWith('data:image')) {
+            imageUrl = product.image;
+        } else if (product.image && product.image.startsWith('http')) {
+            imageUrl = product.image;
+        } else {
+            imageUrl = `https://via.placeholder.com/500x500/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+        }
+
+        const isOutOfStock = product.stock === 0;
+        const hasPromotion = product.enPromotion && product.prixOriginal;
+
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+                <!-- Breadcrumb -->
+                <nav class="mb-8">
+                    <div class="flex items-center space-x-2 text-sm text-emerald-600">
+                        <button onclick="app.showPage('home')" class="hover:text-emerald-800">Accueil</button>
+                        <i class="fas fa-chevron-right text-emerald-400"></i>
+                        <button onclick="app.showPage('products')" class="hover:text-emerald-800">Produits</button>
+                        <i class="fas fa-chevron-right text-emerald-400"></i>
+                        <button onclick="app.filterByCategory('${product.categorie}')" class="hover:text-emerald-800">${product.categorie}</button>
+                        <i class="fas fa-chevron-right text-emerald-400"></i>
+                        <span class="text-emerald-800 font-medium">${product.nom}</span>
+                    </div>
+                </nav>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <!-- Product Image -->
+                    <div class="space-y-4">
+                        <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl overflow-hidden relative">
+                            ${hasPromotion ? `<div class="absolute top-4 left-4 z-10 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                                -${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%
+                            </div>` : ''}
+                            ${isOutOfStock ? `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+                                <span class="text-white font-bold text-xl">Rupture de stock</span>
+                            </div>` : ''}
+                            <img src="${imageUrl}" alt="${product.nom}" 
+                                 class="w-full h-full object-cover"
+                                 onerror="this.src='https://via.placeholder.com/500x500/10b981/ffffff?text=${encodeURIComponent(initials)}'">
+                        </div>
+                    </div>
+
+                    <!-- Product Info -->
+                    <div class="space-y-6">
+                        <div>
+                            <h1 class="text-3xl font-bold text-emerald-800 mb-4">${product.nom}</h1>
+                            <div class="flex items-center space-x-4 mb-4">
+                                <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-medium">${product.categorie}</span>
+                                ${product.marque ? `<span class="text-emerald-600 font-medium">${product.marque}</span>` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Price -->
+                        <div class="bg-emerald-50 rounded-xl p-6 border border-emerald-200">
+                            <div class="flex items-center space-x-4">
+                                ${hasPromotion ? `
+                                    <span class="text-2xl text-gray-400 line-through">${product.prixOriginal} DA</span>
+                                    <span class="text-4xl font-bold text-red-600">${product.prix} DA</span>
+                                ` : `
+                                    <span class="text-4xl font-bold text-emerald-700">${product.prix} DA</span>
+                                `}
+                            </div>
+                            ${hasPromotion ? `<div class="mt-2 text-sm text-red-600">
+                                Économisez ${product.prixOriginal - product.prix} DA !
+                            </div>` : ''}
+                        </div>
+
+                        <!-- Stock Info -->
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-boxes text-emerald-600"></i>
+                                <span class="text-emerald-700 font-medium">Stock: ${product.stock} unités</span>
+                            </div>
+                            ${product.stock > 0 && product.stock <= 5 ? `
+                                <div class="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>Stock limité
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Description -->
+                        <div>
+                            <h3 class="text-xl font-semibold text-emerald-800 mb-3">Description</h3>
+                            <p class="text-emerald-700 leading-relaxed">${product.description || 'Aucune description disponible pour ce produit.'}</p>
+                        </div>
+
+                        <!-- Add to Cart -->
+                        ${!isOutOfStock ? `
+                            <div class="bg-white border-2 border-emerald-200 rounded-xl p-6">
+                                <div class="flex items-center space-x-4 mb-4">
+                                    <label class="text-emerald-700 font-medium">Quantité:</label>
+                                    <div class="flex items-center space-x-2">
+                                        <button onclick="changeQuantity(-1)" class="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 font-bold">-</button>
+                                        <input type="number" id="quantity" value="1" min="1" max="${product.stock}" 
+                                               class="w-20 text-center border border-emerald-200 rounded-lg py-2 font-medium">
+                                        <button onclick="changeQuantity(1)" class="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 font-bold">+</button>
+                                    </div>
+                                </div>
+                                
+                                <button onclick="addToCartFromProduct()" 
+                                        class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
+                                    <i class="fas fa-cart-plus mr-2"></i>Ajouter au panier
+                                </button>
+                            </div>
+                        ` : `
+                            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-6 text-center">
+                                <i class="fas fa-times-circle text-red-500 text-3xl mb-3"></i>
+                                <h3 class="text-lg font-bold text-red-800 mb-2">Produit en rupture de stock</h3>
+                                <p class="text-red-600">Ce produit n'est actuellement pas disponible.</p>
+                            </div>
+                        `}
+
+                        <!-- Features -->
+                        <div class="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-6 border border-emerald-200">
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-4">
+                                <i class="fas fa-shield-alt mr-2"></i>Nos garanties
+                            </h3>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div class="flex items-center space-x-2 text-emerald-700">
+                                    <i class="fas fa-truck text-emerald-500"></i>
+                                    <span>Livraison rapide</span>
+                                </div>
+                                <div class="flex items-center space-x-2 text-emerald-700">
+                                    <i class="fas fa-certificate text-emerald-500"></i>
+                                    <span>Produits authentiques</span>
+                                </div>
+                                <div class="flex items-center space-x-2 text-emerald-700">
+                                    <i class="fas fa-phone-alt text-emerald-500"></i>
+                                    <span>Support client</span>
+                                </div>
+                                <div class="flex items-center space-x-2 text-emerald-700">
+                                    <i class="fas fa-undo text-emerald-500"></i>
+                                    <span>Retour possible</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Related Products -->
+                <div class="mt-16">
+                    <h2 class="text-3xl font-bold text-emerald-800 mb-8 text-center">Produits similaires</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="relatedProducts">
+                        <!-- Related products will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                // Product page specific functions
+                function changeQuantity(change) {
+                    const quantityInput = document.getElementById('quantity');
+                    let newValue = parseInt(quantityInput.value) + change;
+                    
+                    if (newValue < 1) newValue = 1;
+                    if (newValue > ${product.stock}) newValue = ${product.stock};
+                    
+                    quantityInput.value = newValue;
+                }
+                
+                function addToCartFromProduct() {
+                    const quantity = parseInt(document.getElementById('quantity').value) || 1;
+                    if (window.app) {
+                        window.app.addToCart('${product._id}', quantity);
+                    }
+                }
+            </script>
+        `;
+
+        // Load related products
+        this.loadRelatedProducts(product);
+    }
+
+    loadRelatedProducts(currentProduct) {
+        // Find products in same category, excluding current product
+        const relatedProducts = this.allProducts
+            .filter(p => p.categorie === currentProduct.categorie && p._id !== currentProduct._id && p.actif !== false)
+            .slice(0, 4);
+
+        const container = document.getElementById('relatedProducts');
+        if (container && relatedProducts.length > 0) {
+            container.innerHTML = relatedProducts.map(product => this.createProductCard(product)).join('');
+        } else if (container) {
+            container.innerHTML = `
+                <div class="col-span-full text-center py-8">
+                    <p class="text-emerald-600">Aucun produit similaire trouvé</p>
+                </div>
+            `;
+        }
     }
 
     async loadContactPage() {
@@ -1314,13 +1726,157 @@ class PharmacieGaherApp {
                     </div>
                 </div>
                 
-                <!-- Admin Content Placeholder -->
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
-                    <h2 class="text-2xl font-bold text-emerald-800 mb-4">Tableau de bord</h2>
-                    <p class="text-emerald-600">Interface d'administration en développement...</p>
+                <!-- Navigation Admin -->
+                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 mb-8 overflow-hidden">
+                    <nav class="flex flex-wrap">
+                        <button onclick="switchAdminSection('dashboard')" 
+                                class="admin-nav-btn dashboard flex-1 min-w-max px-6 py-4 text-sm font-bold bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+                            <i class="fas fa-chart-line mr-2"></i>Tableau de bord
+                        </button>
+                        <button onclick="switchAdminSection('products')" 
+                                class="admin-nav-btn products flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
+                            <i class="fas fa-pills mr-2"></i>Produits
+                        </button>
+                        <button onclick="switchAdminSection('orders')" 
+                                class="admin-nav-btn orders flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
+                            <i class="fas fa-shopping-bag mr-2"></i>Commandes
+                        </button>
+                        <button onclick="switchAdminSection('featured')" 
+                                class="admin-nav-btn featured flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
+                            <i class="fas fa-star mr-2"></i>Coups de Coeur
+                        </button>
+                        <button onclick="switchAdminSection('cleanup')" 
+                                class="admin-nav-btn cleanup flex-1 min-w-max px-6 py-4 text-sm font-semibold text-red-700 hover:bg-red-50 transition-all">
+                            <i class="fas fa-broom mr-2"></i>Nettoyage
+                        </button>
+                    </nav>
+                </div>
+                
+                <!-- Admin Content -->
+                <div id="adminContent" class="min-h-96">
+                    <!-- Content will be loaded here -->
                 </div>
             </div>
         `;
+        
+        await this.loadAdminDashboard();
+    }
+    
+    async loadAdminDashboard() {
+        try {
+            // Get stats from localStorage and cached products
+            const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            const products = this.allProducts;
+            
+            let stats = {
+                totalProducts: products.length,
+                totalOrders: adminOrders.length,
+                pendingOrders: adminOrders.filter(o => o.statut === 'en-attente').length,
+                totalUsers: 1,
+                monthlyRevenue: adminOrders.reduce((sum, o) => sum + (o.total || 0), 0)
+            };
+
+            try {
+                const data = await apiCall('/admin/dashboard');
+                if (data && data.stats) {
+                    stats = { ...stats, ...data.stats };
+                }
+            } catch (error) {
+                console.log('API unavailable, using local stats');
+            }
+            
+            document.getElementById('adminContent').innerHTML = `
+                <!-- Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-blue-600 uppercase tracking-wide">Produits</p>
+                                <p class="text-3xl font-bold text-blue-800">${stats.totalProducts}</p>
+                                <p class="text-xs text-blue-500 mt-1">Total actifs</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-pills text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-green-600 uppercase tracking-wide">Commandes</p>
+                                <p class="text-3xl font-bold text-green-800">${stats.totalOrders}</p>
+                                <p class="text-xs text-green-500 mt-1">Total reçues</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-shopping-bag text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-yellow-600 uppercase tracking-wide">En attente</p>
+                                <p class="text-3xl font-bold text-yellow-800">${stats.pendingOrders}</p>
+                                <p class="text-xs text-yellow-500 mt-1">Commandes</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-clock text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-purple-600 uppercase tracking-wide">Revenus</p>
+                                <p class="text-3xl font-bold text-purple-800">${stats.monthlyRevenue} DA</p>
+                                <p class="text-xs text-purple-500 mt-1">Ce mois</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-coins text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('products')">
+                        <i class="fas fa-plus-circle text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Gérer les produits</h3>
+                        <p class="text-emerald-100">Ajouter, modifier et gérer vos produits</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('orders')">
+                        <i class="fas fa-shopping-bag text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Commandes</h3>
+                        <p class="text-blue-100">Voir et gérer les commandes</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('featured')">
+                        <i class="fas fa-star text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Coups de Coeur</h3>
+                        <p class="text-yellow-100">Gérer les produits mis en avant</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('cleanup')">
+                        <i class="fas fa-broom text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Nettoyage</h3>
+                        <p class="text-red-100">Supprimer produits indésirables</p>
+                    </div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+            document.getElementById('adminContent').innerHTML = `
+                <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                    <p class="text-red-800">Erreur de chargement du tableau de bord</p>
+                </div>
+            `;
+        }
     }
     
     async loadCategories() {
@@ -1829,6 +2385,462 @@ function togglePasswordVisibility(inputId, button) {
     }
 }
 
+// Admin section switching function
+function switchAdminSection(section) {
+    // Update navigation
+    document.querySelectorAll('.admin-nav-btn').forEach(btn => {
+        btn.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
+        btn.classList.add('text-emerald-700', 'hover:bg-emerald-50');
+    });
+    
+    const activeBtn = document.querySelector(`.admin-nav-btn.${section}`);
+    if (activeBtn) {
+        activeBtn.classList.remove('text-emerald-700', 'hover:bg-emerald-50');
+        activeBtn.classList.add('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
+    }
+    
+    // Load section content
+    switch (section) {
+        case 'dashboard':
+            if (window.app) window.app.loadAdminDashboard();
+            break;
+        case 'products':
+            loadAdminProducts();
+            break;
+        case 'orders':
+            loadAdminOrders();
+            break;
+        case 'featured':
+            loadAdminFeatured();
+            break;
+        case 'cleanup':
+            loadAdminCleanup();
+            break;
+    }
+}
+
+// Admin functions
+function loadAdminProducts() {
+    const content = document.getElementById('adminContent');
+    content.innerHTML = `
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-emerald-800">Gestion des Produits</h2>
+                <button onclick="showAddProductForm()" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                    <i class="fas fa-plus mr-2"></i>Ajouter un produit
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full table-auto">
+                    <thead>
+                        <tr class="bg-emerald-50 border-b border-emerald-200">
+                            <th class="text-left p-4 font-semibold text-emerald-800">Image</th>
+                            <th class="text-left p-4 font-semibold text-emerald-800">Nom</th>
+                            <th class="text-left p-4 font-semibold text-emerald-800">Catégorie</th>
+                            <th class="text-left p-4 font-semibold text-emerald-800">Prix</th>
+                            <th class="text-left p-4 font-semibold text-emerald-800">Stock</th>
+                            <th class="text-left p-4 font-semibold text-emerald-800">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTable">
+                        <!-- Products will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Add Product Modal -->
+        <div id="addProductModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <h3 class="text-2xl font-bold text-emerald-800 mb-6">Ajouter un nouveau produit</h3>
+                
+                <form id="addProductForm" onsubmit="handleAddProduct(event)" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-emerald-700 mb-2">Nom du produit *</label>
+                            <input type="text" id="productName" required class="w-full px-4 py-3 border border-emerald-200 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-emerald-700 mb-2">Catégorie *</label>
+                            <select id="productCategory" required class="w-full px-4 py-3 border border-emerald-200 rounded-xl">
+                                <option value="">Sélectionnez une catégorie</option>
+                                <option value="Vitalité">Vitalité</option>
+                                <option value="Sport">Sport</option>
+                                <option value="Visage">Visage</option>
+                                <option value="Cheveux">Cheveux</option>
+                                <option value="Solaire">Solaire</option>
+                                <option value="Intime">Intime</option>
+                                <option value="Soins">Soins</option>
+                                <option value="Bébé">Bébé</option>
+                                <option value="Homme">Homme</option>
+                                <option value="Dentaire">Dentaire</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-emerald-700 mb-2">Description</label>
+                        <textarea id="productDescription" rows="3" class="w-full px-4 py-3 border border-emerald-200 rounded-xl"></textarea>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-emerald-700 mb-2">Prix (DA) *</label>
+                            <input type="number" id="productPrice" required min="0" step="1" class="w-full px-4 py-3 border border-emerald-200 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-emerald-700 mb-2">Stock *</label>
+                            <input type="number" id="productStock" required min="0" step="1" class="w-full px-4 py-3 border border-emerald-200 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-emerald-700 mb-2">Marque</label>
+                            <input type="text" id="productBrand" class="w-full px-4 py-3 border border-emerald-200 rounded-xl">
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-6">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="productFeatured" class="mr-2">
+                            <span class="text-sm text-emerald-700">Produit en vedette</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="productPromotion" class="mr-2">
+                            <span class="text-sm text-emerald-700">En promotion</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex space-x-4 pt-4">
+                        <button type="submit" class="flex-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl">
+                            Ajouter le produit
+                        </button>
+                        <button type="button" onclick="hideAddProductForm()" class="flex-1 bg-gray-300 text-gray-700 font-bold py-3 rounded-xl">
+                            Annuler
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    loadProductsTable();
+}
+
+function loadAdminOrders() {
+    const content = document.getElementById('adminContent');
+    const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+    
+    content.innerHTML = `
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Gestion des Commandes</h2>
+            
+            ${orders.length === 0 ? `
+                <div class="text-center py-16">
+                    <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
+                    <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
+                    <p class="text-emerald-600">Les commandes apparaîtront ici dès qu'elles seront passées.</p>
+                </div>
+            ` : `
+                <div class="space-y-6">
+                    ${orders.map(order => `
+                        <div class="border border-emerald-200 rounded-xl p-6">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="text-lg font-bold text-emerald-800">Commande ${order.numeroCommande}</h3>
+                                    <p class="text-emerald-600">Client: ${order.client.prenom} ${order.client.nom}</p>
+                                    <p class="text-emerald-600">${order.client.email} - ${order.client.telephone}</p>
+                                    <p class="text-sm text-emerald-500">Passée le ${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</p>
+                                </div>
+                                <div class="text-right">
+                                    <select onchange="updateOrderStatus('${order.numeroCommande}', this.value)" 
+                                            class="px-3 py-1 border border-emerald-300 rounded-lg text-sm">
+                                        <option value="en-attente" ${order.statut === 'en-attente' ? 'selected' : ''}>En attente</option>
+                                        <option value="confirmee" ${order.statut === 'confirmee' ? 'selected' : ''}>Confirmée</option>
+                                        <option value="en-preparation" ${order.statut === 'en-preparation' ? 'selected' : ''}>En préparation</option>
+                                        <option value="expedier" ${order.statut === 'expedier' ? 'selected' : ''}>Expédiée</option>
+                                        <option value="livree" ${order.statut === 'livree' ? 'selected' : ''}>Livrée</option>
+                                        <option value="annulee" ${order.statut === 'annulee' ? 'selected' : ''}>Annulée</option>
+                                    </select>
+                                    <p class="text-lg font-bold text-emerald-800 mt-2">${order.total} DA</p>
+                                </div>
+                            </div>
+                            
+                            <div class="border-t pt-4">
+                                <h4 class="font-semibold text-emerald-800 mb-2">Articles:</h4>
+                                <div class="space-y-2">
+                                    ${order.articles.map(article => `
+                                        <div class="flex justify-between text-sm">
+                                            <span>${article.nom} x ${article.quantite}</span>
+                                            <span>${article.prix * article.quantite} DA</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="border-t pt-4 mt-4">
+                                <h4 class="font-semibold text-emerald-800 mb-2">Livraison:</h4>
+                                <p class="text-sm text-emerald-600">${order.livraison.adresse}, ${order.livraison.wilaya}</p>
+                                ${order.livraison.notes ? `<p class="text-sm text-emerald-500">Notes: ${order.livraison.notes}</p>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `}
+        </div>
+    `;
+}
+
+function loadAdminFeatured() {
+    const content = document.getElementById('adminContent');
+    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+    const featuredProducts = products.filter(p => p.enVedette);
+    const regularProducts = products.filter(p => !p.enVedette);
+    
+    content.innerHTML = `
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Gestion des Coups de Cœur</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Featured Products -->
+                <div>
+                    <h3 class="text-xl font-semibold text-emerald-800 mb-4">Produits en vedette (${featuredProducts.length})</h3>
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                        ${featuredProducts.length === 0 ? `
+                            <p class="text-emerald-600 text-center py-8">Aucun produit en vedette</p>
+                        ` : featuredProducts.map(product => `
+                            <div class="flex items-center justify-between p-3 bg-emerald-50 rounded-xl">
+                                <div class="flex-1">
+                                    <h4 class="font-semibold text-emerald-800">${product.nom}</h4>
+                                    <p class="text-sm text-emerald-600">${product.categorie} - ${product.prix} DA</p>
+                                </div>
+                                <button onclick="toggleFeatured('${product._id}', false)" 
+                                        class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-600">
+                                    Retirer
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <!-- Regular Products -->
+                <div>
+                    <h3 class="text-xl font-semibold text-emerald-800 mb-4">Produits disponibles</h3>
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                        ${regularProducts.map(product => `
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                <div class="flex-1">
+                                    <h4 class="font-semibold text-gray-800">${product.nom}</h4>
+                                    <p class="text-sm text-gray-600">${product.categorie} - ${product.prix} DA</p>
+                                </div>
+                                <button onclick="toggleFeatured('${product._id}', true)" 
+                                        class="bg-emerald-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-emerald-600">
+                                    <i class="fas fa-star mr-1"></i>Mettre en vedette
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function loadAdminCleanup() {
+    const content = document.getElementById('adminContent');
+    content.innerHTML = `
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+            <h2 class="text-2xl font-bold text-red-800 mb-6">Nettoyage des Données</h2>
+            <p class="text-red-600 mb-8">⚠️ Attention: Ces actions sont irréversibles!</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                    <h3 class="text-lg font-bold text-red-800 mb-4">
+                        <i class="fas fa-trash mr-2"></i>Supprimer tous les produits
+                    </h3>
+                    <p class="text-red-600 mb-4">Supprime tous les produits du catalogue</p>
+                    <button onclick="confirmCleanup('products')" 
+                            class="bg-red-500 text-white px-6 py-3 rounded-xl hover:bg-red-600 transition-all font-bold">
+                        Supprimer tous les produits
+                    </button>
+                </div>
+                
+                <div class="bg-orange-50 border border-orange-200 rounded-xl p-6">
+                    <h3 class="text-lg font-bold text-orange-800 mb-4">
+                        <i class="fas fa-shopping-bag mr-2"></i>Supprimer toutes les commandes
+                    </h3>
+                    <p class="text-orange-600 mb-4">Supprime toutes les commandes</p>
+                    <button onclick="confirmCleanup('orders')" 
+                            class="bg-orange-500 text-white px-6 py-3 rounded-xl hover:bg-orange-600 transition-all font-bold">
+                        Supprimer toutes les commandes
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Admin utility functions
+function showAddProductForm() {
+    document.getElementById('addProductModal').classList.remove('hidden');
+}
+
+function hideAddProductForm() {
+    document.getElementById('addProductModal').classList.add('hidden');
+    document.getElementById('addProductForm').reset();
+}
+
+function handleAddProduct(event) {
+    event.preventDefault();
+    
+    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+    
+    const newProduct = {
+        _id: 'prod_' + Date.now(),
+        nom: document.getElementById('productName').value.trim(),
+        categorie: document.getElementById('productCategory').value,
+        description: document.getElementById('productDescription').value.trim(),
+        prix: parseInt(document.getElementById('productPrice').value),
+        stock: parseInt(document.getElementById('productStock').value),
+        marque: document.getElementById('productBrand').value.trim(),
+        enVedette: document.getElementById('productFeatured').checked,
+        enPromotion: document.getElementById('productPromotion').checked,
+        actif: true,
+        dateAjout: new Date().toISOString()
+    };
+    
+    products.push(newProduct);
+    localStorage.setItem('demoProducts', JSON.stringify(products));
+    
+    if (window.app) {
+        window.app.refreshProductsCache();
+        window.app.showToast('Produit ajouté avec succès', 'success');
+    }
+    
+    hideAddProductForm();
+    loadProductsTable();
+}
+
+function loadProductsTable() {
+    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+    const tbody = document.getElementById('productsTable');
+    
+    if (tbody) {
+        tbody.innerHTML = products.map(product => `
+            <tr class="border-b border-emerald-100 hover:bg-emerald-50">
+                <td class="p-4">
+                    <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-pills text-emerald-600"></i>
+                    </div>
+                </td>
+                <td class="p-4">
+                    <div>
+                        <p class="font-semibold text-emerald-800">${product.nom}</p>
+                        <p class="text-sm text-emerald-600">${product.marque || 'Sans marque'}</p>
+                    </div>
+                </td>
+                <td class="p-4 text-emerald-700">${product.categorie}</td>
+                <td class="p-4 font-semibold text-emerald-800">${product.prix} DA</td>
+                <td class="p-4">
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold ${product.stock > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                        ${product.stock} unités
+                    </span>
+                </td>
+                <td class="p-4">
+                    <div class="flex space-x-2">
+                        <button onclick="editProduct('${product._id}')" 
+                                class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">
+                            Modifier
+                        </button>
+                        <button onclick="deleteProduct('${product._id}')" 
+                                class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
+                            Supprimer
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+}
+
+function editProduct(productId) {
+    // Implementation for editing products
+    if (window.app) {
+        window.app.showToast('Fonction de modification en développement', 'info');
+    }
+}
+
+function deleteProduct(productId) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
+        let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        products = products.filter(p => p._id !== productId);
+        localStorage.setItem('demoProducts', JSON.stringify(products));
+        
+        if (window.app) {
+            window.app.refreshProductsCache();
+            window.app.showToast('Produit supprimé', 'success');
+        }
+        
+        loadProductsTable();
+    }
+}
+
+function toggleFeatured(productId, featured) {
+    let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+    const productIndex = products.findIndex(p => p._id === productId);
+    
+    if (productIndex > -1) {
+        products[productIndex].enVedette = featured;
+        localStorage.setItem('demoProducts', JSON.stringify(products));
+        
+        if (window.app) {
+            window.app.refreshProductsCache();
+            window.app.showToast(featured ? 'Produit mis en vedette' : 'Produit retiré de la vedette', 'success');
+        }
+        
+        loadAdminFeatured();
+    }
+}
+
+function updateOrderStatus(orderNumber, newStatus) {
+    let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+    const orderIndex = orders.findIndex(o => o.numeroCommande === orderNumber);
+    
+    if (orderIndex > -1) {
+        orders[orderIndex].statut = newStatus;
+        localStorage.setItem('adminOrders', JSON.stringify(orders));
+        
+        if (window.app) {
+            window.app.showToast('Statut de la commande mis à jour', 'success');
+        }
+    }
+}
+
+function confirmCleanup(type) {
+    let message = '';
+    if (type === 'products') {
+        message = 'Êtes-vous sûr de vouloir supprimer TOUS les produits ? Cette action est irréversible !';
+    } else if (type === 'orders') {
+        message = 'Êtes-vous sûr de vouloir supprimer TOUTES les commandes ? Cette action est irréversible !';
+    }
+    
+    if (confirm(message)) {
+        if (type === 'products') {
+            localStorage.removeItem('demoProducts');
+            if (window.app) {
+                window.app.allProducts = [];
+                window.app.refreshProductsCache();
+                window.app.showToast('Tous les produits ont été supprimés', 'success');
+            }
+        } else if (type === 'orders') {
+            localStorage.removeItem('adminOrders');
+            if (window.app) {
+                window.app.showToast('Toutes les commandes ont été supprimées', 'success');
+            }
+            loadAdminOrders();
+        }
+    }
+}
+
 // Global functions
 function addToCartFromCard(productId, quantity = 1) {
     console.log('Add to cart from card called:', productId);
@@ -1919,4 +2931,4 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('App initialized and made globally available');
 });
 
-console.log('✅ Complete app.js loaded with full functionality');
+console.log('✅ Complete app.js loaded with ALL functionality including admin features');
