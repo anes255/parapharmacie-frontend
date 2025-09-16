@@ -1,4 +1,4 @@
-// Complete Fixed PharmacieGaherApp with Profile, Orders, and all missing functionality
+// Fixed PharmacieGaherApp - Updated with proper login/register pages
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -19,30 +19,22 @@ class PharmacieGaherApp {
     
     async init() {
         try {
-            console.log('🚀 Initializing Shifa Parapharmacie App...');
-            
             await this.checkAuth();
-            await this.loadProductsCache();
+            await this.loadProductsCache(); // Load products from localStorage/API
             this.initUI();
-            
-            // Fix: Always start with home page and scroll to top
-            this.currentPage = 'home';
             await this.showPage('home');
-            
             this.updateCartUI();
             this.initSearch();
-            
-            console.log('✅ App initialized successfully');
         } catch (error) {
-            console.error('❌ Error initializing app:', error);
+            console.error('Erreur initialisation app:', error);
             this.showToast('Erreur de chargement de l\'application', 'error');
         }
     }
     
-    // Load and cache products from localStorage and API
+    // New method to load and cache products
     async loadProductsCache() {
         try {
-            console.log('📦 Loading products cache...');
+            console.log('Loading products cache...');
             
             // Start with localStorage products
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
@@ -66,39 +58,43 @@ class PharmacieGaherApp {
                     }
                 }
             } catch (error) {
-                console.log('ℹ️ API unavailable, using local products only:', error.message);
+                console.log('API unavailable, using local products only:', error.message);
             }
             
-            console.log(`✅ Products cache loaded: ${this.allProducts.length} products`);
+            console.log(`Products cache loaded: ${this.allProducts.length} products`);
             
         } catch (error) {
-            console.error('❌ Error loading products cache:', error);
+            console.error('Error loading products cache:', error);
             this.allProducts = [];
         }
     }
     
-    // Refresh products cache (called from admin when products are modified)
+    // New method to refresh products cache (called from admin when products are modified)
     refreshProductsCache() {
-        console.log('🔄 Refreshing products cache...');
+        console.log('Refreshing products cache...');
         
         // Reload from localStorage
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         this.allProducts = [...localProducts];
         
-        console.log(`✅ Products cache refreshed: ${this.allProducts.length} products`);
+        console.log(`Products cache refreshed: ${this.allProducts.length} products`);
         
-        // Refresh current page if needed
+        // If we're on the home page, refresh the displayed products
         if (this.currentPage === 'home') {
             this.refreshHomePage();
         } else if (this.currentPage === 'products') {
+            // Refresh products page if we're on it
             this.showPage('products');
         }
     }
     
-    // Refresh home page content
+    // New method to refresh home page content
     refreshHomePage() {
-        console.log('🔄 Refreshing home page content...');
+        console.log('Refreshing home page content...');
+        
+        // Refresh featured products
         this.loadFeaturedProducts();
+        // Refresh promotion products  
         this.loadPromotionProducts();
     }
     
@@ -117,7 +113,7 @@ class PharmacieGaherApp {
                     localStorage.removeItem('token');
                 }
             } catch (error) {
-                console.error('Auth check error:', error);
+                console.error('Erreur vérification auth:', error);
                 localStorage.removeItem('token');
             }
         }
@@ -135,8 +131,6 @@ class PharmacieGaherApp {
         
         this.updateCartUI();
         window.app = this; // Critical: Make globally available
-        
-        console.log('✅ UI initialized');
     }
     
     updateUserUI() {
@@ -160,13 +154,8 @@ class PharmacieGaherApp {
     
     async showPage(pageName, params = {}) {
         try {
-            console.log(`📄 Loading page: ${pageName}`, params);
-            
             this.showLoading();
             this.currentPage = pageName;
-            
-            // Fix: Always scroll to top when loading new page
-            window.scrollTo({ top: 0, behavior: 'smooth' });
             
             switch (pageName) {
                 case 'home':
@@ -191,13 +180,6 @@ class PharmacieGaherApp {
                     }
                     await this.loadProfilePage();
                     break;
-                case 'orders':
-                    if (!this.currentUser) {
-                        await this.showPage('login');
-                        return;
-                    }
-                    await this.loadOrdersPage();
-                    break;
                 case 'checkout':
                     await this.loadCheckoutPage();
                     break;
@@ -220,14 +202,363 @@ class PharmacieGaherApp {
             }
             
             this.hideLoading();
-            
-            console.log(`✅ Page loaded: ${pageName}`);
-            
         } catch (error) {
-            console.error('❌ Error loading page:', error);
+            console.error('Erreur chargement page:', error);
             this.hideLoading();
             this.showToast('Erreur de chargement de la page', 'error');
         }
+    }
+    
+    // MISSING LOGIN PAGE METHOD - FIXED
+    async loadLoginPage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-green-100 to-teal-200 py-12 px-4 sm:px-6 lg:px-8">
+                <div class="max-w-md w-full space-y-8">
+                    <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8">
+                        <!-- Header -->
+                        <div class="text-center">
+                            <div class="flex justify-center mb-6">
+                                <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                    <i class="fas fa-user-circle text-white text-3xl"></i>
+                                </div>
+                            </div>
+                            <h2 class="text-3xl font-bold text-emerald-800 mb-2">Connexion</h2>
+                            <p class="text-emerald-600 mb-8">Accédez à votre compte Shifa</p>
+                        </div>
+
+                        <!-- Login Form -->
+                        <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-6">
+                            <div>
+                                <label for="loginEmail" class="block text-sm font-semibold text-emerald-700 mb-2">
+                                    <i class="fas fa-envelope mr-2"></i>Adresse email
+                                </label>
+                                <input 
+                                    id="loginEmail" 
+                                    name="email" 
+                                    type="email" 
+                                    required 
+                                    class="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all bg-white/70"
+                                    placeholder="votre@email.com"
+                                >
+                            </div>
+
+                            <div>
+                                <label for="loginPassword" class="block text-sm font-semibold text-emerald-700 mb-2">
+                                    <i class="fas fa-lock mr-2"></i>Mot de passe
+                                </label>
+                                <div class="relative">
+                                    <input 
+                                        id="loginPassword" 
+                                        name="password" 
+                                        type="password" 
+                                        required 
+                                        class="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all bg-white/70 pr-12"
+                                        placeholder="Votre mot de passe"
+                                    >
+                                    <button 
+                                        type="button" 
+                                        onclick="togglePasswordVisibility('loginPassword', this)"
+                                        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-500 hover:text-emerald-700"
+                                    >
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button 
+                                type="submit" 
+                                class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 focus:ring-4 focus:ring-emerald-200 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+                            >
+                                <i class="fas fa-sign-in-alt mr-2"></i>Se connecter
+                            </button>
+                        </form>
+
+                        <!-- Divider -->
+                        <div class="my-6">
+                            <div class="relative">
+                                <div class="absolute inset-0 flex items-center">
+                                    <div class="w-full border-t border-emerald-200"></div>
+                                </div>
+                                <div class="relative flex justify-center text-sm">
+                                    <span class="px-3 bg-white text-emerald-600 font-medium">Nouveau client ?</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Register Link -->
+                        <div class="text-center">
+                            <button 
+                                onclick="app.showPage('register')" 
+                                class="w-full bg-white border-2 border-emerald-500 text-emerald-600 font-semibold py-3 rounded-xl hover:bg-emerald-50 transition-all duration-300"
+                            >
+                                <i class="fas fa-user-plus mr-2"></i>Créer un compte
+                            </button>
+                        </div>
+
+                        <!-- Back to Home -->
+                        <div class="text-center mt-6">
+                            <button 
+                                onclick="app.showPage('home')" 
+                                class="text-emerald-600 hover:text-emerald-800 font-medium transition-colors"
+                            >
+                                <i class="fas fa-arrow-left mr-2"></i>Retour à l'accueil
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // MISSING REGISTER PAGE METHOD - FIXED
+    async loadRegisterPage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-green-100 to-teal-200 py-12 px-4 sm:px-6 lg:px-8">
+                <div class="max-w-2xl w-full space-y-8">
+                    <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8">
+                        <!-- Header -->
+                        <div class="text-center mb-8">
+                            <div class="flex justify-center mb-6">
+                                <div class="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                    <i class="fas fa-user-plus text-white text-3xl"></i>
+                                </div>
+                            </div>
+                            <h2 class="text-3xl font-bold text-emerald-800 mb-2">Créer un compte</h2>
+                            <p class="text-emerald-600">Rejoignez la communauté Shifa</p>
+                        </div>
+
+                        <!-- Register Form -->
+                        <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-6">
+                            <!-- Personal Info -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="registerPrenom" class="block text-sm font-semibold text-emerald-700 mb-2">
+                                        <i class="fas fa-user mr-2"></i>Prénom *
+                                    </label>
+                                    <input 
+                                        id="registerPrenom" 
+                                        name="prenom" 
+                                        type="text" 
+                                        required 
+                                        class="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all bg-white/70"
+                                        placeholder="Votre prénom"
+                                    >
+                                </div>
+                                
+                                <div>
+                                    <label for="registerNom" class="block text-sm font-semibold text-emerald-700 mb-2">
+                                        <i class="fas fa-user mr-2"></i>Nom *
+                                    </label>
+                                    <input 
+                                        id="registerNom" 
+                                        name="nom" 
+                                        type="text" 
+                                        required 
+                                        class="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all bg-white/70"
+                                        placeholder="Votre nom"
+                                    >
+                                </div>
+                            </div>
+
+                            <!-- Contact Info -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="registerEmail" class="block text-sm font-semibold text-emerald-700 mb-2">
+                                        <i class="fas fa-envelope mr-2"></i>Adresse email *
+                                    </label>
+                                    <input 
+                                        id="registerEmail" 
+                                        name="email" 
+                                        type="email" 
+                                        required 
+                                        class="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all bg-white/70"
+                                        placeholder="votre@email.com"
+                                    >
+                                </div>
+                                
+                                <div>
+                                    <label for="registerTelephone" class="block text-sm font-semibold text-emerald-700 mb-2">
+                                        <i class="fas fa-phone mr-2"></i>Téléphone *
+                                    </label>
+                                    <input 
+                                        id="registerTelephone" 
+                                        name="telephone" 
+                                        type="tel" 
+                                        required 
+                                        class="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all bg-white/70"
+                                        placeholder="0123456789"
+                                        pattern="^(\\+213|0)[5-9]\\d{8}$"
+                                        title="Numéro de téléphone algérien valide"
+                                    >
+                                </div>
+                            </div>
+
+                            <!-- Password -->
+                            <div>
+                                <label for="registerPassword" class="block text-sm font-semibold text-emerald-700 mb-2">
+                                    <i class="fas fa-lock mr-2"></i>Mot de passe *
+                                </label>
+                                <div class="relative">
+                                    <input 
+                                        id="registerPassword" 
+                                        name="password" 
+                                        type="password" 
+                                        required 
+                                        minlength="6"
+                                        class="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all bg-white/70 pr-12"
+                                        placeholder="Minimum 6 caractères"
+                                    >
+                                    <button 
+                                        type="button" 
+                                        onclick="togglePasswordVisibility('registerPassword', this)"
+                                        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-500 hover:text-emerald-700"
+                                    >
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <div class="mt-1 text-xs text-emerald-600">
+                                    Le mot de passe doit contenir au moins 6 caractères
+                                </div>
+                            </div>
+
+                            <!-- Address Info -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="registerWilaya" class="block text-sm font-semibold text-emerald-700 mb-2">
+                                        <i class="fas fa-map-marker-alt mr-2"></i>Wilaya *
+                                    </label>
+                                    <select 
+                                        id="registerWilaya" 
+                                        name="wilaya" 
+                                        required 
+                                        class="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all bg-white/70"
+                                    >
+                                        <option value="">Sélectionnez votre wilaya</option>
+                                        <option value="Adrar">01 - Adrar</option>
+                                        <option value="Chlef">02 - Chlef</option>
+                                        <option value="Laghouat">03 - Laghouat</option>
+                                        <option value="Oum El Bouaghi">04 - Oum El Bouaghi</option>
+                                        <option value="Batna">05 - Batna</option>
+                                        <option value="Béjaïa">06 - Béjaïa</option>
+                                        <option value="Biskra">07 - Biskra</option>
+                                        <option value="Béchar">08 - Béchar</option>
+                                        <option value="Blida">09 - Blida</option>
+                                        <option value="Bouira">10 - Bouira</option>
+                                        <option value="Tamanrasset">11 - Tamanrasset</option>
+                                        <option value="Tébessa">12 - Tébessa</option>
+                                        <option value="Tlemcen">13 - Tlemcen</option>
+                                        <option value="Tiaret">14 - Tiaret</option>
+                                        <option value="Tizi Ouzou">15 - Tizi Ouzou</option>
+                                        <option value="Alger">16 - Alger</option>
+                                        <option value="Djelfa">17 - Djelfa</option>
+                                        <option value="Jijel">18 - Jijel</option>
+                                        <option value="Sétif">19 - Sétif</option>
+                                        <option value="Saïda">20 - Saïda</option>
+                                        <option value="Skikda">21 - Skikda</option>
+                                        <option value="Sidi Bel Abbès">22 - Sidi Bel Abbès</option>
+                                        <option value="Annaba">23 - Annaba</option>
+                                        <option value="Guelma">24 - Guelma</option>
+                                        <option value="Constantine">25 - Constantine</option>
+                                        <option value="Médéa">26 - Médéa</option>
+                                        <option value="Mostaganem">27 - Mostaganem</option>
+                                        <option value="M'Sila" selected>28 - M'Sila</option>
+                                        <option value="Mascara">29 - Mascara</option>
+                                        <option value="Ouargla">30 - Ouargla</option>
+                                        <option value="Oran">31 - Oran</option>
+                                        <option value="El Bayadh">32 - El Bayadh</option>
+                                        <option value="Illizi">33 - Illizi</option>
+                                        <option value="Bordj Bou Arréridj">34 - Bordj Bou Arréridj</option>
+                                        <option value="Boumerdès">35 - Boumerdès</option>
+                                        <option value="El Tarf">36 - El Tarf</option>
+                                        <option value="Tindouf">37 - Tindouf</option>
+                                        <option value="Tissemsilt">38 - Tissemsilt</option>
+                                        <option value="El Oued">39 - El Oued</option>
+                                        <option value="Khenchela">40 - Khenchela</option>
+                                        <option value="Souk Ahras">41 - Souk Ahras</option>
+                                        <option value="Tipaza">42 - Tipaza</option>
+                                        <option value="Mila">43 - Mila</option>
+                                        <option value="Aïn Defla">44 - Aïn Defla</option>
+                                        <option value="Naâma">45 - Naâma</option>
+                                        <option value="Aïn Témouchent">46 - Aïn Témouchent</option>
+                                        <option value="Ghardaïa">47 - Ghardaïa</option>
+                                        <option value="Relizane">48 - Relizane</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label for="registerAdresse" class="block text-sm font-semibold text-emerald-700 mb-2">
+                                        <i class="fas fa-home mr-2"></i>Adresse (optionnel)
+                                    </label>
+                                    <input 
+                                        id="registerAdresse" 
+                                        name="adresse" 
+                                        type="text" 
+                                        class="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all bg-white/70"
+                                        placeholder="Votre adresse"
+                                    >
+                                </div>
+                            </div>
+
+                            <!-- Terms and Submit -->
+                            <div class="space-y-4">
+                                <div class="flex items-center">
+                                    <input 
+                                        id="acceptTerms" 
+                                        type="checkbox" 
+                                        required
+                                        class="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-emerald-300 rounded"
+                                    >
+                                    <label for="acceptTerms" class="ml-3 text-sm text-emerald-700">
+                                        J'accepte les <a href="#" class="text-emerald-600 hover:text-emerald-800 font-semibold">conditions d'utilisation</a> et la <a href="#" class="text-emerald-600 hover:text-emerald-800 font-semibold">politique de confidentialité</a>
+                                    </label>
+                                </div>
+
+                                <button 
+                                    type="submit" 
+                                    class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl hover:from-green-600 hover:to-emerald-700 focus:ring-4 focus:ring-emerald-200 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+                                >
+                                    <i class="fas fa-user-plus mr-2"></i>Créer mon compte
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Divider -->
+                        <div class="my-6">
+                            <div class="relative">
+                                <div class="absolute inset-0 flex items-center">
+                                    <div class="w-full border-t border-emerald-200"></div>
+                                </div>
+                                <div class="relative flex justify-center text-sm">
+                                    <span class="px-3 bg-white text-emerald-600 font-medium">Déjà membre ?</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Login Link -->
+                        <div class="text-center">
+                            <button 
+                                onclick="app.showPage('login')" 
+                                class="w-full bg-white border-2 border-emerald-500 text-emerald-600 font-semibold py-3 rounded-xl hover:bg-emerald-50 transition-all duration-300"
+                            >
+                                <i class="fas fa-sign-in-alt mr-2"></i>Se connecter
+                            </button>
+                        </div>
+
+                        <!-- Back to Home -->
+                        <div class="text-center mt-6">
+                            <button 
+                                onclick="app.showPage('home')" 
+                                class="text-emerald-600 hover:text-emerald-800 font-medium transition-colors"
+                            >
+                                <i class="fas fa-arrow-left mr-2"></i>Retour à l'accueil
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
     
     async loadHomePage() {
@@ -308,6 +639,7 @@ class PharmacieGaherApp {
     }
     
     async loadCategories() {
+        // Show all 10 categories with Vitalité first
         const mainPageCategories = [
             { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
             { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
@@ -338,9 +670,11 @@ class PharmacieGaherApp {
     }
     
     async loadFeaturedProducts() {
-        console.log('📦 Loading featured products...');
+        console.log('Loading featured products...');
         
+        // Use cached products and filter for featured products
         const featuredProducts = this.allProducts.filter(p => p.enVedette && p.actif !== false);
+        
         console.log(`Found ${featuredProducts.length} featured products`);
         
         const container = document.getElementById('featuredProducts');
@@ -365,9 +699,11 @@ class PharmacieGaherApp {
     }
     
     async loadPromotionProducts() {
-        console.log('📦 Loading promotion products...');
+        console.log('Loading promotion products...');
         
+        // Use cached products and filter for promotion products
         const promotionProducts = this.allProducts.filter(p => p.enPromotion && p.actif !== false);
+        
         console.log(`Found ${promotionProducts.length} promotion products`);
         
         const container = document.getElementById('promotionProducts');
@@ -384,775 +720,6 @@ class PharmacieGaherApp {
                 container.innerHTML = promotionProducts.slice(0, 8).map(product => this.createProductCard(product)).join('');
             }
         }
-    }
-    
-    // NEW: Profile Page Implementation
-    async loadProfilePage() {
-        console.log('👤 Loading profile page...');
-        
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-4xl">
-                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 overflow-hidden">
-                    <!-- Profile Header -->
-                    <div class="bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-12 text-white relative">
-                        <div class="absolute top-4 right-4">
-                            <button onclick="app.showPage('home')" class="text-white/80 hover:text-white transition-colors">
-                                <i class="fas fa-times text-xl"></i>
-                            </button>
-                        </div>
-                        <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6">
-                            <div class="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border-2 border-white/30">
-                                <i class="fas fa-user text-3xl"></i>
-                            </div>
-                            <div class="text-center md:text-left">
-                                <h1 class="text-3xl font-bold mb-2">Mon Profil</h1>
-                                <p class="text-emerald-100 text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
-                                <p class="text-emerald-200">${this.currentUser.email}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Profile Content -->
-                    <div class="p-8">
-                        <!-- Navigation Tabs -->
-                        <div class="flex flex-wrap border-b border-emerald-200 mb-8">
-                            <button onclick="switchProfileTab('info')" class="profile-tab active px-6 py-3 text-emerald-600 font-semibold border-b-2 border-emerald-500 transition-all">
-                                <i class="fas fa-user mr-2"></i>Informations personnelles
-                            </button>
-                            <button onclick="switchProfileTab('security')" class="profile-tab px-6 py-3 text-gray-500 hover:text-emerald-600 font-semibold border-b-2 border-transparent transition-all">
-                                <i class="fas fa-lock mr-2"></i>Sécurité
-                            </button>
-                        </div>
-                        
-                        <!-- Personal Information Tab -->
-                        <div id="profileInfoTab" class="tab-content">
-                            <form id="profileForm" onsubmit="handleProfileUpdate(event)" class="space-y-6">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
-                                        <input type="text" id="profilePrenom" value="${this.currentUser.prenom || ''}" 
-                                               class="form-input" required>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
-                                        <input type="text" id="profileNom" value="${this.currentUser.nom || ''}" 
-                                               class="form-input" required>
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                                    <input type="email" id="profileEmail" value="${this.currentUser.email || ''}" 
-                                           class="form-input" required>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
-                                    <input type="tel" id="profileTelephone" value="${this.currentUser.telephone || ''}" 
-                                           class="form-input" required>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Adresse</label>
-                                    <textarea id="profileAdresse" rows="3" class="form-input">${this.currentUser.adresse || ''}</textarea>
-                                </div>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Wilaya</label>
-                                        <select id="profileWilaya" class="form-input">
-                                            <option value="">Sélectionnez une wilaya</option>
-                                            ${this.getWilayaOptions(this.currentUser.wilaya)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Code postal</label>
-                                        <input type="text" id="profileCodePostal" value="${this.currentUser.codePostal || ''}" 
-                                               class="form-input">
-                                    </div>
-                                </div>
-                                
-                                <div class="flex justify-end space-x-4 pt-6">
-                                    <button type="button" onclick="app.showPage('home')" 
-                                            class="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-all">
-                                        Annuler
-                                    </button>
-                                    <button type="submit" class="btn-primary px-8 py-3" id="profileUpdateBtn">
-                                        <i class="fas fa-save mr-2"></i>Enregistrer les modifications
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                        
-                        <!-- Security Tab -->
-                        <div id="profileSecurityTab" class="tab-content hidden">
-                            <form id="passwordForm" onsubmit="handlePasswordChange(event)" class="space-y-6">
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe actuel *</label>
-                                    <input type="password" id="currentPassword" class="form-input" required>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Nouveau mot de passe *</label>
-                                    <input type="password" id="newPassword" class="form-input" required>
-                                    <p class="text-xs text-gray-500 mt-1">Minimum 6 caractères</p>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Confirmer le nouveau mot de passe *</label>
-                                    <input type="password" id="confirmPassword" class="form-input" required>
-                                </div>
-                                
-                                <div class="flex justify-end space-x-4 pt-6">
-                                    <button type="button" onclick="document.getElementById('passwordForm').reset()" 
-                                            class="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-all">
-                                        Annuler
-                                    </button>
-                                    <button type="submit" class="btn-primary px-8 py-3" id="passwordUpdateBtn">
-                                        <i class="fas fa-key mr-2"></i>Changer le mot de passe
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    // NEW: Orders Page Implementation  
-    async loadOrdersPage() {
-        console.log('📦 Loading orders page...');
-        
-        const mainContent = document.getElementById('mainContent');
-        
-        // Show loading state
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="text-center py-16">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
-                    <p class="text-emerald-600 mt-4">Chargement de vos commandes...</p>
-                </div>
-            </div>
-        `;
-        
-        let orders = [];
-        
-        try {
-            // Try to load from API first
-            const response = await apiCall('/orders/user/all');
-            if (response && response.orders) {
-                orders = response.orders;
-                console.log(`✅ Loaded ${orders.length} orders from API`);
-            }
-        } catch (error) {
-            console.log('⚠️ API unavailable, loading from localStorage');
-            
-            // Load from localStorage if API fails
-            const userOrdersKey = `userOrders_${this.currentUser.id}`;
-            const localOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
-            orders = localOrders;
-            
-            console.log(`📦 Loaded ${orders.length} orders from localStorage`);
-        }
-        
-        // Render orders page
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 overflow-hidden">
-                    <!-- Orders Header -->
-                    <div class="bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-12 text-white relative">
-                        <div class="absolute top-4 right-4">
-                            <button onclick="app.showPage('home')" class="text-white/80 hover:text-white transition-colors">
-                                <i class="fas fa-times text-xl"></i>
-                            </button>
-                        </div>
-                        <div class="flex flex-col md:flex-row items-center justify-between">
-                            <div>
-                                <h1 class="text-3xl font-bold mb-2">Mes Commandes</h1>
-                                <p class="text-emerald-100">${orders.length} commande${orders.length !== 1 ? 's' : ''} au total</p>
-                            </div>
-                            <div class="mt-4 md:mt-0">
-                                <button onclick="app.showPage('products')" class="bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl hover:bg-white/30 transition-all font-semibold">
-                                    <i class="fas fa-plus mr-2"></i>Nouvelle commande
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Orders Content -->
-                    <div class="p-8">
-                        ${orders.length === 0 ? this.renderNoOrders() : this.renderOrdersList(orders)}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    renderNoOrders() {
-        return `
-            <div class="text-center py-16">
-                <div class="w-32 h-32 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-8">
-                    <i class="fas fa-shopping-bag text-5xl text-emerald-500"></i>
-                </div>
-                <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
-                <p class="text-emerald-600 mb-8 max-w-md mx-auto">
-                    Vous n'avez pas encore passé de commande. Explorez notre catalogue et découvrez nos produits naturels.
-                </p>
-                <button onclick="app.showPage('products')" class="btn-primary px-8 py-3">
-                    <i class="fas fa-leaf mr-2"></i>Découvrir nos produits
-                </button>
-            </div>
-        `;
-    }
-    
-    renderOrdersList(orders) {
-        const getStatusColor = (status) => {
-            const colors = {
-                'en-attente': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-                'confirmée': 'bg-blue-100 text-blue-800 border-blue-200',
-                'préparée': 'bg-purple-100 text-purple-800 border-purple-200',
-                'expédiée': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-                'livrée': 'bg-green-100 text-green-800 border-green-200',
-                'annulée': 'bg-red-100 text-red-800 border-red-200'
-            };
-            return colors[status] || colors['en-attente'];
-        };
-        
-        const getStatusIcon = (status) => {
-            const icons = {
-                'en-attente': 'fa-clock',
-                'confirmée': 'fa-check-circle',
-                'préparée': 'fa-box',
-                'expédiée': 'fa-truck',
-                'livrée': 'fa-check-double',
-                'annulée': 'fa-times-circle'
-            };
-            return icons[status] || icons['en-attente'];
-        };
-        
-        return `
-            <div class="space-y-6">
-                ${orders.map(order => `
-                    <div class="bg-white rounded-2xl shadow-lg border border-emerald-100 overflow-hidden hover:shadow-xl transition-all duration-300">
-                        <!-- Order Header -->
-                        <div class="bg-gradient-to-r from-emerald-50 to-green-50 px-6 py-4 border-b border-emerald-100">
-                            <div class="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0">
-                                <div class="flex items-center space-x-4">
-                                    <div class="font-bold text-emerald-800">
-                                        Commande #${order.numeroCommande}
-                                    </div>
-                                    <div class="px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(order.statut)}">
-                                        <i class="fas ${getStatusIcon(order.statut)} mr-1"></i>
-                                        ${order.statut.charAt(0).toUpperCase() + order.statut.slice(1)}
-                                    </div>
-                                </div>
-                                <div class="text-sm text-gray-600">
-                                    ${new Date(order.dateCommande).toLocaleDateString('fr-FR', {
-                                        year: 'numeric',
-                                        month: 'long', 
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Order Details -->
-                        <div class="p-6">
-                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                <!-- Products -->
-                                <div class="lg:col-span-2">
-                                    <h4 class="font-semibold text-gray-800 mb-4">Articles commandés</h4>
-                                    <div class="space-y-3">
-                                        ${order.articles.map(article => `
-                                            <div class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
-                                                <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                    ${article.image ? 
-                                                        `<img src="${article.image}" alt="${article.nom}" class="w-full h-full object-cover rounded-lg">` :
-                                                        `<i class="fas fa-pills text-emerald-600"></i>`
-                                                    }
-                                                </div>
-                                                <div class="flex-1">
-                                                    <div class="font-medium text-gray-800">${article.nom}</div>
-                                                    <div class="text-sm text-gray-600">Quantité: ${article.quantite} × ${article.prix} DA</div>
-                                                </div>
-                                                <div class="font-semibold text-emerald-700">
-                                                    ${article.quantite * article.prix} DA
-                                                </div>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                                
-                                <!-- Order Summary -->
-                                <div>
-                                    <h4 class="font-semibold text-gray-800 mb-4">Résumé</h4>
-                                    <div class="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-4 space-y-2">
-                                        <div class="flex justify-between text-sm">
-                                            <span class="text-gray-600">Sous-total:</span>
-                                            <span class="font-medium">${order.sousTotal} DA</span>
-                                        </div>
-                                        <div class="flex justify-between text-sm">
-                                            <span class="text-gray-600">Livraison:</span>
-                                            <span class="font-medium ${order.fraisLivraison === 0 ? 'text-green-600' : ''}">${order.fraisLivraison} DA</span>
-                                        </div>
-                                        <hr class="border-emerald-200">
-                                        <div class="flex justify-between font-bold text-lg">
-                                            <span class="text-emerald-800">Total:</span>
-                                            <span class="text-emerald-800">${order.total} DA</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Customer Info -->
-                                    <div class="mt-4 text-sm text-gray-600">
-                                        <div><strong>Livraison:</strong> ${order.client.adresse}</div>
-                                        <div><strong>Wilaya:</strong> ${order.client.wilaya}</div>
-                                        <div><strong>Paiement:</strong> ${order.modePaiement}</div>
-                                    </div>
-                                    
-                                    <!-- Actions -->
-                                    <div class="mt-4 space-y-2">
-                                        ${order.statut === 'en-attente' ? `
-                                            <button onclick="cancelOrder('${order._id}')" 
-                                                    class="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm font-medium">
-                                                <i class="fas fa-times mr-2"></i>Annuler la commande
-                                            </button>
-                                        ` : ''}
-                                        <button onclick="trackOrder('${order._id}')" 
-                                                class="w-full px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all text-sm font-medium">
-                                            <i class="fas fa-search mr-2"></i>Suivre la commande
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-    
-    // Login page implementation
-    async loadLoginPage() {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
-                    <div class="bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-12 text-center text-white">
-                        <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-sign-in-alt text-2xl"></i>
-                        </div>
-                        <h1 class="text-2xl font-bold">Connexion</h1>
-                        <p class="text-emerald-100 mt-2">Accédez à votre compte</p>
-                    </div>
-                    
-                    <form id="loginForm" onsubmit="handleLogin(event)" class="p-8 space-y-6">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                            <input type="email" id="loginEmail" required class="form-input" placeholder="votre@email.com">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe *</label>
-                            <input type="password" id="loginPassword" required class="form-input" placeholder="••••••••">
-                        </div>
-                        
-                        <button type="submit" class="w-full btn-primary py-3">
-                            <i class="fas fa-sign-in-alt mr-2"></i>Se connecter
-                        </button>
-                        
-                        <div class="text-center">
-                            <p class="text-gray-600">Pas encore de compte ?</p>
-                            <button type="button" onclick="showPage('register')" class="text-emerald-600 hover:text-emerald-700 font-semibold">
-                                Créer un compte
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        `;
-    }
-    
-    // Register page implementation
-    async loadRegisterPage() {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
-                    <div class="bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-12 text-center text-white">
-                        <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-user-plus text-2xl"></i>
-                        </div>
-                        <h1 class="text-2xl font-bold">Inscription</h1>
-                        <p class="text-emerald-100 mt-2">Créez votre compte</p>
-                    </div>
-                    
-                    <form id="registerForm" onsubmit="handleRegister(event)" class="p-8 space-y-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
-                                <input type="text" id="registerPrenom" required class="form-input">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
-                                <input type="text" id="registerNom" required class="form-input">
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                            <input type="email" id="registerEmail" required class="form-input">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
-                            <input type="tel" id="registerTelephone" required class="form-input" placeholder="+213 XXX XXX XXX">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe *</label>
-                            <input type="password" id="registerPassword" required class="form-input" placeholder="Minimum 6 caractères">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Adresse</label>
-                            <textarea id="registerAdresse" rows="2" class="form-input"></textarea>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Wilaya</label>
-                            <select id="registerWilaya" class="form-input">
-                                <option value="">Sélectionnez une wilaya</option>
-                                ${this.getWilayaOptions()}
-                            </select>
-                        </div>
-                        
-                        <button type="submit" class="w-full btn-primary py-3">
-                            <i class="fas fa-user-plus mr-2"></i>Créer mon compte
-                        </button>
-                        
-                        <div class="text-center">
-                            <p class="text-gray-600">Déjà un compte ?</p>
-                            <button type="button" onclick="showPage('login')" class="text-emerald-600 hover:text-emerald-700 font-semibold">
-                                Se connecter
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        `;
-    }
-    
-    // Checkout page implementation
-    async loadCheckoutPage() {
-        if (this.cart.length === 0) {
-            this.showToast('Votre panier est vide', 'warning');
-            this.showPage('products');
-            return;
-        }
-        
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Checkout Form -->
-                    <div class="lg:col-span-2">
-                        <div class="bg-white rounded-2xl shadow-xl p-8">
-                            <h2 class="text-2xl font-bold text-emerald-800 mb-8">Finaliser la commande</h2>
-                            
-                            <form id="checkoutForm" onsubmit="app.processOrder(); return false;" class="space-y-6">
-                                <!-- Customer Information -->
-                                <div>
-                                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Informations de livraison</h3>
-                                    
-                                    ${this.currentUser ? `
-                                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
-                                            <p class="text-emerald-700">
-                                                <i class="fas fa-user mr-2"></i>
-                                                Connecté en tant que: ${this.currentUser.prenom} ${this.currentUser.nom}
-                                            </p>
-                                        </div>
-                                    ` : ''}
-                                    
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
-                                            <input type="text" id="checkoutPrenom" value="${this.currentUser?.prenom || ''}" 
-                                                   class="form-input" required>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
-                                            <input type="text" id="checkoutNom" value="${this.currentUser?.nom || ''}" 
-                                                   class="form-input" required>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                                            <input type="email" id="checkoutEmail" value="${this.currentUser?.email || ''}" 
-                                                   class="form-input" required>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
-                                            <input type="tel" id="checkoutTelephone" value="${this.currentUser?.telephone || ''}" 
-                                                   class="form-input" required>
-                                        </div>
-                                    </div>
-                                    
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Adresse de livraison *</label>
-                                        <textarea id="checkoutAdresse" rows="3" class="form-input" required>${this.currentUser?.adresse || ''}</textarea>
-                                    </div>
-                                    
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
-                                        <select id="checkoutWilaya" class="form-input" required onchange="checkoutSystem?.calculateShipping()">
-                                            <option value="">Sélectionnez une wilaya</option>
-                                            ${this.getWilayaOptions(this.currentUser?.wilaya)}
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <!-- Payment Method -->
-                                <div>
-                                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Mode de paiement</h3>
-                                    <div class="space-y-3">
-                                        <label class="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                                            <input type="radio" name="modePaiement" value="Paiement à la livraison" checked class="mr-4">
-                                            <div class="flex items-center">
-                                                <i class="fas fa-money-bill-wave text-green-500 text-xl mr-3"></i>
-                                                <div>
-                                                    <div class="font-semibold">Paiement à la livraison</div>
-                                                    <div class="text-sm text-gray-600">Payez en espèces lors de la réception</div>
-                                                </div>
-                                            </div>
-                                        </label>
-                                    </div>
-                                    <div id="paymentMethodInfo"></div>
-                                </div>
-                                
-                                <!-- Comments -->
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Commentaires (optionnel)</label>
-                                    <textarea id="checkoutCommentaires" rows="3" class="form-input" 
-                                              placeholder="Instructions spéciales pour la livraison..."></textarea>
-                                </div>
-                                
-                                <button type="submit" class="w-full btn-primary py-4 text-lg">
-                                    <i class="fas fa-check mr-2"></i>Confirmer la commande
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                    
-                    <!-- Order Summary -->
-                    <div class="lg:col-span-1">
-                        <div class="bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl shadow-xl p-8 sticky top-4">
-                            <h3 class="text-xl font-bold text-emerald-800 mb-6">Résumé de la commande</h3>
-                            
-                            <!-- Cart Items -->
-                            <div class="space-y-4 mb-6 max-h-64 overflow-y-auto">
-                                ${this.cart.map(item => `
-                                    <div class="flex items-center space-x-3 bg-white rounded-lg p-3">
-                                        <img src="${item.image}" alt="${item.nom}" 
-                                             class="w-12 h-12 object-cover rounded-lg">
-                                        <div class="flex-1">
-                                            <div class="font-medium text-gray-800 text-sm">${item.nom}</div>
-                                            <div class="text-xs text-gray-600">${item.quantite} × ${item.prix} DA</div>
-                                        </div>
-                                        <div class="font-semibold text-emerald-700">
-                                            ${item.quantite * item.prix} DA
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            
-                            <!-- Totals -->
-                            <div class="space-y-3 border-t border-emerald-200 pt-4">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-700">Sous-total:</span>
-                                    <span id="checkoutSousTotal" class="font-semibold">${this.getCartTotal()} DA</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-700">Livraison:</span>
-                                    <span id="checkoutFraisLivraison" class="font-semibold">300 DA</span>
-                                </div>
-                                <div id="shippingMessage"></div>
-                                <hr class="border-emerald-200">
-                                <div class="flex justify-between text-lg font-bold text-emerald-800">
-                                    <span>Total:</span>
-                                    <span id="checkoutTotal">${this.getCartTotal() + 300} DA</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Initialize checkout system
-        if (window.initCheckout) {
-            window.initCheckout();
-        }
-    }
-    
-    // Order confirmation page
-    async loadOrderConfirmationPage(orderNumber) {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-4xl">
-                <div class="text-center">
-                    <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-8">
-                        <i class="fas fa-check text-4xl text-green-600"></i>
-                    </div>
-                    <h1 class="text-4xl font-bold text-green-800 mb-4">Commande confirmée !</h1>
-                    <p class="text-xl text-green-600 mb-8">
-                        Votre commande #${orderNumber} a été enregistrée avec succès.
-                    </p>
-                    
-                    <div class="bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl p-8 mb-8">
-                        <h3 class="text-xl font-semibold text-green-800 mb-4">Prochaines étapes</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                            <div class="text-center">
-                                <div class="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <i class="fas fa-phone text-green-700"></i>
-                                </div>
-                                <h4 class="font-semibold text-green-800 mb-2">Confirmation</h4>
-                                <p class="text-green-600">Nous vous contacterons pour confirmer votre commande</p>
-                            </div>
-                            <div class="text-center">
-                                <div class="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <i class="fas fa-box text-green-700"></i>
-                                </div>
-                                <h4 class="font-semibold text-green-800 mb-2">Préparation</h4>
-                                <p class="text-green-600">Votre commande sera préparée avec soin</p>
-                            </div>
-                            <div class="text-center">
-                                <div class="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <i class="fas fa-truck text-green-700"></i>
-                                </div>
-                                <h4 class="font-semibold text-green-800 mb-2">Livraison</h4>
-                                <p class="text-green-600">Livraison sous 2-5 jours ouvrables</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="space-x-4">
-                        <button onclick="app.showPage('home')" class="btn-primary px-8 py-3">
-                            <i class="fas fa-home mr-2"></i>Retour à l'accueil
-                        </button>
-                        ${this.currentUser ? `
-                            <button onclick="app.showPage('orders')" class="bg-gray-500 text-white px-8 py-3 rounded-xl hover:bg-gray-600 transition-all">
-                                <i class="fas fa-list mr-2"></i>Mes commandes
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    // Contact page implementation
-    async loadContactPage() {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
-                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
-                </div>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    <div class="space-y-8">
-                        <div>
-                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnées</h2>
-                            
-                            <div class="space-y-6">
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-map-marker-alt text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Adresse</h3>
-                                        <p class="text-gray-600">Tipaza, Algérie</p>
-                                    </div>
-                                </div>
-                                
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-phone text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Téléphone</h3>
-                                        <p class="text-gray-600">+213 123 456 789</p>
-                                    </div>
-                                </div>
-                                
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-envelope text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Email</h3>
-                                        <a href="mailto:pharmaciegaher@gmail.com" class="text-emerald-600 hover:text-emerald-700">
-                                            pharmaciegaher@gmail.com
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-lg shadow-lg p-8">
-                        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Envoyez-nous un message</h2>
-                        
-                        <form id="contactForm" onsubmit="handleContactForm(event)" class="space-y-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="contactName" class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
-                                    <input type="text" id="contactName" name="name" required class="form-input" placeholder="Votre nom complet">
-                                </div>
-                                <div>
-                                    <label for="contactEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                                    <input type="email" id="contactEmail" name="email" required class="form-input" placeholder="votre@email.com">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label for="contactMessage" class="block text-sm font-medium text-gray-700 mb-2">Message *</label>
-                                <textarea id="contactMessage" name="message" rows="5" required class="form-input resize-none" placeholder="Votre message..."></textarea>
-                            </div>
-                            
-                            <button type="submit" class="w-full btn-primary py-3" id="contactSubmitBtn">
-                                <span id="contactSubmitText">Envoyer le message</span>
-                                <i id="contactSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    // Helper method to get wilaya options
-    getWilayaOptions(selectedWilaya = '') {
-        const wilayas = [
-            'Adrar', 'Chlef', 'Laghouat', 'Oum El Bouaghi', 'Batna', 'Béjaïa', 'Biskra', 'Béchar', 'Blida',
-            'Bouira', 'Tamanrasset', 'Tébessa', 'Tlemcen', 'Tiaret', 'Tizi Ouzou', 'Alger', 'Djelfa',
-            'Jijel', 'Sétif', 'Saïda', 'Skikda', 'Sidi Bel Abbès', 'Annaba', 'Guelma', 'Constantine',
-            'Médéa', 'Mostaganem', 'M\'Sila', 'Mascara', 'Ouargla', 'Oran', 'El Bayadh', 'Illizi',
-            'Bordj Bou Arréridj', 'Boumerdès', 'El Tarf', 'Tindouf', 'Tissemsilt', 'El Oued', 'Khenchela',
-            'Souk Ahras', 'Tipaza', 'Mila', 'Aïn Defla', 'Naâma', 'Aïn Témouchent', 'Ghardaïa', 'Relizane'
-        ];
-        
-        return wilayas.map(wilaya => 
-            `<option value="${wilaya}" ${selectedWilaya === wilaya ? 'selected' : ''}>${wilaya}</option>`
-        ).join('');
     }
     
     createProductCard(product) {
@@ -1253,11 +820,12 @@ class PharmacieGaherApp {
         }
     }
     
-    // Cart functionality
+    // ADD TO CART FUNCTIONALITY - FIXED
     async addToCart(productId, quantity = 1) {
         try {
-            console.log('🛒 Adding to cart:', productId, quantity);
+            console.log('Adding to cart:', productId, quantity);
             
+            // Find product in our cached products
             const product = this.allProducts.find(p => p._id === productId);
             
             if (!product) {
@@ -1328,7 +896,7 @@ class PharmacieGaherApp {
             this.showToast(`${product.nom} ajouté au panier`, 'success');
             
         } catch (error) {
-            console.error('❌ Error adding to cart:', error);
+            console.error('Erreur ajout au panier:', error);
             this.showToast('Erreur lors de l\'ajout au panier', 'error');
         }
     }
@@ -1462,15 +1030,6 @@ class PharmacieGaherApp {
         return this.cart.reduce((count, item) => count + item.quantite, 0);
     }
     
-    // Process order method - Fixed to work with checkout
-    async processOrder() {
-        if (window.checkoutSystem) {
-            return await window.checkoutSystem.processOrder();
-        } else {
-            this.showToast('Système de commande non initialisé', 'error');
-        }
-    }
-    
     logout() {
         localStorage.removeItem('token');
         this.currentUser = null;
@@ -1479,7 +1038,89 @@ class PharmacieGaherApp {
         this.showPage('home');
     }
     
-    // ADMIN METHODS
+    async loadContactPage() {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
+                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div class="space-y-8">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnées</h2>
+                            
+                            <div class="space-y-6">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-map-marker-alt text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Adresse</h3>
+                                        <p class="text-gray-600">Tipaza, Algérie</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-phone text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Téléphone</h3>
+                                        <p class="text-gray-600">+213 123 456 789</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-envelope text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Email</h3>
+                                        <a href="mailto:pharmaciegaher@gmail.com" class="text-primary hover:text-secondary">
+                                            pharmaciegaher@gmail.com
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-lg p-8">
+                        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Envoyez-nous un message</h2>
+                        
+                        <form id="contactForm" onsubmit="handleContactForm(event)" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="contactName" class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
+                                    <input type="text" id="contactName" name="name" required class="form-input" placeholder="Votre nom complet">
+                                </div>
+                                <div>
+                                    <label for="contactEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                                    <input type="email" id="contactEmail" name="email" required class="form-input" placeholder="votre@email.com">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label for="contactMessage" class="block text-sm font-medium text-gray-700 mb-2">Message *</label>
+                                <textarea id="contactMessage" name="message" rows="5" required class="form-input resize-none" placeholder="Votre message..."></textarea>
+                            </div>
+                            
+                            <button type="submit" class="w-full btn-primary py-3" id="contactSubmitBtn">
+                                <span id="contactSubmitText">Envoyer le message</span>
+                                <i id="contactSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // ADMIN METHODS - These need to be part of the main app class
     async loadAdminPage() {
         if (!this.currentUser || this.currentUser.role !== 'admin') {
             this.showToast('Accès refusé - Droits administrateur requis', 'error');
@@ -1549,6 +1190,7 @@ class PharmacieGaherApp {
     
     async loadAdminDashboard() {
         try {
+            // Get stats from localStorage and cached products
             const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
             const products = this.allProducts;
             
@@ -1743,6 +1385,7 @@ class PharmacieGaherApp {
         console.error(`Auth Error ${context}:`, error);
         
         if (error.message.includes('401') || error.message.includes('Token invalide')) {
+            // Token expired or invalid
             localStorage.removeItem('token');
             this.currentUser = null;
             this.updateUserUI();
@@ -1760,9 +1403,23 @@ class PharmacieGaherApp {
     }
 }
 
+// Password visibility toggle function
+function togglePasswordVisibility(inputId, button) {
+    const input = document.getElementById(inputId);
+    const icon = button.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'fas fa-eye';
+    }
+}
+
 // Global functions - CRITICAL FIXES
 function addToCartFromCard(productId, quantity = 1) {
-    console.log('🛒 Add to cart from card called:', productId);
+    console.log('Add to cart from card called:', productId);
     if (window.app && typeof window.app.addToCart === 'function') {
         window.app.addToCart(productId, quantity);
     } else {
@@ -1818,14 +1475,14 @@ function handleContactForm(event) {
     const submitText = document.getElementById('contactSubmitText');
     const submitSpinner = document.getElementById('contactSubmitSpinner');
     
-    if (submitBtn) submitBtn.disabled = true;
-    if (submitText) submitText.textContent = 'Envoi en cours...';
-    if (submitSpinner) submitSpinner.classList.remove('hidden');
+    submitBtn.disabled = true;
+    submitText.textContent = 'Envoi en cours...';
+    submitSpinner.classList.remove('hidden');
     
     setTimeout(() => {
-        if (submitBtn) submitBtn.disabled = false;
-        if (submitText) submitText.textContent = 'Envoyer le message';
-        if (submitSpinner) submitSpinner.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitText.textContent = 'Envoyer le message';
+        submitSpinner.classList.add('hidden');
         
         event.target.reset();
         
@@ -1841,169 +1498,13 @@ function logout() {
     }
 }
 
-// Profile and Orders functions
-function switchProfileTab(tabName) {
-    // Hide all tabs
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.add('hidden');
-    });
-    
-    // Remove active class from all tab buttons
-    document.querySelectorAll('.profile-tab').forEach(btn => {
-        btn.classList.remove('active', 'border-emerald-500', 'text-emerald-600');
-        btn.classList.add('border-transparent', 'text-gray-500');
-    });
-    
-    // Show selected tab
-    const selectedTab = document.getElementById(`profile${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Tab`);
-    if (selectedTab) {
-        selectedTab.classList.remove('hidden');
-    }
-    
-    // Set active tab button
-    const activeButton = document.querySelector(`.profile-tab[onclick*="'${tabName}'"]`);
-    if (activeButton) {
-        activeButton.classList.add('active', 'border-emerald-500', 'text-emerald-600');
-        activeButton.classList.remove('border-transparent', 'text-gray-500');
-    }
-}
-
-async function handleProfileUpdate(event) {
-    event.preventDefault();
-    
-    if (!window.app || !window.app.currentUser) {
-        return;
-    }
-    
-    const updateBtn = document.getElementById('profileUpdateBtn');
-    const originalText = updateBtn ? updateBtn.innerHTML : '';
-    
-    try {
-        if (updateBtn) {
-            updateBtn.disabled = true;
-            updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Mise à jour...';
-        }
-        
-        const updateData = {
-            prenom: document.getElementById('profilePrenom').value.trim(),
-            nom: document.getElementById('profileNom').value.trim(),
-            email: document.getElementById('profileEmail').value.trim(),
-            telephone: document.getElementById('profileTelephone').value.trim(),
-            adresse: document.getElementById('profileAdresse').value.trim(),
-            wilaya: document.getElementById('profileWilaya').value,
-            codePostal: document.getElementById('profileCodePostal').value.trim()
-        };
-        
-        // Update via API or locally
-        if (window.authSystem) {
-            const result = await window.authSystem.updateProfile(updateData);
-            if (result) {
-                window.app.currentUser = { ...window.app.currentUser, ...updateData };
-                window.app.showToast('Profil mis à jour avec succès', 'success');
-            }
-        } else {
-            // Local update
-            window.app.currentUser = { ...window.app.currentUser, ...updateData };
-            window.app.showToast('Profil mis à jour localement', 'success');
-        }
-        
-    } catch (error) {
-        console.error('Profile update error:', error);
-        window.app.showToast(error.message || 'Erreur lors de la mise à jour', 'error');
-    } finally {
-        if (updateBtn) {
-            updateBtn.disabled = false;
-            updateBtn.innerHTML = originalText;
-        }
-    }
-}
-
-async function handlePasswordChange(event) {
-    event.preventDefault();
-    
-    if (!window.app || !window.app.currentUser) {
-        return;
-    }
-    
-    const passwordBtn = document.getElementById('passwordUpdateBtn');
-    const originalText = passwordBtn ? passwordBtn.innerHTML : '';
-    
-    try {
-        if (passwordBtn) {
-            passwordBtn.disabled = true;
-            passwordBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Modification...';
-        }
-        
-        const currentPassword = document.getElementById('currentPassword').value;
-        const newPassword = document.getElementById('newPassword').value;
-        const confirmPassword = document.getElementById('confirmPassword').value;
-        
-        if (newPassword !== confirmPassword) {
-            throw new Error('Les mots de passe ne correspondent pas');
-        }
-        
-        if (window.authSystem) {
-            await window.authSystem.changePassword(currentPassword, newPassword);
-            document.getElementById('passwordForm').reset();
-            window.app.showToast('Mot de passe modifié avec succès', 'success');
-        } else {
-            throw new Error('Système d\'authentification non disponible');
-        }
-        
-    } catch (error) {
-        console.error('Password change error:', error);
-        window.app.showToast(error.message || 'Erreur lors de la modification', 'error');
-    } finally {
-        if (passwordBtn) {
-            passwordBtn.disabled = false;
-            passwordBtn.innerHTML = originalText;
-        }
-    }
-}
-
-function cancelOrder(orderId) {
-    if (confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
-        // Implementation for order cancellation
-        if (window.app) {
-            window.app.showToast('Demande d\'annulation envoyée', 'info');
-        }
-    }
-}
-
-function trackOrder(orderId) {
-    // Implementation for order tracking
-    if (window.app) {
-        window.app.showToast('Fonctionnalité de suivi bientôt disponible', 'info');
-    }
-}
-
-// Initialize app - FIXED to ensure home page loads first
+// Initialize app
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Initializing Shifa Parapharmacie App...');
-    
-    // Ensure we start at the top of the page
-    window.scrollTo(0, 0);
-    
+    console.log('Initializing app...');
     app = new PharmacieGaherApp();
     window.app = app;
-    
-    console.log('✅ App initialized and made globally available');
+    console.log('App initialized and made globally available');
 });
 
-// Export functions for global access
-window.addToCartFromCard = addToCartFromCard;
-window.showPage = showPage;
-window.filterByCategory = filterByCategory;
-window.toggleMobileMenu = toggleMobileMenu;
-window.toggleCart = toggleCart;
-window.proceedToCheckout = proceedToCheckout;
-window.handleContactForm = handleContactForm;
-window.logout = logout;
-window.switchProfileTab = switchProfileTab;
-window.handleProfileUpdate = handleProfileUpdate;
-window.handlePasswordChange = handlePasswordChange;
-window.cancelOrder = cancelOrder;
-window.trackOrder = trackOrder;
-
-console.log('✅ Complete Fixed app.js loaded with all functionality');
+console.log('✅ Fixed app.js loaded with complete login/register functionality');
