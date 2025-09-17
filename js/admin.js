@@ -1,4 +1,4 @@
-// Complete Admin Panel with Full Product Management and Order System - FIXED VERSION
+// Enhanced Admin Panel with Authentication and Order Management - FIXED VERSION
 
 // Global variables
 let adminCurrentSection = 'dashboard';
@@ -10,8 +10,8 @@ const API_BASE_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:5000/api'
     : 'https://parapharmacie-gaher.onrender.com/api';
 
-// Helper function to make API calls
-async function apiCall(endpoint, options = {}) {
+// Helper function to make authenticated API calls
+async function authenticatedApiCall(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
     
     const defaultOptions = {
@@ -24,6 +24,7 @@ async function apiCall(endpoint, options = {}) {
     const token = localStorage.getItem('token');
     if (token) {
         defaultOptions.headers['x-auth-token'] = token;
+        defaultOptions.headers['Authorization'] = `Bearer ${token}`;
     }
     
     const finalOptions = {
@@ -35,14 +36,21 @@ async function apiCall(endpoint, options = {}) {
         }
     };
     
-    const response = await fetch(url, finalOptions);
-    
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
-        throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    try {
+        const response = await fetch(url, finalOptions);
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ 
+                message: `HTTP error! status: ${response.status}` 
+            }));
+            throw new Error(error.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        return response.json();
+    } catch (error) {
+        console.error(`API call failed for ${endpoint}:`, error.message);
+        throw error;
     }
-    
-    return response.json();
 }
 
 // Products Management - Add to app prototype
@@ -53,7 +61,7 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
         
         // Try to get products from API as well
         try {
-            const data = await apiCall('/products');
+            const data = await authenticatedApiCall('/products');
             if (data && data.products && data.products.length > 0) {
                 // Merge API products with local ones, avoiding duplicates
                 const localIds = products.map(p => p._id);
@@ -64,7 +72,7 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
                 localStorage.setItem('demoProducts', JSON.stringify(products));
             }
         } catch (error) {
-            console.log('API unavailable, using local products only');
+            console.log('⚠️ API unavailable, using local products only:', error.message);
         }
         
         document.getElementById('adminContent').innerHTML = `
@@ -190,74 +198,47 @@ PharmacieGaherApp.prototype.renderProductRow = function(product) {
     `;
 };
 
-// FIXED: Orders Management with better error handling and loading
+// FIXED Orders Management with Authentication
 PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
-        console.log('🔄 Loading admin orders...');
+        console.log('🔄 Loading orders from admin panel...');
         
-        // Show loading state first
-        document.getElementById('adminContent').innerHTML = `
-            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
-                <div class="text-center py-8">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-                    <p class="text-emerald-600">Chargement des commandes...</p>
-                </div>
-            </div>
-        `;
+        // Always start with localStorage orders
+        let orders = [...adminOrders];
+        console.log('📦 Local orders loaded:', orders.length);
         
-        // Always start with localStorage orders (these are from the checkout)
-        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        console.log(`📦 Local orders loaded: ${orders.length}`);
-        
-        // Try to merge with API orders if available and user is properly authenticated
-        const token = localStorage.getItem('token');
-        if (token && !token.startsWith('demo-token')) {
-            // Only try API if we have a real token (not demo token)
-            try {
-                console.log('🌐 Attempting API call to /orders...');
-                const data = await apiCall('/orders');
+        // Try to merge with API orders using authentication
+        try {
+            console.log('🔐 Attempting authenticated API call for orders...');
+            const data = await authenticatedApiCall('/orders');
+            
+            if (data && data.orders && data.orders.length > 0) {
+                console.log('✅ API orders loaded:', data.orders.length);
                 
-                if (data && data.orders && Array.isArray(data.orders)) {
-                    console.log(`📡 API orders loaded: ${data.orders.length}`);
-                    
-                    // Merge API orders with local ones, avoiding duplicates
-                    const localOrderNumbers = orders.map(o => o.numeroCommande);
-                    const newApiOrders = data.orders.filter(apiOrder => 
-                        !localOrderNumbers.includes(apiOrder.numeroCommande)
-                    );
-                    
-                    if (newApiOrders.length > 0) {
-                        console.log(`➕ Adding ${newApiOrders.length} new API orders`);
-                        orders = [...orders, ...newApiOrders];
-                        
-                        // Update localStorage with merged data
-                        localStorage.setItem('adminOrders', JSON.stringify(orders));
-                        adminOrders = orders;
-                    }
-                }
-            } catch (apiError) {
-                console.warn('⚠️ API call failed, using only local orders:', apiError.message);
+                // Merge API orders with local ones, avoiding duplicates
+                const apiOrders = data.orders.filter(apiOrder => 
+                    !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
+                );
                 
-                // If it's a 404 or 401/403, it's expected for demo mode
-                if (apiError.message.includes('404') || 
-                    apiError.message.includes('401') || 
-                    apiError.message.includes('403')) {
-                    console.log('📝 This is normal in demo mode - using local orders only');
-                }
+                orders = [...orders, ...apiOrders];
+                console.log('📊 Total orders after merge:', orders.length);
+            } else {
+                console.log('📭 No orders returned from API');
             }
-        } else {
-            console.log('🎭 Demo mode detected - using local orders only');
+        } catch (error) {
+            console.log('⚠️ API call failed, using only local orders:', error.message);
+            
+            // Show warning message about API
+            if (window.app) {
+                window.app.showToast('⚠️ API call failed, using only local orders: ' + error.message, 'warning');
+            }
         }
         
         // Sort by date, newest first
         orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
         
-        console.log(`✅ Total orders to display: ${orders.length}`);
+        console.log('📋 Total orders to display:', orders.length);
         
-        // Update the global variable
-        adminOrders = orders;
-        
-        // Render the orders interface
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
                 <div class="flex justify-between items-center mb-6">
@@ -266,7 +247,7 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                         <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-semibold">
                             ${orders.length} commande(s)
                         </span>
-                        <button onclick="app.loadAdminOrders()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-all">
+                        <button onclick="app.loadAdminOrders()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg">
                             <i class="fas fa-sync mr-2"></i>Actualiser
                         </button>
                     </div>
@@ -276,20 +257,18 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                     <div class="text-center py-16">
                         <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
                         <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
-                        <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées par les clients</p>
-                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto mb-6">
-                            <h4 class="font-semibold text-blue-800 mb-2">Comment ça marche :</h4>
-                            <ul class="text-sm text-blue-700 text-left space-y-1">
-                                <li>• Les clients passent commande via le site</li>
-                                <li>• Les commandes apparaissent automatiquement ici</li>
-                                <li>• Vous pouvez voir les détails et gérer les statuts</li>
-                            </ul>
+                        <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées</p>
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
+                            <h4 class="font-semibold text-blue-800 mb-2">Info:</h4>
+                            <p class="text-sm text-blue-700">Les commandes sont automatiquement ajoutées ici lors du checkout</p>
                         </div>
-                        <div class="space-y-2">
-                            <button onclick="createDemoOrders()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-all">
-                                <i class="fas fa-plus mr-2"></i>Créer des commandes de test
+                        <div class="mt-6">
+                            <button onclick="testOrdersEndpoint()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mr-2">
+                                <i class="fas fa-vial mr-2"></i>Tester API Commandes
                             </button>
-                            <p class="text-xs text-gray-500">Pour voir un exemple de fonctionnement</p>
+                            <button onclick="addTestOrder()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                                <i class="fas fa-plus mr-2"></i>Ajouter commande test
+                            </button>
                         </div>
                     </div>
                 ` : `
@@ -310,19 +289,19 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                                     <tr class="border-b border-emerald-50 hover:bg-emerald-50/50 transition-colors">
                                         <td class="py-4 px-6">
                                             <div class="font-semibold text-emerald-800">#${order.numeroCommande}</div>
-                                            <div class="text-sm text-emerald-600">${(order.articles && order.articles.length) || 0} article(s)</div>
+                                            <div class="text-sm text-emerald-600">${order.articles?.length || 0} article(s)</div>
                                         </td>
                                         <td class="py-4 px-6">
-                                            <div class="font-medium text-gray-900">${order.client?.prenom || ''} ${order.client?.nom || ''}</div>
-                                            <div class="text-sm text-gray-600">${order.client?.email || 'N/A'}</div>
-                                            <div class="text-xs text-gray-500">${order.client?.wilaya || 'N/A'}</div>
+                                            <div class="font-medium text-gray-900">${order.client?.prenom} ${order.client?.nom}</div>
+                                            <div class="text-sm text-gray-600">${order.client?.email}</div>
+                                            <div class="text-xs text-gray-500">${order.client?.wilaya}</div>
                                         </td>
                                         <td class="py-4 px-6">
                                             <div class="text-sm text-gray-900">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</div>
                                             <div class="text-xs text-gray-500">${new Date(order.dateCommande).toLocaleTimeString('fr-FR')}</div>
                                         </td>
                                         <td class="py-4 px-6">
-                                            <div class="font-semibold text-emerald-700">${order.total || 0} DA</div>
+                                            <div class="font-semibold text-emerald-700">${order.total} DA</div>
                                             <div class="text-sm text-gray-600">Livraison: ${order.fraisLivraison || 0} DA</div>
                                         </td>
                                         <td class="py-4 px-6">
@@ -342,11 +321,6 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                                                         title="Confirmer">
                                                     <i class="fas fa-check"></i>
                                                 </button>
-                                                <button onclick="updateOrderStatus('${order._id || order.numeroCommande}', 'livrée')" 
-                                                        class="text-purple-600 hover:text-purple-800 hover:bg-purple-100 p-2 rounded-lg transition-all"
-                                                        title="Marquer comme livrée">
-                                                    <i class="fas fa-truck"></i>
-                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -364,23 +338,88 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
             <div class="bg-red-50 border border-red-200 rounded-xl p-6">
                 <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur de chargement des commandes</h3>
                 <p class="text-red-700 mb-4">Détails: ${error.message}</p>
-                <div class="space-y-2">
-                    <button onclick="app.loadAdminOrders()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 mr-2">
-                        <i class="fas fa-sync mr-2"></i>Réessayer
+                <div class="flex gap-2">
+                    <button onclick="app.loadAdminOrders()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                        <i class="fas fa-redo mr-2"></i>Réessayer
                     </button>
-                    <button onclick="clearOrdersCache()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
-                        <i class="fas fa-trash mr-2"></i>Vider le cache
+                    <button onclick="testOrdersEndpoint()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-vial mr-2"></i>Tester API
                     </button>
-                </div>
-                <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                    <p class="text-sm text-blue-700">
-                        <strong>Note:</strong> Les commandes sont automatiquement ajoutées ici lorsque les clients passent commande via le site.
-                    </p>
+                    <button onclick="addTestOrder()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                        <i class="fas fa-plus mr-2"></i>Commande test
+                    </button>
                 </div>
             </div>
         `;
     }
 };
+
+// Test function for orders endpoint
+async function testOrdersEndpoint() {
+    try {
+        console.log('🧪 Testing orders endpoint...');
+        
+        if (window.app) {
+            window.app.showToast('🧪 Test de l\'API des commandes en cours...', 'info');
+        }
+        
+        const response = await authenticatedApiCall('/orders');
+        console.log('✅ Orders endpoint test successful:', response);
+        
+        if (window.app) {
+            window.app.showToast('✅ API des commandes accessible! Commandes trouvées: ' + (response.orders?.length || 0), 'success');
+        }
+        
+    } catch (error) {
+        console.error('❌ Orders endpoint test failed:', error);
+        
+        if (window.app) {
+            window.app.showToast('❌ Test API échoué: ' + error.message, 'error');
+        }
+    }
+}
+
+// Add test order function
+function addTestOrder() {
+    const testOrder = {
+        _id: 'test-' + Date.now(),
+        numeroCommande: 'TEST' + Date.now().toString().slice(-6),
+        client: {
+            prenom: 'Test',
+            nom: 'Client',
+            email: 'test@example.com',
+            telephone: '+213123456789',
+            adresse: 'Adresse de test',
+            wilaya: 'Alger'
+        },
+        articles: [
+            {
+                nom: 'Produit Test',
+                prix: 1500,
+                quantite: 2,
+                image: 'https://via.placeholder.com/64x64/10b981/ffffff?text=TEST'
+            }
+        ],
+        sousTotal: 3000,
+        fraisLivraison: 300,
+        total: 3300,
+        statut: 'en-attente',
+        modePaiement: 'Paiement à la livraison',
+        dateCommande: new Date().toISOString(),
+        commentaires: 'Commande de test créée par l\'administrateur'
+    };
+    
+    // Add to localStorage
+    let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+    orders.unshift(testOrder);
+    localStorage.setItem('adminOrders', JSON.stringify(orders));
+    adminOrders = orders;
+    
+    if (window.app) {
+        window.app.showToast('✅ Commande de test ajoutée avec succès!', 'success');
+        window.app.loadAdminOrders();
+    }
+}
 
 // Featured Products Management
 PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
@@ -393,7 +432,7 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
         
         // Try to get products from API
         try {
-            const allData = await apiCall('/products');
+            const allData = await authenticatedApiCall('/products');
             if (allData && allData.products && allData.products.length > 0) {
                 // Merge API products, avoiding duplicates
                 const localIds = localProducts.map(p => p._id);
@@ -542,10 +581,6 @@ PharmacieGaherApp.prototype.loadCleanupSection = async function() {
                                 class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl">
                             <i class="fas fa-trash-alt mr-2"></i>Supprimer tous les produits
                         </button>
-                        <button onclick="clearOrdersCache()" 
-                                class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-xl">
-                            <i class="fas fa-trash mr-2"></i>Vider cache commandes
-                        </button>
                     </div>
                 </div>
             </div>
@@ -586,7 +621,7 @@ window.addOrderToDemo = function(orderData) {
         // Check for duplicates based on numeroCommande
         const existingIndex = orders.findIndex(o => o.numeroCommande === validOrder.numeroCommande);
         if (existingIndex > -1) {
-            console.log('Order already exists, updating...');
+            console.log('🔄 Order already exists, updating...');
             orders[existingIndex] = validOrder;
         } else {
             orders.unshift(validOrder);
@@ -598,7 +633,7 @@ window.addOrderToDemo = function(orderData) {
         adminOrders = orders;
         
         console.log('✅ Order added successfully. Total orders:', orders.length);
-        console.log('Order details:', validOrder);
+        console.log('📋 Order details:', validOrder);
         
         return validOrder;
         
@@ -1110,7 +1145,7 @@ async function toggleFeatured(productId, newStatus) {
         
         // Try to update via API
         try {
-            await apiCall(`/products/${productId}`, {
+            await authenticatedApiCall(`/products/${productId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ enVedette: newStatus })
             });
@@ -1154,7 +1189,7 @@ async function deleteProduct(productId) {
             
             // Try to delete from API
             try {
-                await apiCall(`/products/${productId}`, {
+                await authenticatedApiCall(`/products/${productId}`, {
                     method: 'DELETE'
                 });
                 console.log('Product deleted from API successfully');
@@ -1325,7 +1360,7 @@ async function updateOrderStatus(orderId, newStatus) {
         
         // Try to update via API
         try {
-            await apiCall(`/orders/${orderId}`, {
+            await authenticatedApiCall(`/orders/${orderId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ 
                     statut: newStatus,
@@ -1378,146 +1413,6 @@ async function clearAllProducts() {
         if (adminCurrentSection === 'products') {
             app.loadAdminProducts();
         }
-    }
-}
-
-// NEW: Clear orders cache function
-async function clearOrdersCache() {
-    if (confirm('ATTENTION: Cette action supprimera TOUTES les commandes du cache local. Êtes-vous sûr ?')) {
-        localStorage.removeItem('adminOrders');
-        adminOrders = [];
-        
-        app.showToast('Cache des commandes vidé', 'success');
-        if (adminCurrentSection === 'orders') {
-            app.loadAdminOrders();
-        }
-    }
-}
-
-// NEW: Create demo orders for testing
-async function createDemoOrders() {
-    try {
-        console.log('Creating demo orders...');
-        
-        const demoOrders = [
-            {
-                _id: 'demo-order-1',
-                numeroCommande: 'CMD20241' + Math.random().toString().slice(-3),
-                client: {
-                    prenom: 'Ahmed',
-                    nom: 'Benali',
-                    email: 'ahmed.benali@email.com',
-                    telephone: '0555123456',
-                    adresse: 'Cité des 1000 logements, Bt A, App 15',
-                    wilaya: 'Alger'
-                },
-                articles: [
-                    {
-                        productId: 'demo-prod-1',
-                        nom: 'Vitamines Multi-Complex',
-                        prix: 2500,
-                        quantite: 2,
-                        image: 'https://via.placeholder.com/64x64/10b981/ffffff?text=VM'
-                    },
-                    {
-                        productId: 'demo-prod-2',
-                        nom: 'Crème Hydratante Visage',
-                        prix: 1800,
-                        quantite: 1,
-                        image: 'https://via.placeholder.com/64x64/ec4899/ffffff?text=CH'
-                    }
-                ],
-                sousTotal: 6800,
-                fraisLivraison: 300,
-                total: 7100,
-                statut: 'en-attente',
-                modePaiement: 'Paiement à la livraison',
-                dateCommande: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-                commentaires: 'Livraison préférée en matinée'
-            },
-            {
-                _id: 'demo-order-2',
-                numeroCommande: 'CMD20241' + Math.random().toString().slice(-3),
-                client: {
-                    prenom: 'Fatima',
-                    nom: 'Zahra',
-                    email: 'fatima.zahra@email.com',
-                    telephone: '0661789012',
-                    adresse: 'Hay Essalam, Rue des Roses, N°25',
-                    wilaya: 'Blida'
-                },
-                articles: [
-                    {
-                        productId: 'demo-prod-3',
-                        nom: 'Shampoing Anti-Chute',
-                        prix: 3200,
-                        quantite: 1,
-                        image: 'https://via.placeholder.com/64x64/f59e0b/ffffff?text=SA'
-                    }
-                ],
-                sousTotal: 3200,
-                fraisLivraison: 250,
-                total: 3450,
-                statut: 'confirmée',
-                modePaiement: 'Paiement à la livraison',
-                dateCommande: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-                commentaires: ''
-            },
-            {
-                _id: 'demo-order-3',
-                numeroCommande: 'CMD20241' + Math.random().toString().slice(-3),
-                client: {
-                    prenom: 'Mohammed',
-                    nom: 'Kader',
-                    email: 'mohammed.kader@email.com',
-                    telephone: '0770345678',
-                    adresse: 'Centre-ville, Avenue de l\'Indépendance, Immeuble El Baraka',
-                    wilaya: 'Tipaza'
-                },
-                articles: [
-                    {
-                        productId: 'demo-prod-4',
-                        nom: 'Complément Sport Énergie',
-                        prix: 4500,
-                        quantite: 1,
-                        image: 'https://via.placeholder.com/64x64/f43f5e/ffffff?text=CS'
-                    },
-                    {
-                        productId: 'demo-prod-5',
-                        nom: 'Protéine Whey Vanille',
-                        prix: 8900,
-                        quantite: 1,
-                        image: 'https://via.placeholder.com/64x64/f43f5e/ffffff?text=PW'
-                    }
-                ],
-                sousTotal: 13400,
-                fraisLivraison: 0, // Free shipping over 5000 DA
-                total: 13400,
-                statut: 'livrée',
-                modePaiement: 'Paiement à la livraison',
-                dateCommande: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), // 2 days ago
-                commentaires: 'Client régulier, livraison rapide souhaitée'
-            }
-        ];
-        
-        // Add demo orders to localStorage
-        let existingOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        
-        // Filter out existing demo orders and add new ones
-        existingOrders = existingOrders.filter(o => !o._id.startsWith('demo-order-'));
-        existingOrders = [...demoOrders, ...existingOrders];
-        
-        localStorage.setItem('adminOrders', JSON.stringify(existingOrders));
-        adminOrders = existingOrders;
-        
-        app.showToast('✅ Commandes de démonstration créées !', 'success');
-        
-        // Reload the orders section
-        app.loadAdminOrders();
-        
-    } catch (error) {
-        console.error('Error creating demo orders:', error);
-        app.showToast('Erreur lors de la création des commandes de test', 'error');
     }
 }
 
@@ -1582,38 +1477,6 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
-// Error handling for API calls
-window.handleApiError = function(error, context = '') {
-    console.error(`❌ API Error ${context}:`, error);
-    
-    if (error.message.includes('401') || error.message.includes('Token invalide')) {
-        // Token expired or invalid
-        localStorage.removeItem('token');
-        if (window.app) {
-            window.app.currentUser = null;
-            window.app.updateUserUI();
-            window.app.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
-            window.app.showPage('login');
-        }
-    } else if (error.message.includes('403')) {
-        if (window.app) {
-            window.app.showToast('Accès refusé', 'error');
-        }
-    } else if (error.message.includes('404')) {
-        if (window.app) {
-            window.app.showToast('Ressource non trouvée', 'error');
-        }
-    } else if (error.message.includes('500')) {
-        if (window.app) {
-            window.app.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
-        }
-    } else {
-        if (window.app) {
-            window.app.showToast(error.message || 'Une erreur est survenue', 'error');
-        }
-    }
-};
-
 // Export functions for global access
 window.switchAdminSection = switchAdminSection;
 window.openAddProductModal = openAddProductModal;
@@ -1625,11 +1488,11 @@ window.deleteProduct = deleteProduct;
 window.refreshProductCache = refreshProductCache;
 window.validateAllProducts = validateAllProducts;
 window.clearAllProducts = clearAllProducts;
-window.clearOrdersCache = clearOrdersCache;
-window.createDemoOrders = createDemoOrders;
 window.viewOrderDetails = viewOrderDetails;
 window.updateOrderStatus = updateOrderStatus;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
+window.testOrdersEndpoint = testOrdersEndpoint;
+window.addTestOrder = addTestOrder;
 
-console.log('✅ Fixed Admin.js loaded with proper orders management and demo data creation');
+console.log('✅ Enhanced Admin.js loaded with authentication support and order management');
