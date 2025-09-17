@@ -1,6 +1,6 @@
 // Fixed Configuration for Shifa Parapharmacie Frontend-Backend Connection
 const API_CONFIG = {
-    // Backend URL configuration - Using your provided URL
+    // Backend URL configuration
     BASE_URL: 'https://parapharmacie-gaher.onrender.com/api',
     
     // Request configuration
@@ -13,11 +13,15 @@ const API_CONFIG = {
         AUTH: {
             LOGIN: '/auth/login',
             REGISTER: '/auth/register',
-            PROFILE: '/auth/profile'
+            PROFILE: '/auth/profile',
+            VERIFY_TOKEN: '/auth/verify-token'
         },
         PRODUCTS: {
             LIST: '/products',
             DETAIL: '/products/',
+            CREATE: '/products',
+            UPDATE: '/products/',
+            DELETE: '/products/',
             CATEGORIES: '/products/categories/all',
             FEATURED: '/products/featured/all',
             PROMOTIONS: '/products/promotions/all'
@@ -25,12 +29,15 @@ const API_CONFIG = {
         ORDERS: {
             CREATE: '/orders',
             DETAIL: '/orders/',
-            USER_ORDERS: '/orders/user/all'
+            UPDATE: '/orders/',
+            USER_ORDERS: '/orders/user/all',
+            ADMIN_ORDERS: '/admin/orders'
         },
         ADMIN: {
             DASHBOARD: '/admin/dashboard',
             PRODUCTS: '/admin/products',
-            ORDERS: '/admin/orders'
+            ORDERS: '/admin/orders',
+            USERS: '/admin/users'
         },
         HEALTH: '/health'
     }
@@ -43,7 +50,7 @@ function buildApiUrl(endpoint) {
     return url;
 }
 
-// Enhanced API call function with better error handling
+// Enhanced API call function with proper error handling
 async function apiCall(endpoint, options = {}) {
     const url = buildApiUrl(endpoint);
     
@@ -88,7 +95,7 @@ async function apiCall(endpoint, options = {}) {
             
             clearTimeout(timeoutId);
             
-            console.log(`📡 Response: ${response.status} ${response.statusText}`);
+            console.log(`📡 Response: ${response.status}`);
             
             const contentType = response.headers.get('content-type');
             let data;
@@ -107,14 +114,33 @@ async function apiCall(endpoint, options = {}) {
             if (!response.ok) {
                 console.error(`❌ HTTP Error ${response.status}:`, data);
                 
-                // Don't retry on client errors
-                if (response.status >= 400 && response.status < 500) {
-                    throw new Error(data.message || `Erreur HTTP: ${response.status}`);
+                // Handle different error types
+                if (response.status === 401) {
+                    // Unauthorized - token expired or invalid
+                    localStorage.removeItem('token');
+                    if (window.authSystem) {
+                        window.authSystem.logout();
+                    }
+                    throw new Error(data.message || 'Session expirée. Veuillez vous reconnecter.');
+                } else if (response.status === 403) {
+                    // Forbidden
+                    throw new Error(data.message || 'Accès non autorisé');
+                } else if (response.status === 404) {
+                    // Not Found
+                    throw new Error(data.message || 'Ressource non trouvée');
+                } else if (response.status === 422) {
+                    // Validation Error
+                    throw new Error(data.message || 'Données invalides');
                 }
                 
-                // Retry on server errors if we have attempts left
+                // Don't retry on client errors (4xx)
+                if (response.status >= 400 && response.status < 500) {
+                    throw new Error(data.message || `Erreur client: ${response.status}`);
+                }
+                
+                // Retry on server errors (5xx) if we have attempts left
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
+                    console.log(`🔄 Server error, retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
                     continue;
                 }
@@ -146,6 +172,7 @@ async function apiCall(endpoint, options = {}) {
                 }
             }
             
+            // If this was the last attempt, throw the error
             if (attempt === API_CONFIG.RETRY_ATTEMPTS) {
                 throw error;
             }
@@ -156,7 +183,7 @@ async function apiCall(endpoint, options = {}) {
     }
 }
 
-// Test backend connection
+// Test backend connection with better error handling
 async function testBackendConnection() {
     try {
         console.log('🔍 Testing backend connection...');
@@ -169,10 +196,64 @@ async function testBackendConnection() {
     }
 }
 
+// Validate authentication status
+async function validateAuthStatus() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        return { valid: false, message: 'No token found' };
+    }
+    
+    try {
+        const response = await apiCall('/auth/verify-token', {
+            method: 'POST',
+            body: JSON.stringify({ token })
+        });
+        
+        if (response.valid) {
+            return { valid: true, user: response.user };
+        } else {
+            localStorage.removeItem('token');
+            return { valid: false, message: response.message };
+        }
+    } catch (error) {
+        localStorage.removeItem('token');
+        return { valid: false, message: error.message };
+    }
+}
+
+// Initialize connection and auth check on load
+document.addEventListener('DOMContentLoaded', async () => {
+    // Test backend connection
+    const connectionTest = await testBackendConnection();
+    
+    if (connectionTest.success) {
+        console.log('✅ Backend is available');
+    } else {
+        console.warn('⚠️ Backend connection issues:', connectionTest.error);
+        // Show user-friendly message
+        if (window.app) {
+            window.app.showToast('Connexion au serveur instable. Certaines fonctionnalités peuvent être limitées.', 'warning');
+        }
+    }
+    
+    // Validate authentication if token exists
+    const token = localStorage.getItem('token');
+    if (token) {
+        const authStatus = await validateAuthStatus();
+        if (!authStatus.valid) {
+            console.log('Token is invalid, removing...');
+            if (window.authSystem) {
+                window.authSystem.logout();
+            }
+        }
+    }
+});
+
 // Export for global access
 window.API_CONFIG = API_CONFIG;
 window.buildApiUrl = buildApiUrl;
 window.apiCall = apiCall;
 window.testBackendConnection = testBackendConnection;
+window.validateAuthStatus = validateAuthStatus;
 
-console.log('✅ Config loaded - Backend URL:', API_CONFIG.BASE_URL);
+console.log('✅ Fixed Config loaded - Backend URL:', API_CONFIG.BASE_URL);
