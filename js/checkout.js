@@ -1,4 +1,4 @@
-// Fixed Checkout System for Shifa Parapharmacie with "Order was sent" message
+// Enhanced Checkout System for Shifa Parapharmacie with Success Messages
 
 class CheckoutSystem {
     constructor() {
@@ -9,7 +9,7 @@ class CheckoutSystem {
 
     // Initialize checkout process
     init() {
-        console.log('Initializing checkout system...');
+        console.log('🛒 Initializing checkout system...');
         this.validateCart();
         this.setupEventListeners();
         this.calculateTotals();
@@ -18,7 +18,7 @@ class CheckoutSystem {
     // Validate cart before checkout
     validateCart() {
         if (!window.app || !window.app.cart || window.app.cart.length === 0) {
-            console.error('Cart is empty');
+            console.error('❌ Cart is empty');
             if (window.app) {
                 window.app.showToast('Votre panier est vide', 'warning');
                 window.app.showPage('products');
@@ -162,7 +162,7 @@ class CheckoutSystem {
 
     // Handle payment method change
     handlePaymentMethodChange(method) {
-        console.log('Payment method changed to:', method);
+        console.log('💳 Payment method changed to:', method);
         
         // Update UI based on payment method
         const paymentInfo = document.getElementById('paymentMethodInfo');
@@ -323,16 +323,21 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // MAIN PROCESS ORDER FUNCTION WITH "ORDER WAS SENT" MESSAGE
+    // ENHANCED Process the order - MAIN FUNCTION with Success Messages
     async processOrder() {
         try {
             if (this.isProcessing) {
-                console.log('Order already being processed');
+                console.log('⏳ Order already being processed');
                 return;
             }
 
-            console.log('🛒 Starting order processing...');
+            console.log('🛒 Starting enhanced order processing...');
             this.isProcessing = true;
+
+            // Show initial processing message
+            if (window.app) {
+                window.app.showToast('🔄 Traitement de votre commande en cours...', 'info');
+            }
 
             // Validate cart
             if (!this.validateCart()) {
@@ -344,67 +349,97 @@ class CheckoutSystem {
                 throw new Error('Veuillez corriger les erreurs dans le formulaire');
             }
 
-            // Disable submit button and show processing
+            // Disable submit button and show processing state
             const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = `
-                    <i class="fas fa-spinner fa-spin mr-2"></i>
-                    <span>Envoi de la commande...</span>
-                `;
-            }
-
-            // Show immediate "sending" feedback
-            if (window.app) {
-                window.app.showToast('📦 Envoi de votre commande en cours...', 'info');
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
             }
 
             // Gather form data
             const orderData = this.gatherOrderData();
             
-            console.log('Order data prepared:', orderData);
+            console.log('📋 Order data prepared:', orderData);
+
+            // Show validation success
+            if (window.app) {
+                window.app.showToast('✅ Données validées avec succès', 'success');
+            }
 
             // Try to submit to API first
             let orderSaved = false;
             try {
-                const response = await apiCall('/orders', {
+                console.log('🌐 Attempting to save order to API...');
+                
+                // Use the authenticated API call
+                const response = await fetch(window.buildApiUrl('/orders'), {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-token': localStorage.getItem('token') || ''
+                    },
                     body: JSON.stringify(orderData)
                 });
                 
-                if (response) {
-                    console.log('✅ Order saved to API successfully');
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('✅ Order saved to API successfully:', result);
                     orderSaved = true;
+                    
+                    if (window.app) {
+                        window.app.showToast('💾 Commande sauvegardée sur le serveur', 'success');
+                    }
+                } else {
+                    const error = await response.json().catch(() => ({ message: 'Erreur serveur' }));
+                    console.log('⚠️ API save failed:', error.message);
+                    throw new Error(error.message);
                 }
+                
             } catch (apiError) {
                 console.log('⚠️ API save failed, will save locally:', apiError.message);
+                
+                if (window.app) {
+                    window.app.showToast('⚠️ Serveur indisponible, sauvegarde locale', 'warning');
+                }
             }
 
-            // Always save locally for admin panel
+            // Always save locally for admin panel and demo
             if (window.addOrderToDemo) {
+                console.log('💾 Saving order locally for admin panel...');
                 const localOrder = window.addOrderToDemo(orderData);
                 if (localOrder) {
                     console.log('✅ Order saved locally for admin panel');
+                    
+                    if (window.app) {
+                        window.app.showToast('✅ Commande enregistrée localement', 'success');
+                    }
                 }
             }
 
             // Save to user's order history
             if (window.app && window.app.currentUser) {
+                console.log('👤 Saving to user order history...');
                 this.saveToUserOrders(orderData);
+                
+                if (window.app) {
+                    window.app.showToast('📝 Commande ajoutée à votre historique', 'success');
+                }
             }
 
             // Clear cart
             if (window.app) {
+                console.log('🧹 Clearing cart...');
                 window.app.clearCart();
             }
 
-            // SUCCESS MESSAGE - This is the key addition
+            // Show final success message
             if (window.app) {
-                // Show success toast with "order was sent" message
-                window.app.showToast('✅ Votre commande a été envoyée avec succès !', 'success');
+                window.app.showToast('🎉 Commande passée avec succès !', 'success');
                 
-                // Navigate to confirmation page with success message
-                window.app.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
+                // Show order confirmation page
+                setTimeout(() => {
+                    window.app.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
+                }, 1000);
             }
 
             console.log('✅ Order processing completed successfully');
@@ -413,7 +448,7 @@ class CheckoutSystem {
             console.error('❌ Error processing order:', error);
             
             if (window.app) {
-                window.app.showToast(`❌ ${error.message || 'Erreur lors de l\'envoi de la commande'}`, 'error');
+                window.app.showToast('❌ Erreur: ' + (error.message || 'Erreur lors de la validation de la commande'), 'error');
             }
             
             // Re-enable submit button
@@ -546,7 +581,7 @@ class CheckoutSystem {
     async applyCoupon(code) {
         try {
             // This would normally call an API to validate the coupon
-            console.log('Applying coupon:', code);
+            console.log('🎫 Applying coupon:', code);
             
             // Placeholder for coupon logic
             if (code.toUpperCase() === 'WELCOME10') {
@@ -555,7 +590,7 @@ class CheckoutSystem {
                 this.calculateTotals();
                 
                 if (window.app) {
-                    window.app.showToast(`Coupon appliqué ! Réduction de ${discount} DA`, 'success');
+                    window.app.showToast(`🎉 Coupon appliqué ! Réduction de ${discount} DA`, 'success');
                 }
                 return true;
             } else {
@@ -579,6 +614,60 @@ class CheckoutSystem {
             window.app.showToast('Coupon retiré', 'info');
         }
     }
+
+    // ENHANCED: Show order success modal
+    showOrderSuccessModal(orderNumber) {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+            <div class="bg-white rounded-2xl max-w-md w-full p-8 text-center transform scale-95 transition-all duration-300">
+                <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+                    <i class="fas fa-check text-white text-3xl"></i>
+                </div>
+                
+                <h2 class="text-3xl font-bold text-green-800 mb-4">Commande Confirmée !</h2>
+                
+                <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
+                    <p class="text-green-700 font-semibold">Numéro de commande:</p>
+                    <p class="text-2xl font-mono font-bold text-green-800">#${orderNumber}</p>
+                </div>
+                
+                <p class="text-gray-600 mb-6">
+                    Merci pour votre commande ! Nous avons bien reçu votre demande et nous vous contacterons bientôt.
+                </p>
+                
+                <div class="space-y-3">
+                    <button onclick="this.closest('.fixed').remove(); window.app.showPage('order-confirmation', {orderNumber: '${orderNumber}'})" 
+                            class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                        Voir les détails
+                    </button>
+                    
+                    <button onclick="this.closest('.fixed').remove(); window.app.showPage('home')" 
+                            class="w-full bg-gray-100 text-gray-700 font-bold py-3 px-6 rounded-xl hover:bg-gray-200 transition-all">
+                        Retour à l'accueil
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Animate modal appearance
+        setTimeout(() => {
+            modal.querySelector('.transform').classList.remove('scale-95');
+            modal.querySelector('.transform').classList.add('scale-100');
+        }, 50);
+        
+        // Auto-close after 10 seconds
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.remove();
+                if (window.app) {
+                    window.app.showPage('order-confirmation', { orderNumber });
+                }
+            }
+        }, 10000);
+    }
 }
 
 // Global checkout system instance
@@ -589,7 +678,7 @@ function initCheckout() {
     checkoutSystem = new CheckoutSystem();
     checkoutSystem.init();
     window.checkoutSystem = checkoutSystem;
-    console.log('✅ Checkout system initialized');
+    console.log('✅ Enhanced checkout system initialized with success messaging');
 }
 
 // Global functions for checkout
@@ -602,11 +691,6 @@ function validateCheckoutField(field) {
 function processCheckoutOrder() {
     if (checkoutSystem) {
         return checkoutSystem.processOrder();
-    } else {
-        console.error('Checkout system not available');
-        if (window.app) {
-            window.app.showToast('Système de commande non disponible', 'error');
-        }
     }
 }
 
@@ -641,4 +725,4 @@ window.processCheckoutOrder = processCheckoutOrder;
 window.applyCheckoutCoupon = applyCheckoutCoupon;
 window.removeCheckoutCoupon = removeCheckoutCoupon;
 
-console.log('✅ Fixed Checkout.js loaded with "order was sent" message');
+console.log('✅ Enhanced Checkout.js loaded with comprehensive success messaging and order confirmation');
