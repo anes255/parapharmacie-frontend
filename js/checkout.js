@@ -1,4 +1,4 @@
-// Enhanced Checkout System for Shifa Parapharmacie with Success Messages
+// Fixed Checkout System for Shifa Parapharmacie
 
 class CheckoutSystem {
     constructor() {
@@ -9,7 +9,7 @@ class CheckoutSystem {
 
     // Initialize checkout process
     init() {
-        console.log('🛒 Initializing checkout system...');
+        console.log('Initializing checkout system...');
         this.validateCart();
         this.setupEventListeners();
         this.calculateTotals();
@@ -18,7 +18,7 @@ class CheckoutSystem {
     // Validate cart before checkout
     validateCart() {
         if (!window.app || !window.app.cart || window.app.cart.length === 0) {
-            console.error('❌ Cart is empty');
+            console.error('Cart is empty');
             if (window.app) {
                 window.app.showToast('Votre panier est vide', 'warning');
                 window.app.showPage('products');
@@ -162,7 +162,7 @@ class CheckoutSystem {
 
     // Handle payment method change
     handlePaymentMethodChange(method) {
-        console.log('💳 Payment method changed to:', method);
+        console.log('Payment method changed to:', method);
         
         // Update UI based on payment method
         const paymentInfo = document.getElementById('paymentMethodInfo');
@@ -323,21 +323,16 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // ENHANCED Process the order - MAIN FUNCTION with Success Messages
+    // Process the order - MAIN FUNCTION
     async processOrder() {
         try {
             if (this.isProcessing) {
-                console.log('⏳ Order already being processed');
+                console.log('Order already being processed');
                 return;
             }
 
-            console.log('🛒 Starting enhanced order processing...');
+            console.log('🛒 Starting order processing...');
             this.isProcessing = true;
-
-            // Show initial processing message
-            if (window.app) {
-                window.app.showToast('🔄 Traitement de votre commande en cours...', 'info');
-            }
 
             // Validate cart
             if (!this.validateCart()) {
@@ -349,8 +344,8 @@ class CheckoutSystem {
                 throw new Error('Veuillez corriger les erreurs dans le formulaire');
             }
 
-            // Disable submit button and show processing state
-            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
+            // Disable submit button
+            const submitBtn = document.querySelector('button[onclick="handleCheckout(event)"], button[onclick="app.processOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
@@ -359,87 +354,46 @@ class CheckoutSystem {
             // Gather form data
             const orderData = this.gatherOrderData();
             
-            console.log('📋 Order data prepared:', orderData);
-
-            // Show validation success
-            if (window.app) {
-                window.app.showToast('✅ Données validées avec succès', 'success');
-            }
+            console.log('Order data prepared:', orderData);
 
             // Try to submit to API first
             let orderSaved = false;
             try {
-                console.log('🌐 Attempting to save order to API...');
-                
-                // Use the authenticated API call
-                const response = await fetch(window.buildApiUrl('/orders'), {
+                const response = await apiCall('/orders', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-auth-token': localStorage.getItem('token') || ''
-                    },
                     body: JSON.stringify(orderData)
                 });
                 
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log('✅ Order saved to API successfully:', result);
+                if (response) {
+                    console.log('✅ Order saved to API successfully');
                     orderSaved = true;
-                    
-                    if (window.app) {
-                        window.app.showToast('💾 Commande sauvegardée sur le serveur', 'success');
-                    }
-                } else {
-                    const error = await response.json().catch(() => ({ message: 'Erreur serveur' }));
-                    console.log('⚠️ API save failed:', error.message);
-                    throw new Error(error.message);
                 }
-                
             } catch (apiError) {
                 console.log('⚠️ API save failed, will save locally:', apiError.message);
-                
-                if (window.app) {
-                    window.app.showToast('⚠️ Serveur indisponible, sauvegarde locale', 'warning');
-                }
             }
 
-            // Always save locally for admin panel and demo
+            // Always save locally for admin panel
             if (window.addOrderToDemo) {
-                console.log('💾 Saving order locally for admin panel...');
                 const localOrder = window.addOrderToDemo(orderData);
                 if (localOrder) {
                     console.log('✅ Order saved locally for admin panel');
-                    
-                    if (window.app) {
-                        window.app.showToast('✅ Commande enregistrée localement', 'success');
-                    }
                 }
             }
 
             // Save to user's order history
             if (window.app && window.app.currentUser) {
-                console.log('👤 Saving to user order history...');
                 this.saveToUserOrders(orderData);
-                
-                if (window.app) {
-                    window.app.showToast('📝 Commande ajoutée à votre historique', 'success');
-                }
             }
 
             // Clear cart
             if (window.app) {
-                console.log('🧹 Clearing cart...');
                 window.app.clearCart();
             }
 
-            // Show final success message
+            // Show success and redirect
             if (window.app) {
-                window.app.showToast('🎉 Commande passée avec succès !', 'success');
-                
-                // Show order confirmation page
-                setTimeout(() => {
-                    window.app.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
-                }, 1000);
+                window.app.showToast('Commande passée avec succès !', 'success');
+                window.app.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
             }
 
             console.log('✅ Order processing completed successfully');
@@ -448,11 +402,11 @@ class CheckoutSystem {
             console.error('❌ Error processing order:', error);
             
             if (window.app) {
-                window.app.showToast('❌ Erreur: ' + (error.message || 'Erreur lors de la validation de la commande'), 'error');
+                window.app.showToast(error.message || 'Erreur lors de la validation de la commande', 'error');
             }
             
             // Re-enable submit button
-            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
+            const submitBtn = document.querySelector('button[onclick="handleCheckout(event)"], button[onclick="app.processOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirmer la commande';
@@ -482,8 +436,29 @@ class CheckoutSystem {
         // Generate order number
         const orderNumber = this.generateOrderNumber();
 
-        // Prepare order data
+        // Prepare order data for API (backend format)
         const orderData = {
+            produits: window.app ? window.app.cart.map(item => ({
+                produit: item.id,
+                nom: item.nom,
+                prix: item.prix,
+                quantite: item.quantite,
+                total: item.prix * item.quantite
+            })) : [],
+            montantTotal: total,
+            modeLivraison: 'domicile',
+            adresseLivraison: {
+                nom,
+                prenom,
+                adresse,
+                ville: wilaya,
+                wilaya,
+                telephone: telephone.replace(/\s+/g, ''),
+                email: email.toLowerCase()
+            },
+            notes: commentaires,
+            
+            // Also store additional data for local use
             _id: Date.now().toString(),
             numeroCommande: orderNumber,
             client: {
@@ -505,7 +480,7 @@ class CheckoutSystem {
             sousTotal,
             fraisLivraison,
             total,
-            statut: 'en-attente',
+            statut: 'en_attente',
             modePaiement,
             commentaires,
             dateCommande: new Date().toISOString()
@@ -581,7 +556,7 @@ class CheckoutSystem {
     async applyCoupon(code) {
         try {
             // This would normally call an API to validate the coupon
-            console.log('🎫 Applying coupon:', code);
+            console.log('Applying coupon:', code);
             
             // Placeholder for coupon logic
             if (code.toUpperCase() === 'WELCOME10') {
@@ -590,7 +565,7 @@ class CheckoutSystem {
                 this.calculateTotals();
                 
                 if (window.app) {
-                    window.app.showToast(`🎉 Coupon appliqué ! Réduction de ${discount} DA`, 'success');
+                    window.app.showToast(`Coupon appliqué ! Réduction de ${discount} DA`, 'success');
                 }
                 return true;
             } else {
@@ -614,60 +589,6 @@ class CheckoutSystem {
             window.app.showToast('Coupon retiré', 'info');
         }
     }
-
-    // ENHANCED: Show order success modal
-    showOrderSuccessModal(orderNumber) {
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
-        modal.innerHTML = `
-            <div class="bg-white rounded-2xl max-w-md w-full p-8 text-center transform scale-95 transition-all duration-300">
-                <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
-                    <i class="fas fa-check text-white text-3xl"></i>
-                </div>
-                
-                <h2 class="text-3xl font-bold text-green-800 mb-4">Commande Confirmée !</h2>
-                
-                <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-                    <p class="text-green-700 font-semibold">Numéro de commande:</p>
-                    <p class="text-2xl font-mono font-bold text-green-800">#${orderNumber}</p>
-                </div>
-                
-                <p class="text-gray-600 mb-6">
-                    Merci pour votre commande ! Nous avons bien reçu votre demande et nous vous contacterons bientôt.
-                </p>
-                
-                <div class="space-y-3">
-                    <button onclick="this.closest('.fixed').remove(); window.app.showPage('order-confirmation', {orderNumber: '${orderNumber}'})" 
-                            class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                        Voir les détails
-                    </button>
-                    
-                    <button onclick="this.closest('.fixed').remove(); window.app.showPage('home')" 
-                            class="w-full bg-gray-100 text-gray-700 font-bold py-3 px-6 rounded-xl hover:bg-gray-200 transition-all">
-                        Retour à l'accueil
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Animate modal appearance
-        setTimeout(() => {
-            modal.querySelector('.transform').classList.remove('scale-95');
-            modal.querySelector('.transform').classList.add('scale-100');
-        }, 50);
-        
-        // Auto-close after 10 seconds
-        setTimeout(() => {
-            if (modal.parentNode) {
-                modal.remove();
-                if (window.app) {
-                    window.app.showPage('order-confirmation', { orderNumber });
-                }
-            }
-        }, 10000);
-    }
 }
 
 // Global checkout system instance
@@ -678,7 +599,33 @@ function initCheckout() {
     checkoutSystem = new CheckoutSystem();
     checkoutSystem.init();
     window.checkoutSystem = checkoutSystem;
-    console.log('✅ Enhanced checkout system initialized with success messaging');
+    console.log('✅ Checkout system initialized');
+}
+
+// MAIN FIX: Add the missing handleCheckout function
+function handleCheckout(event) {
+    if (event) {
+        event.preventDefault();
+    }
+    
+    console.log('🛒 handleCheckout called');
+    
+    if (checkoutSystem) {
+        return checkoutSystem.processOrder();
+    } else if (window.app && typeof window.app.processOrder === 'function') {
+        return window.app.processOrder();
+    } else {
+        console.error('No checkout system available');
+        if (window.app) {
+            window.app.showToast('Erreur: Système de commande indisponible', 'error');
+        }
+    }
+}
+
+// Process Order - Alternative function name for app.js compatibility
+function processOrder() {
+    console.log('🛒 processOrder called');
+    return handleCheckout();
 }
 
 // Global functions for checkout
@@ -720,9 +667,11 @@ if (document.readyState === 'loading') {
 // Export for global access
 window.initCheckout = initCheckout;
 window.checkoutSystem = checkoutSystem;
+window.handleCheckout = handleCheckout;
+window.processOrder = processOrder;
 window.validateCheckoutField = validateCheckoutField;
 window.processCheckoutOrder = processCheckoutOrder;
 window.applyCheckoutCoupon = applyCheckoutCoupon;
 window.removeCheckoutCoupon = removeCheckoutCoupon;
 
-console.log('✅ Enhanced Checkout.js loaded with comprehensive success messaging and order confirmation');
+console.log('✅ Checkout.js loaded successfully with handleCheckout function');
