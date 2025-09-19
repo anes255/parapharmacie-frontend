@@ -5,6 +5,8 @@ class CheckoutSystem {
         this.currentStep = 1;
         this.orderData = {};
         this.isProcessing = false;
+        this.appliedDiscount = 0;
+        this.couponCode = '';
     }
 
     // Initialize checkout process
@@ -245,7 +247,12 @@ class CheckoutSystem {
 
         const sousTotal = window.app.getCartTotal();
         const fraisLivraison = this.getCurrentShippingCost();
-        const total = sousTotal + fraisLivraison;
+        let total = sousTotal + fraisLivraison;
+
+        // Apply discount if any
+        if (this.appliedDiscount > 0) {
+            total = Math.max(0, total - this.appliedDiscount);
+        }
 
         // Update display
         const elements = {
@@ -345,7 +352,7 @@ class CheckoutSystem {
             }
 
             // Disable submit button
-            const submitBtn = document.querySelector('button[onclick="handleCheckout(event)"], button[onclick="app.processOrder()"]');
+            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
@@ -406,7 +413,7 @@ class CheckoutSystem {
             }
             
             // Re-enable submit button
-            const submitBtn = document.querySelector('button[onclick="handleCheckout(event)"], button[onclick="app.processOrder()"]');
+            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirmer la commande';
@@ -431,34 +438,18 @@ class CheckoutSystem {
         // Calculate totals
         const sousTotal = window.app ? window.app.getCartTotal() : 0;
         const fraisLivraison = this.getCurrentShippingCost();
-        const total = sousTotal + fraisLivraison;
+        let total = sousTotal + fraisLivraison;
+
+        // Apply discount if any
+        if (this.appliedDiscount > 0) {
+            total = Math.max(0, total - this.appliedDiscount);
+        }
 
         // Generate order number
         const orderNumber = this.generateOrderNumber();
 
-        // Prepare order data for API (backend format)
+        // Prepare order data
         const orderData = {
-            produits: window.app ? window.app.cart.map(item => ({
-                produit: item.id,
-                nom: item.nom,
-                prix: item.prix,
-                quantite: item.quantite,
-                total: item.prix * item.quantite
-            })) : [],
-            montantTotal: total,
-            modeLivraison: 'domicile',
-            adresseLivraison: {
-                nom,
-                prenom,
-                adresse,
-                ville: wilaya,
-                wilaya,
-                telephone: telephone.replace(/\s+/g, ''),
-                email: email.toLowerCase()
-            },
-            notes: commentaires,
-            
-            // Also store additional data for local use
             _id: Date.now().toString(),
             numeroCommande: orderNumber,
             client: {
@@ -480,10 +471,19 @@ class CheckoutSystem {
             sousTotal,
             fraisLivraison,
             total,
-            statut: 'en_attente',
+            statut: 'en-attente',
             modePaiement,
             commentaires,
-            dateCommande: new Date().toISOString()
+            dateCommande: new Date().toISOString(),
+            // Add remise field with proper structure
+            remise: this.appliedDiscount > 0 ? {
+                type: 'montant',
+                valeur: this.appliedDiscount,
+                codePromo: this.couponCode
+            } : {
+                valeur: 0,
+                codePromo: ''
+            }
         };
 
         return orderData;
@@ -562,6 +562,7 @@ class CheckoutSystem {
             if (code.toUpperCase() === 'WELCOME10') {
                 const discount = Math.round(window.app.getCartTotal() * 0.1);
                 this.appliedDiscount = discount;
+                this.couponCode = code.toUpperCase();
                 this.calculateTotals();
                 
                 if (window.app) {
@@ -583,6 +584,7 @@ class CheckoutSystem {
     // Remove applied coupon
     removeCoupon() {
         this.appliedDiscount = 0;
+        this.couponCode = '';
         this.calculateTotals();
         
         if (window.app) {
@@ -600,32 +602,6 @@ function initCheckout() {
     checkoutSystem.init();
     window.checkoutSystem = checkoutSystem;
     console.log('✅ Checkout system initialized');
-}
-
-// MAIN FIX: Add the missing handleCheckout function
-function handleCheckout(event) {
-    if (event) {
-        event.preventDefault();
-    }
-    
-    console.log('🛒 handleCheckout called');
-    
-    if (checkoutSystem) {
-        return checkoutSystem.processOrder();
-    } else if (window.app && typeof window.app.processOrder === 'function') {
-        return window.app.processOrder();
-    } else {
-        console.error('No checkout system available');
-        if (window.app) {
-            window.app.showToast('Erreur: Système de commande indisponible', 'error');
-        }
-    }
-}
-
-// Process Order - Alternative function name for app.js compatibility
-function processOrder() {
-    console.log('🛒 processOrder called');
-    return handleCheckout();
 }
 
 // Global functions for checkout
@@ -667,11 +643,9 @@ if (document.readyState === 'loading') {
 // Export for global access
 window.initCheckout = initCheckout;
 window.checkoutSystem = checkoutSystem;
-window.handleCheckout = handleCheckout;
-window.processOrder = processOrder;
 window.validateCheckoutField = validateCheckoutField;
 window.processCheckoutOrder = processCheckoutOrder;
 window.applyCheckoutCoupon = applyCheckoutCoupon;
 window.removeCheckoutCoupon = removeCheckoutCoupon;
 
-console.log('✅ Checkout.js loaded successfully with handleCheckout function');
+console.log('✅ Checkout.js loaded successfully');
