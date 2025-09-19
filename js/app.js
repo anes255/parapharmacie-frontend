@@ -3310,4 +3310,3 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 console.log('✅ Complete app.js loaded with ALL functionality including admin features');
-
