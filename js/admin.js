@@ -5,7 +5,7 @@ let adminCurrentSection = 'dashboard';
 let currentEditingProduct = null;
 let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
 
-// Helper function to make API calls
+// Helper function to make API calls with better error handling
 async function apiCall(endpoint, options = {}) {
     const url = buildApiUrl(endpoint);
     
@@ -19,6 +19,9 @@ async function apiCall(endpoint, options = {}) {
     const token = localStorage.getItem('token');
     if (token) {
         defaultOptions.headers['x-auth-token'] = token;
+        console.log('✅ Auth token added to request');
+    } else {
+        console.warn('⚠️ No auth token found');
     }
     
     const finalOptions = {
@@ -30,14 +33,27 @@ async function apiCall(endpoint, options = {}) {
         }
     };
     
+    console.log(`🔗 API Call: ${finalOptions.method || 'GET'} ${url}`);
+    console.log('📦 Request options:', finalOptions);
+    
     const response = await fetch(url, finalOptions);
     
+    console.log(`📡 Response: ${response.status} ${response.statusText}`);
+    
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
+        let error;
+        try {
+            error = await response.json();
+        } catch (parseError) {
+            error = { message: `HTTP error! status: ${response.status}` };
+        }
+        console.error('❌ API Error Response:', error);
         throw new Error(error.message || `HTTP error! status: ${response.status}`);
     }
     
-    return response.json();
+    const data = await response.json();
+    console.log('✅ API Success Response:', data);
+    return data;
 }
 
 // Products Management - Add to app prototype
@@ -866,80 +882,97 @@ function closeProductModal() {
     currentEditingProduct = null;
 }
 
-// New function to save product directly
+// IMPROVED saveProduct function with better validation and debugging
 function saveProduct() {
-    const form = document.getElementById('productForm');
+    console.log('🚀 Starting product save process...');
+    
     const isEditing = !!currentEditingProduct;
+    console.log('📝 Editing mode:', isEditing);
     
-    // Validate form
-    const nom = document.getElementById('productNom').value.trim();
-    const prix = document.getElementById('productPrix').value;
-    const stock = document.getElementById('productStock').value;
-    const categorie = document.getElementById('productCategorie').value;
-    const description = document.getElementById('productDescription').value.trim();
+    // Get all form values
+    const formData = {
+        nom: document.getElementById('productNom').value.trim(),
+        description: document.getElementById('productDescription').value.trim(),
+        prix: document.getElementById('productPrix').value,
+        stock: document.getElementById('productStock').value,
+        categorie: document.getElementById('productCategorie').value,
+        marque: document.getElementById('productMarque').value.trim(),
+        prixOriginal: document.getElementById('productPrixOriginal').value,
+        ingredients: document.getElementById('productIngredients').value.trim(),
+        modeEmploi: document.getElementById('productModeEmploi').value.trim(),
+        precautions: document.getElementById('productPrecautions').value.trim(),
+        enVedette: document.getElementById('productEnVedette').checked,
+        enPromotion: document.getElementById('productEnPromotion').checked,
+        actif: document.getElementById('productActif').checked,
+        image: document.getElementById('productImageUrl').value
+    };
     
-    if (!nom || !prix || !stock || !categorie || !description) {
-        app.showToast('Veuillez remplir tous les champs obligatoires', 'error');
+    console.log('📋 Form data collected:', formData);
+    
+    // Frontend validation
+    const errors = [];
+    if (!formData.nom) errors.push('Nom du produit requis');
+    if (!formData.description) errors.push('Description requise');
+    if (!formData.prix || isNaN(parseFloat(formData.prix)) || parseFloat(formData.prix) < 0) errors.push('Prix valide requis');
+    if (!formData.stock || isNaN(parseInt(formData.stock)) || parseInt(formData.stock) < 0) errors.push('Stock valide requis');
+    if (!formData.categorie) errors.push('Catégorie requise');
+    
+    if (formData.enPromotion && (!formData.prixOriginal || parseFloat(formData.prixOriginal) <= parseFloat(formData.prix))) {
+        errors.push('Prix original requis et doit être supérieur au prix de promotion');
+    }
+    
+    if (errors.length > 0) {
+        console.error('❌ Validation errors:', errors);
+        app.showToast(`Erreurs de validation: ${errors.join(', ')}`, 'error');
         return;
     }
+    
+    console.log('✅ Frontend validation passed');
     
     const button = document.getElementById('productSubmitBtn');
     const buttonText = document.getElementById('productSubmitText');
     const spinner = document.getElementById('productSubmitSpinner');
     
-    // Disable button and show loading
+    // Show loading state
     button.disabled = true;
     buttonText.classList.add('hidden');
     spinner.classList.remove('hidden');
     
     try {
-        // Get form values
+        // Prepare product data with correct types
         const productId = document.getElementById('productId').value || Date.now().toString();
-        const marque = document.getElementById('productMarque').value.trim();
-        const prixOriginal = document.getElementById('productPrixOriginal').value;
-        const ingredients = document.getElementById('productIngredients').value.trim();
-        const modeEmploi = document.getElementById('productModeEmploi').value.trim();
-        const precautions = document.getElementById('productPrecautions').value.trim();
-        const enVedette = document.getElementById('productEnVedette').checked;
-        const enPromotion = document.getElementById('productEnPromotion').checked;
-        const actif = document.getElementById('productActif').checked;
-        const imageUrl = document.getElementById('productImageUrl').value;
         
-        // Prepare product data
         const productData = {
             _id: productId,
-            nom: nom,
-            description: description,
-            marque: marque,
-            prix: parseInt(prix),
-            stock: parseInt(stock),
-            categorie: categorie,
-            actif: actif,
-            enVedette: enVedette,
-            enPromotion: enPromotion,
+            nom: formData.nom,
+            description: formData.description,
+            prix: parseFloat(formData.prix),
+            stock: parseInt(formData.stock),
+            categorie: formData.categorie,
+            marque: formData.marque || '',
+            ingredients: formData.ingredients || '',
+            modeEmploi: formData.modeEmploi || '',
+            precautions: formData.precautions || '',
+            enVedette: formData.enVedette,
+            enPromotion: formData.enPromotion,
+            actif: formData.actif,
+            image: formData.image || '',
             dateAjout: new Date().toISOString()
         };
         
         // Add optional fields
-        if (prixOriginal) {
-            productData.prixOriginal = parseInt(prixOriginal);
+        if (formData.prixOriginal && formData.enPromotion) {
+            productData.prixOriginal = parseFloat(formData.prixOriginal);
             
             // Calculate discount percentage
-            if (enPromotion && productData.prixOriginal > productData.prix) {
-                productData.pourcentagePromotion = Math.round((productData.prixOriginal - productData.prix) / productData.prixOriginal * 100);
+            if (productData.prixOriginal > productData.prix) {
+                productData.pourcentagePromotion = Math.round(
+                    ((productData.prixOriginal - productData.prix) / productData.prixOriginal) * 100
+                );
             }
         }
         
-        if (ingredients) productData.ingredients = ingredients;
-        if (modeEmploi) productData.modeEmploi = modeEmploi;
-        if (precautions) productData.precautions = precautions;
-        
-        // Handle image
-        if (imageUrl) {
-            productData.image = imageUrl;
-        }
-        
-        console.log('Product data to save:', productData);
+        console.log('📦 Final product data for API:', productData);
         
         // Save to localStorage first
         let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
@@ -959,7 +992,7 @@ function saveProduct() {
         
         // Save back to localStorage
         localStorage.setItem('demoProducts', JSON.stringify(localProducts));
-        console.log('Product saved to localStorage');
+        console.log('✅ Product saved to localStorage');
         
         // Update the app's product cache to refresh main page immediately
         if (window.app) {
@@ -969,33 +1002,54 @@ function saveProduct() {
         // Try to save to API (optional) - USING CORRECT ENDPOINTS
         const saveToApi = async () => {
             try {
+                console.log('🔄 Attempting to save to API...');
+                
+                // Check if we have a token
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    console.warn('⚠️ No auth token found, skipping API save');
+                    return;
+                }
+                
                 const endpoint = isEditing ? `/products/${productData._id}` : '/products';
                 const method = isEditing ? 'PUT' : 'POST';
                 
-                const response = await fetch(buildApiUrl(endpoint), {
+                console.log(`🎯 API endpoint: ${method} ${endpoint}`);
+                
+                // Prepare data for API (remove _id from new products)
+                const apiData = { ...productData };
+                if (!isEditing) {
+                    delete apiData._id;
+                }
+                
+                console.log('📤 Data being sent to API:', apiData);
+                
+                const response = await apiCall(endpoint, {
                     method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-auth-token': localStorage.getItem('token')
-                    },
-                    body: JSON.stringify(productData)
+                    body: JSON.stringify(apiData)
                 });
                 
-                if (response.ok) {
-                    console.log('Product saved to API successfully');
-                } else {
-                    console.log('API save failed but product saved locally');
-                }
+                console.log('✅ Product saved to API successfully:', response);
+                
             } catch (error) {
-                console.log('API save failed, but product saved locally:', error);
+                console.error('❌ API save failed:', error);
+                console.log('💾 Product saved locally despite API failure');
+                
+                // Don't show error to user since local save succeeded
+                if (window.app) {
+                    window.app.showToast('Produit sauvegardé localement (API indisponible)', 'warning');
+                }
             }
         };
         
-        // Save to API in background
+        // Save to API in background (don't wait for it)
         saveToApi();
         
-        // Show success message
-        app.showToast(isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 'success');
+        // Show success message immediately
+        app.showToast(
+            isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 
+            'success'
+        );
         closeProductModal();
         
         // Refresh admin section
@@ -1006,7 +1060,7 @@ function saveProduct() {
         }
         
     } catch (error) {
-        console.error('Error saving product:', error);
+        console.error('❌ Error saving product:', error);
         app.showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
     } finally {
         // Re-enable button
@@ -1106,7 +1160,7 @@ async function deleteProduct(productId) {
     }
 }
 
-// Order detail modal
+// Order detail modal and other functions remain the same...
 async function viewOrderDetails(orderId) {
     try {
         console.log('Viewing order details for:', orderId);
@@ -1386,4 +1440,4 @@ window.updateOrderStatus = updateOrderStatus;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
-console.log('✅ Fixed Admin.js loaded with correct API endpoints');
+console.log('✅ Complete Fixed Admin.js loaded with improved debugging and validation');
