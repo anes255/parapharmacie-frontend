@@ -5,14 +5,9 @@ let adminCurrentSection = 'dashboard';
 let currentEditingProduct = null;
 let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
 
-// API Configuration
-const API_BASE_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:5000/api'
-    : 'https://parapharmacie-gaher.onrender.com/api';
-
 // Helper function to make API calls
 async function apiCall(endpoint, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = buildApiUrl(endpoint);
     
     const defaultOptions = {
         headers: {
@@ -45,216 +40,6 @@ async function apiCall(endpoint, options = {}) {
     return response.json();
 }
 
-// FIXED Dashboard functionality
-PharmacieGaherApp.prototype.loadAdminDashboard = async function() {
-    try {
-        console.log('📊 Loading admin dashboard...');
-        
-        // Show loading state
-        document.getElementById('adminContent').innerHTML = `
-            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
-                <div class="flex items-center justify-center py-16">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
-                    <span class="ml-4 text-emerald-600 font-medium">Chargement du dashboard...</span>
-                </div>
-            </div>
-        `;
-        
-        // Get dashboard data from API with fallback
-        let dashboardData;
-        try {
-            dashboardData = await apiCall('/admin/dashboard');
-            console.log('✅ Dashboard data from API:', dashboardData);
-        } catch (apiError) {
-            console.log('⚠️ API dashboard failed, using fallback data:', apiError.message);
-            
-            // Fallback: create basic dashboard data
-            dashboardData = {
-                products: { total: 0, active: 0, featured: 0, inactive: 0 },
-                orders: { total: 0, pending: 0, monthly: 0, daily: 0, byStatus: {} },
-                users: { total: 1, active: 1, inactive: 0 },
-                revenue: { monthly: 0, average: 0 },
-                recentOrders: [],
-                topProducts: [],
-                timestamp: new Date().toISOString()
-            };
-            
-            // Try to get local data
-            const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            const localOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-            
-            dashboardData.products.total = localProducts.length;
-            dashboardData.products.active = localProducts.filter(p => p.actif !== false).length;
-            dashboardData.products.featured = localProducts.filter(p => p.enVedette).length;
-            dashboardData.orders.total = localOrders.length;
-            dashboardData.orders.pending = localOrders.filter(o => o.statut === 'en-attente').length;
-            dashboardData.recentOrders = localOrders.slice(0, 5);
-            
-            // Calculate local revenue
-            dashboardData.revenue.monthly = localOrders.reduce((sum, order) => sum + (order.total || 0), 0);
-        }
-        
-        // Render dashboard
-        document.getElementById('adminContent').innerHTML = `
-            <div class="space-y-6">
-                <!-- Header -->
-                <div class="bg-gradient-to-r from-emerald-500 to-green-600 rounded-2xl shadow-xl p-8 text-white">
-                    <h1 class="text-3xl font-bold mb-2">Tableau de bord</h1>
-                    <p class="text-emerald-100">Vue d'ensemble de votre parapharmacie</p>
-                    <div class="text-xs opacity-75 mt-2">Dernière mise à jour: ${new Date(dashboardData.timestamp || Date.now()).toLocaleString('fr-FR')}</div>
-                </div>
-
-                <!-- Stats Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <!-- Products Stats -->
-                    <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-emerald-200/50 p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 bg-emerald-100 rounded-full">
-                                <i class="fas fa-pills text-emerald-600 text-xl"></i>
-                            </div>
-                            <div class="ml-4">
-                                <h3 class="text-sm font-medium text-gray-600">Produits</h3>
-                                <p class="text-2xl font-bold text-emerald-700">${dashboardData.products?.total || 0}</p>
-                                <p class="text-xs text-emerald-600">${dashboardData.products?.active || 0} actifs</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Orders Stats -->
-                    <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-blue-200/50 p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 bg-blue-100 rounded-full">
-                                <i class="fas fa-shopping-cart text-blue-600 text-xl"></i>
-                            </div>
-                            <div class="ml-4">
-                                <h3 class="text-sm font-medium text-gray-600">Commandes</h3>
-                                <p class="text-2xl font-bold text-blue-700">${dashboardData.orders?.total || 0}</p>
-                                <p class="text-xs text-orange-600">${dashboardData.orders?.pending || 0} en attente</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Users Stats -->
-                    <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200/50 p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 bg-purple-100 rounded-full">
-                                <i class="fas fa-users text-purple-600 text-xl"></i>
-                            </div>
-                            <div class="ml-4">
-                                <h3 class="text-sm font-medium text-gray-600">Utilisateurs</h3>
-                                <p class="text-2xl font-bold text-purple-700">${dashboardData.users?.total || 0}</p>
-                                <p class="text-xs text-purple-600">${dashboardData.users?.active || 0} actifs</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Revenue Stats -->
-                    <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-green-200/50 p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 bg-green-100 rounded-full">
-                                <i class="fas fa-chart-line text-green-600 text-xl"></i>
-                            </div>
-                            <div class="ml-4">
-                                <h3 class="text-sm font-medium text-gray-600">CA mensuel</h3>
-                                <p class="text-2xl font-bold text-green-700">${(dashboardData.revenue?.monthly || 0).toLocaleString()} DA</p>
-                                <p class="text-xs text-green-600">Moyenne: ${(dashboardData.revenue?.average || 0).toLocaleString()} DA</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recent Activity -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Recent Orders -->
-                    <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-emerald-200/50 p-6">
-                        <h3 class="text-lg font-bold text-emerald-800 mb-4">
-                            <i class="fas fa-clock mr-2"></i>Commandes récentes
-                        </h3>
-                        ${dashboardData.recentOrders && dashboardData.recentOrders.length > 0 ? `
-                            <div class="space-y-3">
-                                ${dashboardData.recentOrders.map(order => `
-                                    <div class="flex items-center justify-between p-3 bg-emerald-50/50 rounded-lg border border-emerald-200/50">
-                                        <div>
-                                            <div class="font-medium text-emerald-800">#${order.numeroCommande}</div>
-                                            <div class="text-sm text-emerald-600">${order.client?.prenom} ${order.client?.nom}</div>
-                                            <div class="text-xs text-gray-500">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</div>
-                                        </div>
-                                        <div class="text-right">
-                                            <div class="font-bold text-emerald-700">${order.total} DA</div>
-                                            <span class="text-xs px-2 py-1 rounded-full ${getStatusColor(order.statut)}">${getStatusLabel(order.statut)}</span>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        ` : `
-                            <div class="text-center py-8">
-                                <i class="fas fa-shopping-cart text-gray-300 text-4xl mb-4"></i>
-                                <p class="text-gray-500">Aucune commande récente</p>
-                            </div>
-                        `}
-                    </div>
-
-                    <!-- Quick Actions -->
-                    <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-emerald-200/50 p-6">
-                        <h3 class="text-lg font-bold text-emerald-800 mb-4">
-                            <i class="fas fa-bolt mr-2"></i>Actions rapides
-                        </h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <button onclick="switchAdminSection('products')" 
-                                    class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg text-sm">
-                                <i class="fas fa-pills mr-2"></i>Produits
-                            </button>
-                            <button onclick="switchAdminSection('orders')" 
-                                    class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg text-sm">
-                                <i class="fas fa-shopping-cart mr-2"></i>Commandes
-                            </button>
-                            <button onclick="openAddProductModal()" 
-                                    class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg text-sm">
-                                <i class="fas fa-plus mr-2"></i>Nouveau
-                            </button>
-                            <button onclick="switchAdminSection('featured')" 
-                                    class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg text-sm">
-                                <i class="fas fa-star mr-2"></i>Vedette
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        console.log('✅ Dashboard loaded successfully');
-        
-    } catch (error) {
-        console.error('❌ Dashboard loading error:', error);
-        
-        document.getElementById('adminContent').innerHTML = `
-            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
-                <div class="flex items-center">
-                    <i class="fas fa-exclamation-triangle text-red-600 text-xl mr-3"></i>
-                    <div>
-                        <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur de chargement du dashboard</h3>
-                        <p class="text-red-700 mb-4">Détails: ${error.message}</p>
-                        <div class="space-x-4">
-                            <button onclick="app.loadAdminDashboard()" 
-                                    class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
-                                <i class="fas fa-redo mr-2"></i>Réessayer
-                            </button>
-                            <button onclick="switchAdminSection('orders')" 
-                                    class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700">
-                                <i class="fas fa-list mr-2"></i>Voir les commandes
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        if (window.app) {
-            window.app.showToast('Erreur de chargement du dashboard', 'error');
-        }
-    }
-};
-
 // Products Management - Add to app prototype
 PharmacieGaherApp.prototype.loadAdminProducts = async function() {
     try {
@@ -263,7 +48,7 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
         
         // Try to get products from API as well
         try {
-            const data = await apiCall('/products');
+            const data = await apiCall('/admin/products');
             if (data && data.products && data.products.length > 0) {
                 // Merge API products with local ones, avoiding duplicates
                 const localIds = products.map(p => p._id);
@@ -328,7 +113,10 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
         console.error('Error loading products:', error);
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-red-50 border border-red-200 rounded-xl p-6">
-                <p class="text-red-800">Erreur de chargement des produits</p>
+                <p class="text-red-800">Erreur de chargement des produits: ${error.message}</p>
+                <button onclick="app.loadAdminProducts()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                    Réessayer
+                </button>
             </div>
         `;
     }
@@ -403,7 +191,7 @@ PharmacieGaherApp.prototype.renderProductRow = function(product) {
 // Orders Management
 PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
-        console.log('📦 Loading orders from admin panel...');
+        console.log('Loading orders from admin panel...');
         
         // Always start with localStorage orders
         let orders = [...adminOrders];
@@ -514,7 +302,7 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
         `;
         
     } catch (error) {
-        console.error('❌ Error loading orders:', error);
+        console.error('Error loading orders:', error);
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-red-50 border border-red-200 rounded-xl p-6">
                 <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur de chargement des commandes</h3>
@@ -538,7 +326,7 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
         
         // Try to get products from API
         try {
-            const allData = await apiCall('/products');
+            const allData = await apiCall('/admin/products');
             if (allData && allData.products && allData.products.length > 0) {
                 // Merge API products, avoiding duplicates
                 const localIds = localProducts.map(p => p._id);
@@ -625,7 +413,7 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
         console.error('Error loading featured products:', error);
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-red-50 border border-red-200 rounded-xl p-6">
-                <p class="text-red-800">Erreur de chargement des produits en vedette</p>
+                <p class="text-red-800">Erreur de chargement des produits en vedette: ${error.message}</p>
             </div>
         `;
     }
@@ -906,17 +694,15 @@ function showProductModal(title, submitText) {
                                         class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
                                     <option value="">Sélectionnez</option>
                                     <option value="Vitalité">Vitalité</option>
+                                    <option value="Sport">Sport</option>
                                     <option value="Cheveux">Cheveux</option>
                                     <option value="Visage">Visage</option>
                                     <option value="Intime">Intime</option>
                                     <option value="Solaire">Solaire</option>
-                                    <option value="Bébé">Bébé</option>
-                                    <option value="Maman">Maman</option>
-                                    <option value="Minceur">Minceur</option>
-                                    <option value="Homme">Homme</option>
                                     <option value="Soins">Soins</option>
+                                    <option value="Bébé">Bébé</option>
+                                    <option value="Homme">Homme</option>
                                     <option value="Dentaire">Dentaire</option>
-                                    <option value="Sport">Sport</option>
                                 </select>
                             </div>
                         </div>
@@ -1180,16 +966,17 @@ function saveProduct() {
             window.app.refreshProductsCache();
         }
         
-        // Try to save to API (optional)
+        // Try to save to API (optional) - USING CORRECT ENDPOINTS
         const saveToApi = async () => {
             try {
                 const endpoint = isEditing ? `/products/${productData._id}` : '/products';
                 const method = isEditing ? 'PUT' : 'POST';
                 
-                const response = await fetch(API_BASE_URL + endpoint, {
+                const response = await fetch(buildApiUrl(endpoint), {
                     method: method,
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'x-auth-token': localStorage.getItem('token')
                     },
                     body: JSON.stringify(productData)
                 });
@@ -1229,7 +1016,7 @@ function saveProduct() {
     }
 }
 
-// Product operations
+// Product operations - FIXED TO USE CORRECT API ENDPOINTS
 async function toggleFeatured(productId, newStatus) {
     try {
         console.log('Toggling featured status:', productId, newStatus);
@@ -1249,10 +1036,10 @@ async function toggleFeatured(productId, newStatus) {
             }
         }
         
-        // Try to update via API
+        // Try to update via API - USING CORRECT ENDPOINT
         try {
-            await apiCall(`/products/${productId}`, {
-                method: 'PUT',
+            await apiCall(`/products/${productId}/toggle-featured`, {
+                method: 'PATCH',
                 body: JSON.stringify({ enVedette: newStatus })
             });
             console.log('Product featured status updated via API');
@@ -1293,7 +1080,7 @@ async function deleteProduct(productId) {
                 window.app.refreshProductsCache();
             }
             
-            // Try to delete from API
+            // Try to delete from API - USING CORRECT ENDPOINT
             try {
                 await apiCall(`/products/${productId}`, {
                     method: 'DELETE'
@@ -1330,7 +1117,7 @@ async function viewOrderDetails(orderId) {
         if (!order) {
             // Try to get from API
             try {
-                const response = await fetch(API_BASE_URL + `/orders/${orderId}`);
+                const response = await fetch(buildApiUrl(`/admin/orders/${orderId}`));
                 if (response.ok) {
                     order = await response.json();
                 }
@@ -1464,9 +1251,9 @@ async function updateOrderStatus(orderId, newStatus) {
             console.log('Order status updated locally');
         }
         
-        // Try to update via API
+        // Try to update via API - USING CORRECT ENDPOINT
         try {
-            await apiCall(`/orders/${orderId}`, {
+            await apiCall(`/admin/orders/${orderId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ 
                     statut: newStatus,
@@ -1583,38 +1370,6 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
-// Error handling for API calls
-window.handleApiError = function(error, context = '') {
-    console.error(`❌ API Error ${context}:`, error);
-    
-    if (error.message.includes('401') || error.message.includes('Token invalide')) {
-        // Token expired or invalid
-        localStorage.removeItem('token');
-        if (window.app) {
-            window.app.currentUser = null;
-            window.app.updateUserUI();
-            window.app.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
-            window.app.showPage('login');
-        }
-    } else if (error.message.includes('403')) {
-        if (window.app) {
-            window.app.showToast('Accès refusé', 'error');
-        }
-    } else if (error.message.includes('404')) {
-        if (window.app) {
-            window.app.showToast('Ressource non trouvée', 'error');
-        }
-    } else if (error.message.includes('500')) {
-        if (window.app) {
-            window.app.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
-        }
-    } else {
-        if (window.app) {
-            window.app.showToast(error.message || 'Une erreur est survenue', 'error');
-        }
-    }
-};
-
 // Export functions for global access
 window.switchAdminSection = switchAdminSection;
 window.openAddProductModal = openAddProductModal;
@@ -1631,4 +1386,4 @@ window.updateOrderStatus = updateOrderStatus;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
-console.log('✅ Complete Admin.js loaded with fixed dashboard');
+console.log('✅ Fixed Admin.js loaded with correct API endpoints');
