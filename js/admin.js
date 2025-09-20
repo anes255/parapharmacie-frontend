@@ -1,4 +1,4 @@
-// Complete Admin Panel with Full Product Management and Order System - FIXED VERSION
+// Complete Admin Panel with Full Product Management and Order System - ORIGINAL VERSION
 
 // Global variables
 let adminCurrentSection = 'dashboard';
@@ -190,40 +190,59 @@ PharmacieGaherApp.prototype.renderProductRow = function(product) {
     `;
 };
 
-// Orders Management - FIXED: Remove non-existent /orders/admin endpoint
+// Orders Management - FIXED to handle 500 errors properly
 PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
-        console.log('🔍 Loading orders from admin panel...');
+        console.log('Loading orders from admin panel...');
         
         // Always start with localStorage orders
         let orders = [...adminOrders];
-        console.log('📦 Local orders loaded:', orders.length);
+        console.log('Local orders loaded:', orders.length);
         
-        // Try to get orders from API
-        try {
-            console.log('🌐 Attempting to fetch orders from API...');
-            const data = await apiCall('/orders');
-            console.log('✅ API orders response:', data);
+        // Check if user is logged in and is admin before trying API
+        const token = localStorage.getItem('token');
+        const currentUser = window.authSystem?.currentUser || window.app?.currentUser;
+        
+        if (token && currentUser && currentUser.role === 'admin') {
+            console.log('🔐 User is authenticated admin, trying API...');
             
-            if (data && data.orders && data.orders.length > 0) {
-                console.log('📦 API orders loaded:', data.orders.length);
-                // Merge API orders with local ones, avoiding duplicates
-                const apiOrders = data.orders.filter(apiOrder => 
-                    !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
-                );
-                orders = [...orders, ...apiOrders];
-                console.log('🔗 Merged orders total:', orders.length);
+            try {
+                console.log('🌐 Making API call to /orders...');
+                const data = await apiCall('/orders');
+                console.log('✅ Admin endpoint success:', data);
+                
+                if (data && data.orders && data.orders.length > 0) {
+                    console.log('📦 API orders loaded:', data.orders.length);
+                    const apiOrders = data.orders.filter(apiOrder => 
+                        !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
+                    );
+                    orders = [...orders, ...apiOrders];
+                }
+            } catch (error) {
+                console.log('❌ Admin endpoint failed:', error.message);
+                
+                // Check if it's an authentication error
+                if (error.message.includes('401') || error.message.includes('403')) {
+                    console.log('🔒 Authentication failed - user may not be admin');
+                    if (window.app) {
+                        window.app.showToast('Accès administrateur requis', 'warning');
+                    }
+                } else {
+                    console.log('🌐 Network or server issue detected');
+                }
             }
-        } catch (error) {
-            console.log('❌ API orders failed:', error.message);
-            console.log('📦 Using only local orders');
+        } else {
+            console.log('🚫 No admin token or user, skipping API call');
+            if (window.app) {
+                window.app.showToast('Veuillez vous connecter en tant qu\'administrateur', 'warning');
+            }
         }
         
         // Sort by date, newest first
         orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
         
         console.log('📊 Final orders count:', orders.length);
-        console.log('📊 Orders summary:', orders.map(o => ({ id: o.numeroCommande, status: o.statut, total: o.total })));
+        console.log('📊 Orders summary:', orders.map(o => ({ id: o.numeroCommande, status: o.statut })));
         
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
@@ -328,6 +347,48 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
         `;
     }
 };
+
+// Add delete order function that was missing
+async function deleteOrder(orderId) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette commande ?')) {
+        try {
+            console.log('🗑️ Deleting order:', orderId);
+            
+            // Delete from localStorage first
+            let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            const initialCount = orders.length;
+            orders = orders.filter(o => o._id !== orderId && o.numeroCommande !== orderId);
+            localStorage.setItem('adminOrders', JSON.stringify(orders));
+            
+            // Update global variable
+            adminOrders = orders;
+            
+            const localDeleteSuccess = orders.length < initialCount;
+            console.log('Order deleted locally:', localDeleteSuccess);
+            
+            // Try to delete from API
+            try {
+                await apiCall(`/orders/${orderId}`, {
+                    method: 'DELETE'
+                });
+                console.log('Order deleted from API successfully');
+            } catch (error) {
+                console.log('API delete failed, but order deleted locally:', error);
+            }
+            
+            app.showToast('Commande supprimée avec succès', 'success');
+            
+            // Refresh the orders list
+            if (adminCurrentSection === 'orders') {
+                app.loadAdminOrders();
+            }
+            
+        } catch (error) {
+            console.error('Error deleting order:', error);
+            app.showToast('Erreur lors de la suppression', 'error');
+        }
+    }
+}
 
 // Featured Products Management
 PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
@@ -574,48 +635,6 @@ function getStatusLabel(statut) {
         'annulée': 'Annulée'
     };
     return labels[statut] || statut;
-}
-
-// Delete order function - NEW
-async function deleteOrder(orderId) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette commande ?')) {
-        try {
-            console.log('🗑️ Deleting order:', orderId);
-            
-            // Delete from localStorage first
-            let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-            const initialCount = orders.length;
-            orders = orders.filter(o => o._id !== orderId && o.numeroCommande !== orderId);
-            localStorage.setItem('adminOrders', JSON.stringify(orders));
-            
-            // Update global variable
-            adminOrders = orders;
-            
-            const localDeleteSuccess = orders.length < initialCount;
-            console.log('Order deleted locally:', localDeleteSuccess);
-            
-            // Try to delete from API
-            try {
-                await apiCall(`/orders/${orderId}`, {
-                    method: 'DELETE'
-                });
-                console.log('Order deleted from API successfully');
-            } catch (error) {
-                console.log('API delete failed, but order deleted locally:', error);
-            }
-            
-            app.showToast('Commande supprimée avec succès', 'success');
-            
-            // Refresh the orders list
-            if (adminCurrentSection === 'orders') {
-                app.loadAdminOrders();
-            }
-            
-        } catch (error) {
-            console.error('Error deleting order:', error);
-            app.showToast('Erreur lors de la suppression', 'error');
-        }
-    }
 }
 
 // Enhanced Product Modal Functions with Image Upload
