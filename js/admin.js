@@ -242,9 +242,27 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                     console.log('❌ API test failed:', testResponse.status);
                 }
                 
-                // Now try the actual orders API call
+                // Now try the actual orders API call with fallback
                 console.log('🔍 Calling orders API with token...');
-                const data = await apiCall('/orders');
+                let data = null;
+                
+                // Try the admin endpoint first
+                try {
+                    data = await apiCall('/orders/admin');
+                    console.log('✅ Admin endpoint worked:', data);
+                } catch (adminError) {
+                    console.log('❌ Admin endpoint failed:', adminError.message);
+                    
+                    // Fallback to main endpoint
+                    try {
+                        data = await apiCall('/orders');
+                        console.log('✅ Main endpoint worked:', data);
+                    } catch (mainError) {
+                        console.log('❌ Main endpoint failed:', mainError.message);
+                        throw mainError;
+                    }
+                }
+                
                 console.log('✅ API response received:', {
                     hasOrders: !!data.orders,
                     ordersCount: data.orders?.length || 0,
