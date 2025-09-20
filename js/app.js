@@ -754,284 +754,119 @@ class PharmacieGaherApp {
 
     async loadOrdersPage() {
         if (!this.currentUser) {
-            this.showToast('Veuillez vous connecter pour voir vos commandes', 'warning');
-            await this.showPage('login');
+            this.showPage('login');
             return;
         }
 
         const mainContent = document.getElementById('mainContent');
         
+        // Get user's orders from localStorage
+        const allOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const userOrders = allOrders.filter(order => 
+            order.client.email === this.currentUser.email
+        );
+
         mainContent.innerHTML = `
             <div class="container mx-auto px-4 py-8 max-w-6xl">
                 <div class="text-center mb-8">
                     <h1 class="text-4xl font-bold text-emerald-800 mb-4">Mes Commandes</h1>
                     <p class="text-xl text-emerald-600">Suivez l'état de vos commandes</p>
                 </div>
-                
-                <div id="ordersContent" class="min-h-96">
-                    <div class="text-center py-16">
-                        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-                        <p class="text-emerald-600 text-lg">Chargement de vos commandes...</p>
-                    </div>
-                </div>
-            </div>
-        `;
 
-        try {
-            // Try to load orders from API
-            let orders = [];
-            
-            try {
-                const response = await fetch(buildApiUrl('/orders/user/all'), {
-                    headers: { 'x-auth-token': localStorage.getItem('token') }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    orders = data.orders || [];
-                }
-            } catch (error) {
-                console.log('API unavailable, checking localStorage for orders');
-                
-                // Fallback to localStorage orders if API is unavailable
-                const localOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-                orders = localOrders.filter(order => {
-                    // Safe property access
-                    const client = order.client || {};
-                    return client.email === this.currentUser.email || 
-                           client.userId === this.currentUser.id;
-                });
-            }
-
-            this.displayOrders(orders);
-            
-        } catch (error) {
-            console.error('Error loading orders:', error);
-            document.getElementById('ordersContent').innerHTML = `
-                <div class="text-center py-16">
-                    <div class="bg-red-50 border border-red-200 rounded-xl p-8 max-w-md mx-auto">
-                        <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
-                        <h3 class="text-xl font-bold text-red-800 mb-2">Erreur de chargement</h3>
-                        <p class="text-red-600 mb-4">Impossible de charger vos commandes</p>
-                        <button onclick="app.loadOrdersPage()" class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors">
-                            <i class="fas fa-refresh mr-2"></i>Réessayer
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-    }
-
-    displayOrders(orders) {
-        const ordersContent = document.getElementById('ordersContent');
-        
-        if (!orders || orders.length === 0) {
-            ordersContent.innerHTML = `
-                <div class="text-center py-16">
-                    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-8 max-w-md mx-auto">
-                        <i class="fas fa-shopping-bag text-6xl text-emerald-300 mb-6"></i>
-                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
-                        <p class="text-emerald-600 mb-6">Vous n'avez pas encore passé de commande</p>
-                        <button onclick="app.showPage('products')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                            <i class="fas fa-shopping-cart mr-2"></i>Découvrir nos produits
-                        </button>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-
-        const getStatusColor = (status) => {
-            const colors = {
-                'en-attente': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-                'confirmée': 'bg-blue-100 text-blue-800 border-blue-200',
-                'préparée': 'bg-purple-100 text-purple-800 border-purple-200',
-                'expédiée': 'bg-orange-100 text-orange-800 border-orange-200',
-                'livrée': 'bg-green-100 text-green-800 border-green-200',
-                'annulée': 'bg-red-100 text-red-800 border-red-200'
-            };
-            return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
-        };
-
-        const getStatusIcon = (status) => {
-            const icons = {
-                'en-attente': 'fa-clock',
-                'confirmée': 'fa-check-circle',
-                'préparée': 'fa-box',
-                'expédiée': 'fa-truck',
-                'livrée': 'fa-check-double',
-                'annulée': 'fa-times-circle'
-            };
-            return icons[status] || 'fa-question-circle';
-        };
-
-        ordersContent.innerHTML = `
-            <div class="space-y-6">
-                ${orders.map(order => {
-                    // Safely access order properties with fallbacks
-                    const client = order.client || {};
-                    const livraison = order.livraison || {};
-                    const articles = order.articles || [];
-                    const orderNumber = order.numeroCommande || order._id || 'N/A';
-                    const status = order.statut || 'en-attente';
-                    const total = order.total || 0;
-                    const orderDate = order.dateCommande ? new Date(order.dateCommande).toLocaleDateString('fr-FR') : 'Date inconnue';
-                    const clientAddress = client.adresse || livraison.adresse || 'Adresse non renseignée';
-                    const clientWilaya = client.wilaya || livraison.wilaya || '';
-                    
-                    return `
+                <div class="space-y-6">
+                    ${userOrders.length === 0 ? `
+                        <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-emerald-200/50 p-12 text-center">
+                            <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
+                            <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
+                            <p class="text-emerald-600 mb-8">Vous n'avez pas encore passé de commande.</p>
+                            <button onclick="app.showPage('products')" 
+                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                                <i class="fas fa-shopping-cart mr-2"></i>Commencer mes achats
+                            </button>
+                        </div>
+                    ` : userOrders.map(order => `
                         <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-emerald-200/50 p-8">
                             <!-- Order Header -->
                             <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 pb-6 border-b border-emerald-200">
                                 <div>
-                                    <h3 class="text-2xl font-bold text-emerald-800 mb-2">Commande #${orderNumber}</h3>
-                                    <p class="text-emerald-600">Passée le ${orderDate}</p>
+                                    <h3 class="text-2xl font-bold text-emerald-800 mb-2">Commande ${order.numeroCommande}</h3>
+                                    <p class="text-emerald-600">Passée le ${new Date(order.dateCommande).toLocaleDateString('fr-FR', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })}</p>
                                 </div>
-                                <div class="mt-4 md:mt-0 flex items-center gap-4">
-                                    <span class="px-4 py-2 rounded-full text-sm font-semibold border ${getStatusColor(status)}">
-                                        <i class="fas ${getStatusIcon(status)} mr-2"></i>${status}
+                                <div class="mt-4 md:mt-0">
+                                    <span class="px-4 py-2 rounded-full text-sm font-semibold ${this.getOrderStatusClass(order.statut)}">
+                                        ${this.getOrderStatusText(order.statut)}
                                     </span>
-                                    <span class="text-2xl font-bold text-emerald-800">${total} DA</span>
                                 </div>
                             </div>
-                            
-                            <!-- Order Details -->
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <!-- Articles -->
-                                <div>
-                                    <h4 class="font-semibold text-gray-900 mb-4 flex items-center">
-                                        <i class="fas fa-list mr-2 text-emerald-500"></i>Articles commandés
-                                    </h4>
-                                    <div class="space-y-3">
-                                        ${articles.map(article => `
-                                            <div class="flex items-center space-x-3 p-3 bg-emerald-50 rounded-lg">
-                                                <img src="${article.image || 'https://via.placeholder.com/60x60/10b981/ffffff?text=P'}" 
-                                                     alt="${article.nom || 'Produit'}" 
-                                                     class="w-12 h-12 object-cover rounded-lg">
-                                                <div class="flex-1">
-                                                    <p class="font-medium text-emerald-800">${article.nom || 'Produit sans nom'}</p>
-                                                    <p class="text-sm text-emerald-600">Quantité: ${article.quantite || 1} × ${article.prix || 0} DA</p>
-                                                </div>
-                                                <span class="font-semibold text-emerald-700">${(article.prix || 0) * (article.quantite || 1)} DA</span>
+
+                            <!-- Order Items -->
+                            <div class="mb-6">
+                                <h4 class="text-lg font-semibold text-emerald-800 mb-4">Articles commandés</h4>
+                                <div class="space-y-3">
+                                    ${order.articles.map(article => `
+                                        <div class="flex items-center justify-between p-4 bg-emerald-50 rounded-xl">
+                                            <div class="flex-1">
+                                                <h5 class="font-semibold text-emerald-800">${article.nom}</h5>
+                                                <p class="text-emerald-600 text-sm">Quantité: ${article.quantite}</p>
                                             </div>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                                
-                                <!-- Delivery Info -->
-                                <div>
-                                    <h4 class="font-semibold text-gray-900 mb-4 flex items-center">
-                                        <i class="fas fa-truck mr-2 text-emerald-500"></i>Informations de livraison
-                                    </h4>
-                                    <div class="bg-emerald-50 rounded-lg p-4 space-y-2">
-                                        <p class="text-emerald-900">
-                                            <span class="font-medium">Destinataire:</span> ${client.prenom || ''} ${client.nom || ''}
-                                        </p>
-                                        <p class="text-emerald-900">
-                                            <span class="font-medium">Adresse:</span> ${clientAddress}
-                                        </p>
-                                        ${clientWilaya ? `<p class="text-emerald-900"><span class="font-medium">Wilaya:</span> ${clientWilaya}</p>` : ''}
-                                        <p class="text-emerald-900">
-                                            <span class="font-medium">Téléphone:</span> ${client.telephone || 'Non renseigné'}
-                                        </p>
-                                    </div>
-                                    
-                                    ${status === 'en-attente' ? `
-                                        <div class="mt-4">
-                                            <button onclick="app.cancelOrder('${order._id || orderNumber}')" 
-                                                    class="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors">
-                                                <i class="fas fa-times mr-2"></i>Annuler la commande
-                                            </button>
+                                            <div class="text-right">
+                                                <p class="font-bold text-emerald-700">${article.prix} DA × ${article.quantite}</p>
+                                                <p class="text-sm text-emerald-600">= ${article.prix * article.quantite} DA</p>
+                                            </div>
                                         </div>
-                                    ` : ''}
+                                    `).join('')}
                                 </div>
                             </div>
-                            
+
+                            <!-- Order Summary -->
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                                <div class="mb-4 md:mb-0">
+                                    <p class="text-emerald-700 mb-2">
+                                        <i class="fas fa-truck mr-2"></i>
+                                        Livraison à: ${order.livraison.adresse}, ${order.livraison.wilaya}
+                                    </p>
+                                    <p class="text-emerald-600 text-sm">
+                                        <i class="fas fa-credit-card mr-2"></i>
+                                        Paiement à la livraison
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-emerald-700 mb-1">Sous-total: ${order.sousTotal} DA</p>
+                                    <p class="text-emerald-700 mb-1">Livraison: ${order.fraisLivraison} DA</p>
+                                    <p class="text-xl font-bold text-emerald-800">Total: ${order.total} DA</p>
+                                </div>
+                            </div>
+
                             <!-- Order Actions -->
                             <div class="mt-6 pt-6 border-t border-emerald-200">
                                 <div class="flex flex-wrap gap-3">
-                                    <button onclick="app.contactSupport('${orderNumber}')" 
+                                    ${order.statut === 'en-attente' ? `
+                                        <button onclick="app.cancelOrder('${order.numeroCommande}')" 
+                                                class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors">
+                                            <i class="fas fa-times mr-2"></i>Annuler
+                                        </button>
+                                    ` : ''}
+                                    <button onclick="app.contactSupport('${order.numeroCommande}')" 
                                             class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
                                         <i class="fas fa-headset mr-2"></i>Contacter le support
                                     </button>
-                                    <button onclick="app.reorderItems('${orderNumber}')" 
+                                    <button onclick="app.reorderItems('${order.numeroCommande}')" 
                                             class="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors">
                                         <i class="fas fa-redo mr-2"></i>Recommander
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    `;
-                }).join('')}
+                    `).join('')}
+                </div>
             </div>
         `;
-    }
-
-    async cancelOrder(orderId) {
-        if (!confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
-            return;
-        }
-
-        try {
-            const response = await fetch(buildApiUrl(`/orders/${orderId}`), {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-auth-token': localStorage.getItem('token')
-                },
-                body: JSON.stringify({ statut: 'annulée' })
-            });
-
-            if (response.ok) {
-                this.showToast('Commande annulée avec succès', 'success');
-                await this.loadOrdersPage(); // Reload orders
-            } else {
-                const error = await response.json();
-                this.showToast(error.message || 'Erreur lors de l\'annulation', 'error');
-            }
-        } catch (error) {
-            console.error('Error canceling order:', error);
-            // Fallback to localStorage
-            let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-            const orderIndex = orders.findIndex(o => o._id === orderId || o.numeroCommande === orderId);
-            
-            if (orderIndex > -1) {
-                orders[orderIndex].statut = 'annulée';
-                localStorage.setItem('adminOrders', JSON.stringify(orders));
-                this.showToast('Commande annulée avec succès', 'success');
-                this.loadOrdersPage(); // Refresh the page
-            } else {
-                this.showToast('Erreur lors de l\'annulation de la commande', 'error');
-            }
-        }
-    }
-
-    contactSupport(orderNumber) {
-        this.showToast('Redirection vers le support...', 'info');
-        this.showPage('contact');
-    }
-
-    reorderItems(orderNumber) {
-        const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        const order = orders.find(o => o.numeroCommande === orderNumber);
-        
-        if (order && order.articles) {
-            // Add all items from the order back to cart
-            let itemsAdded = 0;
-            order.articles.forEach(article => {
-                const product = this.allProducts.find(p => p.nom === article.nom || p._id === article.productId);
-                if (product) {
-                    this.addToCart(product._id, article.quantite);
-                    itemsAdded++;
-                }
-            });
-            
-            if (itemsAdded > 0) {
-                this.showToast(`${itemsAdded} article(s) ajouté(s) au panier`, 'success');
-            } else {
-                this.showToast('Aucun article trouvé pour cette commande', 'warning');
-            }
-        }
     }
 
     getOrderStatusClass(status) {
@@ -1056,6 +891,44 @@ class PharmacieGaherApp {
             'annulee': 'Annulée'
         };
         return statusTexts[status] || 'Inconnu';
+    }
+
+    cancelOrder(orderNumber) {
+        if (confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
+            const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            const orderIndex = orders.findIndex(o => o.numeroCommande === orderNumber);
+            
+            if (orderIndex > -1 && orders[orderIndex].statut === 'en-attente') {
+                orders[orderIndex].statut = 'annulee';
+                localStorage.setItem('adminOrders', JSON.stringify(orders));
+                this.showToast('Commande annulée avec succès', 'success');
+                this.loadOrdersPage(); // Refresh the page
+            } else {
+                this.showToast('Impossible d\'annuler cette commande', 'error');
+            }
+        }
+    }
+
+    contactSupport(orderNumber) {
+        this.showToast('Redirection vers le support...', 'info');
+        // Here you could implement a contact form or redirect to support
+        this.showPage('contact');
+    }
+
+    reorderItems(orderNumber) {
+        const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const order = orders.find(o => o.numeroCommande === orderNumber);
+        
+        if (order) {
+            // Add all items from the order back to cart
+            order.articles.forEach(article => {
+                const product = this.allProducts.find(p => p.nom === article.nom);
+                if (product) {
+                    this.addToCart(product._id, article.quantite);
+                }
+            });
+            this.showToast('Articles ajoutés au panier', 'success');
+        }
     }
     
     async loadHomePage() {
@@ -1542,7 +1415,7 @@ class PharmacieGaherApp {
                     <div class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-emerald-200/50 p-8">
                         <h2 class="text-2xl font-bold text-emerald-800 mb-6">Informations de livraison</h2>
                         
-                        <form id="checkoutForm" onsubmit="handleCheckout(event)" class="space-y-6">
+                        <form id="checkoutForm" class="space-y-6">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label class="block text-sm font-semibold text-emerald-700 mb-2">Prénom *</label>
@@ -1607,7 +1480,7 @@ class PharmacieGaherApp {
                                           placeholder="Instructions spéciales pour la livraison..."></textarea>
                             </div>
 
-                            <button type="submit" 
+                            <button type="button" onclick="app.handleCheckout(event)"
                                     class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
                                 <i class="fas fa-credit-card mr-2"></i>Confirmer la commande (${total} DA)
                             </button>
@@ -1666,83 +1539,125 @@ class PharmacieGaherApp {
                     </div>
                 </div>
             </div>
+        `;
+    }
 
-            <script>
-                async function handleCheckout(event) {
-                    event.preventDefault();
-                    
-                    if (!window.app || window.app.cart.length === 0) {
-                        if (window.app) {
-                            window.app.showToast('Panier vide', 'error');
-                        }
-                        return;
-                    }
-                    
-                    const orderData = {
-                        client: {
-                            prenom: document.getElementById('checkoutPrenom').value.trim(),
-                            nom: document.getElementById('checkoutNom').value.trim(),
-                            email: document.getElementById('checkoutEmail').value.trim(),
-                            telephone: document.getElementById('checkoutTelephone').value.trim()
-                        },
-                        livraison: {
-                            adresse: document.getElementById('checkoutAdresse').value.trim(),
-                            wilaya: document.getElementById('checkoutWilaya').value,
-                            ville: document.getElementById('checkoutVille').value.trim(),
-                            notes: document.getElementById('checkoutNotes').value.trim()
-                        },
-                        articles: window.app.cart.map(item => ({
-                            produitId: item.id,
+    // Fixed checkout handler method
+    async handleCheckout(event) {
+        if (event) {
+            event.preventDefault();
+        }
+        
+        console.log('🛒 handleCheckout called');
+        
+        if (!this.cart || this.cart.length === 0) {
+            this.showToast('Votre panier est vide', 'warning');
+            return;
+        }
+        
+        // Validate required fields
+        const requiredFields = ['checkoutPrenom', 'checkoutNom', 'checkoutEmail', 'checkoutTelephone', 'checkoutAdresse', 'checkoutWilaya'];
+        
+        for (let fieldId of requiredFields) {
+            const field = document.getElementById(fieldId);
+            if (!field || !field.value.trim()) {
+                this.showToast(`Le champ ${fieldId.replace('checkout', '')} est requis`, 'error');
+                return;
+            }
+        }
+        
+        try {
+            // Gather order data
+            const orderData = {
+                _id: Date.now().toString(),
+                numeroCommande: `CMD${Date.now().toString().slice(-8)}${Math.random().toString(36).substring(2, 4).toUpperCase()}`,
+                client: {
+                    prenom: document.getElementById('checkoutPrenom').value.trim(),
+                    nom: document.getElementById('checkoutNom').value.trim(),
+                    email: document.getElementById('checkoutEmail').value.trim(),
+                    telephone: document.getElementById('checkoutTelephone').value.trim()
+                },
+                livraison: {
+                    adresse: document.getElementById('checkoutAdresse').value.trim(),
+                    wilaya: document.getElementById('checkoutWilaya').value,
+                    ville: document.getElementById('checkoutVille').value.trim(),
+                    notes: document.getElementById('checkoutNotes').value.trim()
+                },
+                articles: this.cart.map(item => ({
+                    produitId: item.id,
+                    nom: item.nom,
+                    prix: item.prix,
+                    quantite: item.quantite
+                })),
+                sousTotal: this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0),
+                fraisLivraison: this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0) >= 5000 ? 0 : 300,
+                total: this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0) + 
+                       (this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0) >= 5000 ? 0 : 300),
+                statut: 'en-attente',
+                dateCommande: new Date().toISOString()
+            };
+            
+            console.log('Processing order:', orderData);
+            
+            // Try to save to API
+            try {
+                const response = await fetch(buildApiUrl('/orders'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-token': localStorage.getItem('token') || ''
+                    },
+                    body: JSON.stringify({
+                        produits: orderData.articles.map(item => ({
+                            produit: item.produitId,
                             nom: item.nom,
                             prix: item.prix,
-                            quantite: item.quantite
+                            quantite: item.quantite,
+                            total: item.prix * item.quantite
                         })),
-                        sousTotal: window.app.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0),
-                        fraisLivraison: window.app.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0) >= 5000 ? 0 : 300,
-                        total: window.app.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0) + 
-                               (window.app.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0) >= 5000 ? 0 : 300)
-                    };
-                    
-                    try {
-                        // Save order to localStorage for demo
-                        const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-                        const orderNumber = 'CMD' + Date.now().toString().slice(-6);
-                        const newOrder = {
-                            ...orderData,
-                            numeroCommande: orderNumber,
-                            statut: 'en-attente',
-                            dateCommande: new Date().toISOString()
-                        };
-                        
-                        orders.push(newOrder);
-                        localStorage.setItem('adminOrders', JSON.stringify(orders));
-                        
-                        // Try to send to API as well
-                        try {
-                            await apiCall('/orders', {
-                                method: 'POST',
-                                body: JSON.stringify(orderData)
-                            });
-                        } catch (error) {
-                            console.log('API order creation failed, using local storage');
-                        }
-                        
-                        // Clear cart
-                        window.app.clearCart();
-                        
-                        // Show confirmation
-                        window.app.showToast('Commande créée avec succès!', 'success');
-                        window.app.showPage('order-confirmation', { orderNumber });
-                        
-                    } catch (error) {
-                        console.error('Checkout error:', error);
-                        if (window.app) {
-                            window.app.showToast('Erreur lors de la création de la commande', 'error');
-                        }
-                    }
-                }
-            </script>
-        `;
+                        montantTotal: orderData.total,
+                        modeLivraison: 'domicile',
+                        adresseLivraison: {
+                            nom: orderData.client.nom,
+                            prenom: orderData.client.prenom,
+                            adresse: orderData.livraison.adresse,
+                            ville: orderData.livraison.ville,
+                            wilaya: orderData.livraison.wilaya,
+                            telephone: orderData.client.telephone.replace(/\s+/g, ''),
+                            email: orderData.client.email.toLowerCase()
+                        },
+                        notes: orderData.livraison.notes || ''
+                    })
+                });
+                
+                console.log('✅ Order saved to API');
+            } catch (apiError) {
+                console.log('⚠️ API save failed:', apiError.message);
+            }
+            
+            // Always save locally
+            const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            orders.unshift(orderData);
+            localStorage.setItem('adminOrders', JSON.stringify(orders));
+            
+            // Save to user orders if logged in
+            if (this.currentUser) {
+                const userOrdersKey = `userOrders_${this.currentUser.id}`;
+                let userOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
+                userOrders.unshift(orderData);
+                if (userOrders.length > 50) userOrders = userOrders.slice(0, 50);
+                localStorage.setItem(userOrdersKey, JSON.stringify(userOrders));
+            }
+            
+            // Clear cart and show success
+            this.clearCart();
+            this.showToast('Commande passée avec succès !', 'success');
+            this.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
+            
+        } catch (error) {
+            console.error('❌ Error processing order:', error);
+            this.showToast('Erreur lors de la validation de la commande', 'error');
+        }
     }
 
     async loadOrderConfirmationPage(orderNumber) {
@@ -3043,6 +2958,16 @@ function handleContactForm(event) {
     }, 2000);
 }
 
+// Fixed global checkout handler
+function handleCheckout(event) {
+    console.log('🛒 Global handleCheckout called');
+    if (window.app && typeof window.app.handleCheckout === 'function') {
+        window.app.handleCheckout(event);
+    } else {
+        console.error('App or handleCheckout method not available');
+    }
+}
+
 function logout() {
     if (window.app) {
         window.app.logout();
@@ -3058,4 +2983,4 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('App initialized and made globally available');
 });
 
-console.log('✅ Complete app.js loaded with ALL functionality including orders page fix and admin features');
+console.log('✅ Complete app.js loaded with ALL functionality including admin features and FIXED checkout');
