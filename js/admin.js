@@ -206,84 +206,153 @@ PharmacieGaherApp.prototype.renderProductRow = function(product) {
     `;
 };
 
-// Orders Management - FIXED to handle authentication better
+// Orders Management - ENHANCED with better debugging
 PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
-        console.log('Loading orders from admin panel...');
+        console.log('🔍 Starting to load admin orders...');
         
         // Always start with localStorage orders
         let orders = [...adminOrders];
-        console.log('Local orders loaded:', orders.length);
+        console.log('📦 Local orders loaded:', orders.length);
         
-        // Check if user is authenticated before trying API
+        // Check authentication status first
         const token = localStorage.getItem('token');
         const currentUser = window.app?.currentUser;
         
+        console.log('🔍 Auth check:', {
+            hasToken: !!token,
+            hasUser: !!currentUser,
+            userRole: currentUser?.role,
+            userEmail: currentUser?.email
+        });
+        
         if (token && currentUser && currentUser.role === 'admin') {
-            // Try to merge with API orders
+            console.log('✅ Admin authentication confirmed, calling API...');
+            
             try {
+                // Test the API connection first
+                console.log('🔍 Testing API connection...');
+                const testResponse = await fetch(`${API_BASE_URL}/orders/test`);
+                console.log('🔍 Test response status:', testResponse.status);
+                
+                if (testResponse.ok) {
+                    const testData = await testResponse.json();
+                    console.log('✅ API test successful:', testData);
+                } else {
+                    console.log('❌ API test failed:', testResponse.status);
+                }
+                
+                // Now try the actual orders API call
+                console.log('🔍 Calling orders API with token...');
                 const data = await apiCall('/orders');
+                console.log('✅ API response received:', {
+                    hasOrders: !!data.orders,
+                    ordersCount: data.orders?.length || 0,
+                    responseKeys: Object.keys(data)
+                });
+                
                 if (data && data.orders && data.orders.length > 0) {
-                    console.log('API orders loaded:', data.orders.length);
+                    console.log('📦 API orders loaded:', data.orders.length);
                     const apiOrders = data.orders.filter(apiOrder => 
                         !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
                     );
                     orders = [...orders, ...apiOrders];
+                    console.log('📦 Total orders after merge:', orders.length);
+                } else {
+                    console.log('📦 No orders from API or empty response');
                 }
+                
             } catch (error) {
-                console.log('API unavailable or authentication failed, using only local orders:', error.message);
+                console.log('❌ API call failed:', error.message);
                 
                 // If it's an authentication error, show appropriate message
                 if (error.message.includes('Session expirée') || error.message.includes('Accès refusé')) {
-                    // The apiCall function already handles this case, so just continue with local orders
+                    console.log('🔑 Authentication issue detected');
+                } else {
+                    console.log('🌐 Network or server issue detected');
                 }
             }
         } else {
-            console.log('No valid admin authentication, using only local orders');
+            console.log('❌ No valid admin authentication found');
         }
         
-        // Sort by date, newest first
+        // Sort orders by date, newest first
         orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
         
-        console.log('Total orders to display:', orders.length);
+        console.log('📊 Final orders count:', orders.length);
+        console.log('📊 Orders summary:', orders.map(o => ({
+            numero: o.numeroCommande,
+            client: `${o.client?.prenom} ${o.client?.nom}`,
+            total: o.total,
+            statut: o.statut,
+            date: new Date(o.dateCommande).toLocaleDateString()
+        })));
         
+        // Render the orders page
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
                 <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-emerald-800">Gestion des commandes</h2>
+                    <div>
+                        <h2 class="text-2xl font-bold text-emerald-800">Gestion des commandes</h2>
+                        <p class="text-emerald-600">Total: ${orders.length} commande(s)</p>
+                    </div>
                     <div class="flex gap-2">
                         <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-semibold">
                             ${orders.length} commande(s)
                         </span>
-                        <button onclick="app.loadAdminOrders()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg">
+                        <button onclick="app.loadAdminOrders()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-all">
                             <i class="fas fa-sync mr-2"></i>Actualiser
+                        </button>
+                        <button onclick="testApiConnection()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-all">
+                            <i class="fas fa-plug mr-2"></i>Test API
                         </button>
                     </div>
                 </div>
                 
-                ${!token || !currentUser || currentUser.role !== 'admin' ? `
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
-                        <div class="flex items-center">
-                            <i class="fas fa-exclamation-triangle text-yellow-600 text-xl mr-3"></i>
-                            <div>
-                                <h4 class="font-semibold text-yellow-800">Authentification requise</h4>
-                                <p class="text-yellow-700 text-sm">Connectez-vous en tant qu'administrateur pour voir toutes les commandes en temps réel.</p>
-                            </div>
+                <!-- Authentication Status -->
+                <div class="mb-6 p-4 rounded-xl ${token && currentUser && currentUser.role === 'admin' ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'}">
+                    <div class="flex items-center">
+                        <i class="fas ${token && currentUser && currentUser.role === 'admin' ? 'fa-check-circle text-green-600' : 'fa-exclamation-triangle text-yellow-600'} text-xl mr-3"></i>
+                        <div>
+                            <h4 class="font-semibold ${token && currentUser && currentUser.role === 'admin' ? 'text-green-800' : 'text-yellow-800'}">
+                                ${token && currentUser && currentUser.role === 'admin' ? 'Authentification admin active' : 'Authentification requise'}
+                            </h4>
+                            <p class="text-sm ${token && currentUser && currentUser.role === 'admin' ? 'text-green-700' : 'text-yellow-700'}">
+                                ${token && currentUser && currentUser.role === 'admin' 
+                                    ? `Connecté en tant que ${currentUser.email} (${currentUser.role})`
+                                    : 'Connectez-vous en tant qu\'administrateur pour voir toutes les commandes en temps réel'
+                                }
+                            </p>
                         </div>
                     </div>
-                ` : ''}
+                </div>
                 
                 ${orders.length === 0 ? `
                     <div class="text-center py-16">
                         <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
-                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
-                        <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées</p>
-                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
-                            <h4 class="font-semibold text-blue-800 mb-2">Info:</h4>
-                            <p class="text-sm text-blue-700">Les commandes sont automatiquement ajoutées ici lors du checkout</p>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande trouvée</h3>
+                        <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées par les clients</p>
+                        
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 max-w-md mx-auto mb-6">
+                            <h4 class="font-semibold text-blue-800 mb-2">💡 Pour tester:</h4>
+                            <ul class="text-sm text-blue-700 text-left space-y-1">
+                                <li>• Passez une commande en tant que client</li>
+                                <li>• Utilisez le bouton "Test API" ci-dessus</li>
+                                <li>• Vérifiez votre connexion admin</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="flex justify-center space-x-4">
+                            <button onclick="testApiConnection()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl">
+                                <i class="fas fa-plug mr-2"></i>Tester la connexion API
+                            </button>
+                            <button onclick="createTestOrder()" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl">
+                                <i class="fas fa-plus mr-2"></i>Créer une commande test
+                            </button>
                         </div>
                     </div>
                 ` : `
+                    <!-- Orders Table with Enhanced Information -->
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead class="bg-emerald-50 border-b border-emerald-200">
@@ -393,13 +462,14 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
         `;
         
     } catch (error) {
-        console.error('Error loading orders:', error);
+        console.error('💥 Critical error in loadAdminOrders:', error);
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-red-50 border border-red-200 rounded-xl p-6">
-                <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur de chargement des commandes</h3>
-                <p class="text-red-700 mb-4">Détails: ${error.message}</p>
-                <button onclick="app.loadAdminOrders()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
-                    Réessayer
+                <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur critique</h3>
+                <p class="text-red-700 mb-4">Impossible de charger les commandes</p>
+                <p class="text-red-600 text-sm mb-4">Erreur: ${error.message}</p>
+                <button onclick="app.loadAdminOrders()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-all">
+                    <i class="fas fa-redo mr-2"></i>Réessayer
                 </button>
             </div>
         `;
@@ -1886,6 +1956,161 @@ function exportOrderToPDF(orderId) {
     // In a real implementation, you could use libraries like jsPDF
     app.showToast('Fonction PDF en développement. Utilisez l\'impression pour le moment.', 'info');
     printOrder(orderId);
+}
+
+// Test API connection function
+async function testApiConnection() {
+    console.log('🔍 Testing API connection...');
+    app.showToast('Test de connexion API en cours...', 'info');
+    
+    try {
+        // Test 1: Basic server health
+        console.log('🔍 Test 1: Server health check');
+        const healthResponse = await fetch(`${API_BASE_URL}/health`);
+        console.log('Health response:', healthResponse.status);
+        
+        if (!healthResponse.ok) {
+            throw new Error(`Server health check failed: ${healthResponse.status}`);
+        }
+        
+        const healthData = await healthResponse.json();
+        console.log('Health data:', healthData);
+        
+        // Test 2: Orders test endpoint
+        console.log('🔍 Test 2: Orders test endpoint');
+        const testResponse = await fetch(`${API_BASE_URL}/orders/test`);
+        console.log('Orders test response:', testResponse.status);
+        
+        if (!testResponse.ok) {
+            throw new Error(`Orders test failed: ${testResponse.status}`);
+        }
+        
+        const testData = await testResponse.json();
+        console.log('Orders test data:', testData);
+        
+        // Test 3: Authentication check
+        console.log('🔍 Test 3: Authentication check');
+        const token = localStorage.getItem('token');
+        const currentUser = window.app?.currentUser;
+        
+        console.log('Auth status:', {
+            hasToken: !!token,
+            hasUser: !!currentUser,
+            userRole: currentUser?.role
+        });
+        
+        if (token && currentUser && currentUser.role === 'admin') {
+            // Test 4: Authenticated orders endpoint
+            console.log('🔍 Test 4: Authenticated orders endpoint');
+            const ordersResponse = await fetch(`${API_BASE_URL}/orders`, {
+                headers: {
+                    'x-auth-token': token,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            console.log('Orders response:', ordersResponse.status);
+            
+            if (ordersResponse.ok) {
+                const ordersData = await ordersResponse.json();
+                console.log('Orders data:', ordersData);
+                
+                app.showToast(`✅ API connectée! ${ordersData.orders?.length || 0} commandes trouvées`, 'success');
+                
+                // Refresh the orders page
+                app.loadAdminOrders();
+            } else {
+                const errorData = await ordersResponse.json().catch(() => ({ message: 'Unknown error' }));
+                console.log('Orders error:', errorData);
+                throw new Error(`Orders API failed: ${ordersResponse.status} - ${errorData.message}`);
+            }
+        } else {
+            app.showToast('⚠️ API accessible mais authentification manquante', 'warning');
+        }
+        
+    } catch (error) {
+        console.error('❌ API test failed:', error);
+        app.showToast(`❌ Test API échoué: ${error.message}`, 'error');
+    }
+}
+
+// Create test order function
+async function createTestOrder() {
+    console.log('🔍 Creating test order...');
+    app.showToast('Création d\'une commande test...', 'info');
+    
+    try {
+        const testOrder = {
+            numeroCommande: `TEST${Date.now()}`,
+            client: {
+                prenom: 'Test',
+                nom: 'Client',
+                email: 'test@example.com',
+                telephone: '+213555123456',
+                adresse: '123 Rue Test',
+                wilaya: 'Alger'
+            },
+            articles: [
+                {
+                    productId: 'test-product-1',
+                    nom: 'Produit Test',
+                    prix: 500,
+                    quantite: 1,
+                    image: ''
+                }
+            ],
+            sousTotal: 500,
+            fraisLivraison: 200,
+            total: 700,
+            modePaiement: 'Paiement à la livraison',
+            commentaires: 'Commande de test créée depuis l\'admin'
+        };
+        
+        // Add to localStorage first
+        const validOrder = {
+            _id: Date.now().toString(),
+            ...testOrder,
+            statut: 'en-attente',
+            dateCommande: new Date().toISOString()
+        };
+        
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        orders.unshift(validOrder);
+        localStorage.setItem('adminOrders', JSON.stringify(orders));
+        adminOrders = orders;
+        
+        console.log('✅ Test order added to localStorage');
+        
+        // Try to add to API as well
+        try {
+            const response = await fetch(`${API_BASE_URL}/orders`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(testOrder)
+            });
+            
+            if (response.ok) {
+                const apiData = await response.json();
+                console.log('✅ Test order added to API:', apiData);
+                app.showToast('✅ Commande test créée avec succès!', 'success');
+            } else {
+                console.log('⚠️ API creation failed, but local order created');
+                app.showToast('✅ Commande test créée localement', 'warning');
+            }
+        } catch (apiError) {
+            console.log('⚠️ API unavailable, but local order created');
+            app.showToast('✅ Commande test créée localement', 'warning');
+        }
+        
+        // Refresh the orders page
+        app.loadAdminOrders();
+        
+    } catch (error) {
+        console.error('❌ Test order creation failed:', error);
+        app.showToast(`❌ Échec création commande test: ${error.message}`, 'error');
+    }
 }
 
 console.log('✅ Enhanced Admin.js loaded with complete order management and delete functionality');
