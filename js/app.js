@@ -1572,57 +1572,42 @@ class PharmacieGaherApp {
             const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
             const total = sousTotal + fraisLivraison;
             
+            // Generate order number
+            const numeroCommande = `CMD${Date.now().toString().slice(-8)}${Math.random().toString(36).substring(2, 4).toUpperCase()}`;
+            
             // Get form data
             const clientData = {
                 prenom: document.getElementById('checkoutPrenom').value.trim(),
                 nom: document.getElementById('checkoutNom').value.trim(),
                 email: document.getElementById('checkoutEmail').value.trim().toLowerCase(),
-                telephone: document.getElementById('checkoutTelephone').value.trim().replace(/\s+/g, '')
-            };
-            
-            const livraisonData = {
+                telephone: document.getElementById('checkoutTelephone').value.trim().replace(/\s+/g, ''),
                 adresse: document.getElementById('checkoutAdresse').value.trim(),
-                wilaya: document.getElementById('checkoutWilaya').value,
-                ville: document.getElementById('checkoutVille').value.trim(),
-                notes: document.getElementById('checkoutNotes').value.trim()
+                wilaya: document.getElementById('checkoutWilaya').value
             };
             
-            // Format articles for API
+            const notes = document.getElementById('checkoutNotes').value.trim();
+            
+            // Format articles for API (backend expects 'articles', not 'produits')
             const articlesFormatted = this.cart.map(item => ({
-                produit: item.id,
+                productId: item.id,
                 nom: item.nom,
                 prix: item.prix,
                 quantite: item.quantite,
-                total: item.prix * item.quantite
+                image: item.image || ''
             }));
             
-            // Try to save to API with correct format
+            // Try to save to API with correct format matching backend validation
             let orderSavedToAPI = false;
             try {
                 const apiPayload = {
-                    produits: articlesFormatted,
-                    montantTotal: total,
-                    fraisLivraison: fraisLivraison,
+                    numeroCommande: numeroCommande,
+                    client: clientData,  // Backend expects address fields directly in client object
+                    articles: articlesFormatted,  // Backend expects 'articles', not 'produits'
                     sousTotal: sousTotal,
-                    modeLivraison: 'domicile',
-                    modePaiement: 'cash_on_delivery',
-                    adresseLivraison: {
-                        nom: clientData.nom,
-                        prenom: clientData.prenom,
-                        adresse: livraisonData.adresse,
-                        ville: livraisonData.ville || '',
-                        wilaya: livraisonData.wilaya,
-                        telephone: clientData.telephone,
-                        email: clientData.email
-                    },
-                    client: {
-                        nom: clientData.nom,
-                        prenom: clientData.prenom,
-                        email: clientData.email,
-                        telephone: clientData.telephone
-                    },
-                    notes: livraisonData.notes || '',
-                    statut: 'en-attente'
+                    fraisLivraison: fraisLivraison,
+                    total: total,
+                    modePaiement: 'Paiement à la livraison',
+                    commentaires: notes
                 };
                 
                 console.log('Sending API payload:', apiPayload);
@@ -1657,13 +1642,16 @@ class PharmacieGaherApp {
             }
             
             // Always save locally regardless of API result
-            const orderNumber = `CMD${Date.now().toString().slice(-8)}${Math.random().toString(36).substring(2, 4).toUpperCase()}`;
-            
             const orderData = {
                 _id: Date.now().toString(),
-                numeroCommande: orderNumber,
+                numeroCommande: numeroCommande,
                 client: clientData,
-                livraison: livraisonData,
+                livraison: {
+                    adresse: clientData.adresse,
+                    wilaya: clientData.wilaya,
+                    ville: document.getElementById('checkoutVille').value.trim(),
+                    notes: notes
+                },
                 articles: this.cart.map(item => ({
                     produitId: item.id,
                     nom: item.nom,
