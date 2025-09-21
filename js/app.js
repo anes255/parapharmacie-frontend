@@ -1683,7 +1683,7 @@ class PharmacieGaherApp {
             // Clear cart and show success
             this.clearCart();
             this.showToast('Commande passée avec succès !', 'success');
-            this.showPage('order-confirmation', { orderNumber: orderNumber });
+            this.showPage('order-confirmation', { orderNumber: numeroCommande });
             
         } catch (error) {
             console.error('❌ Error processing order:', error);
