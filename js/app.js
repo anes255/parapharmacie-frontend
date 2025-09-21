@@ -1582,7 +1582,6 @@ class PharmacieGaherApp {
                 email: document.getElementById('checkoutEmail').value.trim().toLowerCase(),
                 telephone: document.getElementById('checkoutTelephone').value.trim().replace(/\s+/g, ''),
                 adresse: document.getElementById('checkoutAdresse').value.trim(),
-                ville: document.getElementById('checkoutVille').value.trim() || '', // Added ville field
                 wilaya: document.getElementById('checkoutWilaya').value
             };
             
@@ -1590,78 +1589,25 @@ class PharmacieGaherApp {
             
             // Format articles for API (backend expects 'articles', not 'produits')
             const articlesFormatted = this.cart.map(item => ({
-                productId: String(item.id), // Ensure string type
-                nom: String(item.nom),
-                prix: Number(item.prix),    // Ensure number type
-                quantite: Number(item.quantite), // Ensure number type
-                image: String(item.image || '')
+                productId: item.id,
+                nom: item.nom,
+                prix: item.prix,
+                quantite: item.quantite,
+                image: item.image || ''
             }));
             
-            // Try to save to API with better error handling
+            // Try to save to API with correct format matching backend validation
             let orderSavedToAPI = false;
             try {
-                // Make numeroCommande more unique to avoid database conflicts
-                const timestamp = Date.now();
-                const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-                const uniqueOrderNumber = `CMD${timestamp}${randomSuffix}`;
-                
                 const apiPayload = {
-                    numeroCommande: uniqueOrderNumber,
-                    client: clientData,
-                    articles: articlesFormatted,
-                    sousTotal: Number(sousTotal),
-                    fraisLivraison: Number(fraisLivraison),
-                    total: Number(total),
+                    numeroCommande: numeroCommande,
+                    client: clientData,  // Backend expects address fields directly in client object
+                    articles: articlesFormatted,  // Backend expects 'articles', not 'produits'
+                    sousTotal: sousTotal,
+                    fraisLivraison: fraisLivraison,
+                    total: total,
                     modePaiement: 'Paiement à la livraison',
-                    commentaires: notes || ''
-                };
-                
-                console.log('Sending API payload:', apiPayload);
-                
-                const response = await fetch(buildApiUrl('/orders'), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-auth-token': localStorage.getItem('token') || ''
-                    },
-                    body: JSON.stringify(apiPayload)
-                });
-                
-                if (response.ok) {
-                    const apiResult = await response.json();
-                    console.log('✅ Order saved to API successfully:', apiResult);
-                    orderSavedToAPI = true;
-                    // Use the API-generated order number if available
-                    numeroCommande = apiResult.order?.numeroCommande || uniqueOrderNumber;
-                } else {
-                    const errorData = await response.text();
-                    console.log('⚠️ API save failed:', response.status, errorData);
-                    
-                    try {
-                        const errorJson = JSON.parse(errorData);
-                        console.log('Server error details:', errorJson);
-                        
-                        // Log the specific error for debugging
-                        if (response.status === 500) {
-                            console.error('🚨 Server error - likely database or validation issue');
-                            console.error('Payload that caused error:', JSON.stringify(apiPayload, null, 2));
-                        }
-                    } catch (e) {
-                        console.log('Raw server error response:', errorData);
-                    }
-                    
-                    // Continue with localStorage save even if API fails
-                    console.log('📝 Continuing with localStorage save...');
-                }
-            } catch (apiError) {
-                console.log('⚠️ API request failed:', apiError.message);
-                console.log('📝 Continuing with localStorage save...');
-            } types ensured
-                    sousTotal: Number(sousTotal),
-                    fraisLivraison: Number(fraisLivraison),
-                    total: Number(total),
-                    modePaiement: 'Paiement à la livraison',
-                    commentaires: notes || ''
+                    commentaires: notes
                 };
                 
                 console.log('Sending API payload:', apiPayload);
