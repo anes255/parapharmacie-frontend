@@ -1602,7 +1602,10 @@ class PharmacieGaherApp {
                 const apiPayload = {
                     produits: articlesFormatted,
                     montantTotal: total,
+                    fraisLivraison: fraisLivraison,
+                    sousTotal: sousTotal,
                     modeLivraison: 'domicile',
+                    modePaiement: 'cash_on_delivery',
                     adresseLivraison: {
                         nom: clientData.nom,
                         prenom: clientData.prenom,
@@ -1612,7 +1615,14 @@ class PharmacieGaherApp {
                         telephone: clientData.telephone,
                         email: clientData.email
                     },
-                    notes: livraisonData.notes || ''
+                    client: {
+                        nom: clientData.nom,
+                        prenom: clientData.prenom,
+                        email: clientData.email,
+                        telephone: clientData.telephone
+                    },
+                    notes: livraisonData.notes || '',
+                    statut: 'en-attente'
                 };
                 
                 console.log('Sending API payload:', apiPayload);
@@ -1631,8 +1641,16 @@ class PharmacieGaherApp {
                     console.log('✅ Order saved to API successfully:', apiResult);
                     orderSavedToAPI = true;
                 } else {
-                    const errorText = await response.text();
-                    console.log('⚠️ API save failed:', response.status, errorText);
+                    const errorData = await response.text();
+                    console.log('⚠️ API save failed:', response.status, errorData);
+                    
+                    // Try to parse error message
+                    try {
+                        const errorJson = JSON.parse(errorData);
+                        console.log('Error details:', errorJson);
+                    } catch (e) {
+                        console.log('Raw error:', errorData);
+                    }
                 }
             } catch (apiError) {
                 console.log('⚠️ API save failed:', apiError.message);
