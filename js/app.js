@@ -1597,13 +1597,66 @@ class PharmacieGaherApp {
                 image: String(item.image || '')
             }));
             
-            // Try to save to API with correct format matching backend validation
+            // Try to save to API with better error handling
             let orderSavedToAPI = false;
             try {
+                // Make numeroCommande more unique to avoid database conflicts
+                const timestamp = Date.now();
+                const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const uniqueOrderNumber = `CMD${timestamp}${randomSuffix}`;
+                
                 const apiPayload = {
-                    numeroCommande: numeroCommande,
-                    client: clientData,  // Now includes ville field
-                    articles: articlesFormatted,  // Data types ensured
+                    numeroCommande: uniqueOrderNumber,
+                    client: clientData,
+                    articles: articlesFormatted,
+                    sousTotal: Number(sousTotal),
+                    fraisLivraison: Number(fraisLivraison),
+                    total: Number(total),
+                    modePaiement: 'Paiement à la livraison',
+                    commentaires: notes || ''
+                };
+                
+                console.log('Sending API payload:', apiPayload);
+                
+                const response = await fetch(buildApiUrl('/orders'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-token': localStorage.getItem('token') || ''
+                    },
+                    body: JSON.stringify(apiPayload)
+                });
+                
+                if (response.ok) {
+                    const apiResult = await response.json();
+                    console.log('✅ Order saved to API successfully:', apiResult);
+                    orderSavedToAPI = true;
+                    // Use the API-generated order number if available
+                    numeroCommande = apiResult.order?.numeroCommande || uniqueOrderNumber;
+                } else {
+                    const errorData = await response.text();
+                    console.log('⚠️ API save failed:', response.status, errorData);
+                    
+                    try {
+                        const errorJson = JSON.parse(errorData);
+                        console.log('Server error details:', errorJson);
+                        
+                        // Log the specific error for debugging
+                        if (response.status === 500) {
+                            console.error('🚨 Server error - likely database or validation issue');
+                            console.error('Payload that caused error:', JSON.stringify(apiPayload, null, 2));
+                        }
+                    } catch (e) {
+                        console.log('Raw server error response:', errorData);
+                    }
+                    
+                    // Continue with localStorage save even if API fails
+                    console.log('📝 Continuing with localStorage save...');
+                }
+            } catch (apiError) {
+                console.log('⚠️ API request failed:', apiError.message);
+                console.log('📝 Continuing with localStorage save...');
+            } types ensured
                     sousTotal: Number(sousTotal),
                     fraisLivraison: Number(fraisLivraison),
                     total: Number(total),
