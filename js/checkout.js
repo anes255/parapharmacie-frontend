@@ -5,8 +5,6 @@ class CheckoutSystem {
         this.currentStep = 1;
         this.orderData = {};
         this.isProcessing = false;
-        this.appliedDiscount = 0;
-        this.couponCode = '';
     }
 
     // Initialize checkout process
@@ -247,12 +245,7 @@ class CheckoutSystem {
 
         const sousTotal = window.app.getCartTotal();
         const fraisLivraison = this.getCurrentShippingCost();
-        let total = sousTotal + fraisLivraison;
-
-        // Apply discount if any
-        if (this.appliedDiscount > 0) {
-            total = Math.max(0, total - this.appliedDiscount);
-        }
+        const total = sousTotal + fraisLivraison;
 
         // Update display
         const elements = {
@@ -330,7 +323,7 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // Process the order - MAIN FUNCTION
+    // Process the order - MAIN FUNCTION - FIXED
     async processOrder() {
         try {
             if (this.isProcessing) {
@@ -352,7 +345,8 @@ class CheckoutSystem {
             }
 
             // Disable submit button
-            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
+            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]') || 
+                              document.querySelector('button[onclick="processCheckoutOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
@@ -361,22 +355,49 @@ class CheckoutSystem {
             // Gather form data
             const orderData = this.gatherOrderData();
             
-            console.log('Order data prepared:', orderData);
+            console.log('📦 Order data prepared:', orderData);
+
+            // Build API URL
+            const API_BASE_URL = window.location.hostname === 'localhost' 
+                ? 'http://localhost:5000/api'
+                : 'https://parapharmacie-gaher.onrender.com/api';
 
             // Try to submit to API first
             let orderSaved = false;
             try {
-                const response = await apiCall('/orders', {
+                const token = localStorage.getItem('token');
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                // Add auth token if available (but not required for order creation)
+                if (token) {
+                    headers['x-auth-token'] = token;
+                }
+
+                console.log('📤 Sending order to API...');
+                const response = await fetch(`${API_BASE_URL}/orders`, {
                     method: 'POST',
+                    headers: headers,
                     body: JSON.stringify(orderData)
                 });
-                
-                if (response) {
-                    console.log('✅ Order saved to API successfully');
-                    orderSaved = true;
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
                 }
+
+                const result = await response.json();
+                console.log('✅ Order saved to API successfully:', result);
+                orderSaved = true;
+                
             } catch (apiError) {
                 console.log('⚠️ API save failed, will save locally:', apiError.message);
+                
+                // If it's a validation error (400), throw it to show the user
+                if (apiError.message.includes('400') || apiError.message.includes('incomplètes') || apiError.message.includes('invalides')) {
+                    throw new Error(`Erreur de validation: ${apiError.message}`);
+                }
             }
 
             // Always save locally for admin panel
@@ -413,7 +434,8 @@ class CheckoutSystem {
             }
             
             // Re-enable submit button
-            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
+            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]') || 
+                              document.querySelector('button[onclick="processCheckoutOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirmer la commande';
@@ -438,12 +460,7 @@ class CheckoutSystem {
         // Calculate totals
         const sousTotal = window.app ? window.app.getCartTotal() : 0;
         const fraisLivraison = this.getCurrentShippingCost();
-        let total = sousTotal + fraisLivraison;
-
-        // Apply discount if any
-        if (this.appliedDiscount > 0) {
-            total = Math.max(0, total - this.appliedDiscount);
-        }
+        const total = sousTotal + fraisLivraison;
 
         // Generate order number
         const orderNumber = this.generateOrderNumber();
@@ -474,16 +491,7 @@ class CheckoutSystem {
             statut: 'en-attente',
             modePaiement,
             commentaires,
-            dateCommande: new Date().toISOString(),
-            // Add remise field with proper structure
-            remise: this.appliedDiscount > 0 ? {
-                type: 'montant',
-                valeur: this.appliedDiscount,
-                codePromo: this.couponCode
-            } : {
-                valeur: 0,
-                codePromo: ''
-            }
+            dateCommande: new Date().toISOString()
         };
 
         return orderData;
@@ -562,7 +570,6 @@ class CheckoutSystem {
             if (code.toUpperCase() === 'WELCOME10') {
                 const discount = Math.round(window.app.getCartTotal() * 0.1);
                 this.appliedDiscount = discount;
-                this.couponCode = code.toUpperCase();
                 this.calculateTotals();
                 
                 if (window.app) {
@@ -584,7 +591,6 @@ class CheckoutSystem {
     // Remove applied coupon
     removeCoupon() {
         this.appliedDiscount = 0;
-        this.couponCode = '';
         this.calculateTotals();
         
         if (window.app) {
