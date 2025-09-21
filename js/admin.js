@@ -206,57 +206,147 @@ PharmacieGaherApp.prototype.renderProductRow = function(product) {
     `;
 };
 
-async function updateOrderStatus(orderId, newStatus) {
+PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
-        console.log('📦 Updating order status:', orderId, 'to', newStatus);
+        console.log('📦 Loading admin orders...');
         
-        // Update in localStorage
-        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        const orderIndex = orders.findIndex(o => o._id === orderId || o.numeroCommande === orderId);
+        // Always start with localStorage orders
+        let orders = [...adminOrders];
+        console.log('📦 Local orders loaded:', orders.length);
         
-        if (orderIndex > -1) {
-            orders[orderIndex].statut = newStatus;
-            if (newStatus === 'livrée') {
-                orders[orderIndex].dateLivraison = new Date().toISOString();
-            }
-            localStorage.setItem('adminOrders', JSON.stringify(orders));
-            adminOrders = orders;
-            console.log('✅ Order status updated locally');
-        }
-        
-        // Try to update via API using admin endpoint
+        // Try to merge with API orders using correct admin endpoint
         try {
-            await apiCall(`/admin/orders/${orderId}`, {
-                method: 'PUT',
-                body: JSON.stringify({ 
-                    statut: newStatus,
-                    dateLivraison: newStatus === 'livrée' ? new Date().toISOString() : null
-                })
-            });
-            console.log('✅ Order status updated via admin API');
+            console.log('🔍 Calling admin orders API with token...');
+            const data = await apiCall('/admin/orders');
+            
+            if (data && data.orders && data.orders.length > 0) {
+                console.log('✅ Admin API orders loaded:', data.orders.length);
+                const apiOrders = data.orders.filter(apiOrder => 
+                    !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
+                );
+                orders = [...orders, ...apiOrders];
+                console.log('📦 Merged orders total:', orders.length);
+            } else {
+                console.log('📦 No orders from API or empty response');
+            }
         } catch (error) {
-            console.log('❌ Admin API update failed, but local update succeeded:', error.message);
+            console.log('❌ Admin API unavailable, using only local orders:', error.message);
+            // Check if it's an auth error
             if (error.message.includes('401') || error.message.includes('403')) {
-                window.handleApiError(error, 'Update Order Status');
+                window.handleApiError(error, 'Admin Orders');
                 return;
             }
         }
         
-        app.showToast('Statut de la commande mis à jour', 'success');
+        // Sort by date, newest first
+        orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
         
-        // Close modal if open
-        closeOrderDetailModal();
+        console.log('📊 Final orders count:', orders.length);
+        console.log('📊 Orders summary:', orders.map(o => ({ 
+            num: o.numeroCommande, 
+            status: o.statut, 
+            total: o.total 
+        })));
         
-        // Refresh orders list
-        if (adminCurrentSection === 'orders') {
-            app.loadAdminOrders();
-        }
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-emerald-800">Gestion des commandes</h2>
+                    <div class="flex gap-2">
+                        <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-semibold">
+                            ${orders.length} commande(s)
+                        </span>
+                        <button onclick="app.loadAdminOrders()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-sync mr-2"></i>Actualiser
+                        </button>
+                    </div>
+                </div>
+                
+                ${orders.length === 0 ? `
+                    <div class="text-center py-16">
+                        <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
+                        <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées</p>
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
+                            <h4 class="font-semibold text-blue-800 mb-2">Info:</h4>
+                            <p class="text-sm text-blue-700">Les commandes sont automatiquement ajoutées ici lors du checkout</p>
+                        </div>
+                    </div>
+                ` : `
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-emerald-50 border-b border-emerald-200">
+                                <tr>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Commande</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Client</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Date</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Total</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Statut</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${orders.map(order => `
+                                    <tr class="border-b border-emerald-50 hover:bg-emerald-50/50 transition-colors">
+                                        <td class="py-4 px-6">
+                                            <div class="font-semibold text-emerald-800">#${order.numeroCommande}</div>
+                                            <div class="text-sm text-emerald-600">${order.articles?.length || 0} article(s)</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="font-medium text-gray-900">${order.client?.prenom} ${order.client?.nom}</div>
+                                            <div class="text-sm text-gray-600">${order.client?.email}</div>
+                                            <div class="text-xs text-gray-500">${order.client?.wilaya}</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="text-sm text-gray-900">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</div>
+                                            <div class="text-xs text-gray-500">${new Date(order.dateCommande).toLocaleTimeString('fr-FR')}</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="font-semibold text-emerald-700">${order.total} DA</div>
+                                            <div class="text-sm text-gray-600">Livraison: ${order.fraisLivraison || 0} DA</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.statut)}">
+                                                ${getStatusLabel(order.statut)}
+                                            </span>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="flex items-center space-x-2">
+                                                <button onclick="viewOrderDetails('${order._id || order.numeroCommande}')" 
+                                                        class="text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-all"
+                                                        title="Voir détails">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button onclick="updateOrderStatus('${order._id || order.numeroCommande}', 'confirmée')" 
+                                                        class="text-green-600 hover:text-green-800 hover:bg-green-100 p-2 rounded-lg transition-all"
+                                                        title="Confirmer">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        `;
         
     } catch (error) {
-        console.error('❌ Error updating order status:', error);
-        app.showToast('Erreur lors de la mise à jour du statut', 'error');
+        console.error('❌ Error loading admin orders:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur de chargement des commandes</h3>
+                <p class="text-red-700 mb-4">Détails: ${error.message}</p>
+                <button onclick="app.loadAdminOrders()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                    Réessayer
+                </button>
+            </div>
+        `;
     }
-}
+};
+
 // Featured Products Management
 PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
     try {
@@ -1895,4 +1985,3 @@ async function createTestOrder() {
 }
 
 console.log('✅ Enhanced Admin.js loaded with complete order management and delete functionality');
-
