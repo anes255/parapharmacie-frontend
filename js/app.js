@@ -1567,75 +1567,100 @@ class PharmacieGaherApp {
         }
         
         try {
-            // Gather order data
-            const orderData = {
-                _id: Date.now().toString(),
-                numeroCommande: `CMD${Date.now().toString().slice(-8)}${Math.random().toString(36).substring(2, 4).toUpperCase()}`,
-                client: {
-                    prenom: document.getElementById('checkoutPrenom').value.trim(),
-                    nom: document.getElementById('checkoutNom').value.trim(),
-                    email: document.getElementById('checkoutEmail').value.trim(),
-                    telephone: document.getElementById('checkoutTelephone').value.trim()
-                },
-                livraison: {
-                    adresse: document.getElementById('checkoutAdresse').value.trim(),
-                    wilaya: document.getElementById('checkoutWilaya').value,
-                    ville: document.getElementById('checkoutVille').value.trim(),
-                    notes: document.getElementById('checkoutNotes').value.trim()
-                },
-                articles: this.cart.map(item => ({
-                    produitId: item.id,
-                    nom: item.nom,
-                    prix: item.prix,
-                    quantite: item.quantite
-                })),
-                sousTotal: this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0),
-                fraisLivraison: this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0) >= 5000 ? 0 : 300,
-                total: this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0) + 
-                       (this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0) >= 5000 ? 0 : 300),
-                statut: 'en-attente',
-                dateCommande: new Date().toISOString()
+            // Calculate totals
+            const sousTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+            const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
+            const total = sousTotal + fraisLivraison;
+            
+            // Get form data
+            const clientData = {
+                prenom: document.getElementById('checkoutPrenom').value.trim(),
+                nom: document.getElementById('checkoutNom').value.trim(),
+                email: document.getElementById('checkoutEmail').value.trim().toLowerCase(),
+                telephone: document.getElementById('checkoutTelephone').value.trim().replace(/\s+/g, '')
             };
             
-            console.log('Processing order:', orderData);
+            const livraisonData = {
+                adresse: document.getElementById('checkoutAdresse').value.trim(),
+                wilaya: document.getElementById('checkoutWilaya').value,
+                ville: document.getElementById('checkoutVille').value.trim(),
+                notes: document.getElementById('checkoutNotes').value.trim()
+            };
             
-            // Try to save to API
+            // Format articles for API
+            const articlesFormatted = this.cart.map(item => ({
+                produit: item.id,
+                nom: item.nom,
+                prix: item.prix,
+                quantite: item.quantite,
+                total: item.prix * item.quantite
+            }));
+            
+            // Try to save to API with correct format
+            let orderSavedToAPI = false;
             try {
+                const apiPayload = {
+                    produits: articlesFormatted,
+                    montantTotal: total,
+                    modeLivraison: 'domicile',
+                    adresseLivraison: {
+                        nom: clientData.nom,
+                        prenom: clientData.prenom,
+                        adresse: livraisonData.adresse,
+                        ville: livraisonData.ville || '',
+                        wilaya: livraisonData.wilaya,
+                        telephone: clientData.telephone,
+                        email: clientData.email
+                    },
+                    notes: livraisonData.notes || ''
+                };
+                
+                console.log('Sending API payload:', apiPayload);
+                
                 const response = await fetch(buildApiUrl('/orders'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'x-auth-token': localStorage.getItem('token') || ''
                     },
-                    body: JSON.stringify({
-                        produits: orderData.articles.map(item => ({
-                            produit: item.produitId,
-                            nom: item.nom,
-                            prix: item.prix,
-                            quantite: item.quantite,
-                            total: item.prix * item.quantite
-                        })),
-                        montantTotal: orderData.total,
-                        modeLivraison: 'domicile',
-                        adresseLivraison: {
-                            nom: orderData.client.nom,
-                            prenom: orderData.client.prenom,
-                            adresse: orderData.livraison.adresse,
-                            ville: orderData.livraison.ville,
-                            wilaya: orderData.livraison.wilaya,
-                            telephone: orderData.client.telephone.replace(/\s+/g, ''),
-                            email: orderData.client.email.toLowerCase()
-                        },
-                        notes: orderData.livraison.notes || ''
-                    })
+                    body: JSON.stringify(apiPayload)
                 });
                 
-                console.log('✅ Order saved to API');
+                if (response.ok) {
+                    const apiResult = await response.json();
+                    console.log('✅ Order saved to API successfully:', apiResult);
+                    orderSavedToAPI = true;
+                } else {
+                    const errorText = await response.text();
+                    console.log('⚠️ API save failed:', response.status, errorText);
+                }
             } catch (apiError) {
                 console.log('⚠️ API save failed:', apiError.message);
             }
             
-            // Always save locally
+            // Always save locally regardless of API result
+            const orderNumber = `CMD${Date.now().toString().slice(-8)}${Math.random().toString(36).substring(2, 4).toUpperCase()}`;
+            
+            const orderData = {
+                _id: Date.now().toString(),
+                numeroCommande: orderNumber,
+                client: clientData,
+                livraison: livraisonData,
+                articles: this.cart.map(item => ({
+                    produitId: item.id,
+                    nom: item.nom,
+                    prix: item.prix,
+                    quantite: item.quantite
+                })),
+                sousTotal: sousTotal,
+                fraisLivraison: fraisLivraison,
+                total: total,
+                statut: 'en-attente',
+                dateCommande: new Date().toISOString(),
+                savedToAPI: orderSavedToAPI
+            };
+            
+            // Save to localStorage
             const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
             orders.unshift(orderData);
             localStorage.setItem('adminOrders', JSON.stringify(orders));
@@ -1652,7 +1677,7 @@ class PharmacieGaherApp {
             // Clear cart and show success
             this.clearCart();
             this.showToast('Commande passée avec succès !', 'success');
-            this.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
+            this.showPage('order-confirmation', { orderNumber: orderNumber });
             
         } catch (error) {
             console.error('❌ Error processing order:', error);
@@ -2972,6 +2997,12 @@ function logout() {
     if (window.app) {
         window.app.logout();
     }
+}
+
+// Helper function for API calls
+function buildApiUrl(endpoint) {
+    const API_BASE_URL = 'https://parapharmacie-gaher.onrender.com/api';
+    return `${API_BASE_URL}${endpoint}`;
 }
 
 // Initialize app
