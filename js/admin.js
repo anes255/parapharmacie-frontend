@@ -1476,7 +1476,7 @@ function closeOrderDetailModal() {
 
 async function updateOrderStatus(orderId, newStatus) {
     try {
-        console.log('Updating order status:', orderId, 'to', newStatus);
+        console.log('📦 Updating order status:', orderId, 'to', newStatus);
         
         // Update in localStorage
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
@@ -1489,21 +1489,25 @@ async function updateOrderStatus(orderId, newStatus) {
             }
             localStorage.setItem('adminOrders', JSON.stringify(orders));
             adminOrders = orders;
-            console.log('Order status updated locally');
+            console.log('✅ Order status updated locally');
         }
         
-        // Try to update via API
+        // Try to update via API using admin endpoint
         try {
-            await apiCall(`/orders/${orderId}`, {
+            await apiCall(`/admin/orders/${orderId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ 
                     statut: newStatus,
                     dateLivraison: newStatus === 'livrée' ? new Date().toISOString() : null
                 })
             });
-            console.log('Order status updated via API');
+            console.log('✅ Order status updated via admin API');
         } catch (error) {
-            console.log('API update failed, but local update succeeded');
+            console.log('❌ Admin API update failed, but local update succeeded:', error.message);
+            if (error.message.includes('401') || error.message.includes('403')) {
+                window.handleApiError(error, 'Update Order Status');
+                return;
+            }
         }
         
         app.showToast('Statut de la commande mis à jour', 'success');
@@ -1517,11 +1521,10 @@ async function updateOrderStatus(orderId, newStatus) {
         }
         
     } catch (error) {
-        console.error('Error updating order status:', error);
+        console.error('❌ Error updating order status:', error);
         app.showToast('Erreur lors de la mise à jour du statut', 'error');
     }
 }
-
 // Delete order function
 async function deleteOrder(orderId) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ? Cette action est irréversible.')) {
@@ -1985,3 +1988,4 @@ async function createTestOrder() {
 }
 
 console.log('✅ Enhanced Admin.js loaded with complete order management and delete functionality');
+
