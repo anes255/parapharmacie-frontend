@@ -1582,6 +1582,7 @@ class PharmacieGaherApp {
                 email: document.getElementById('checkoutEmail').value.trim().toLowerCase(),
                 telephone: document.getElementById('checkoutTelephone').value.trim().replace(/\s+/g, ''),
                 adresse: document.getElementById('checkoutAdresse').value.trim(),
+                ville: document.getElementById('checkoutVille').value.trim() || '', // Added ville field
                 wilaya: document.getElementById('checkoutWilaya').value
             };
             
@@ -1589,11 +1590,11 @@ class PharmacieGaherApp {
             
             // Format articles for API (backend expects 'articles', not 'produits')
             const articlesFormatted = this.cart.map(item => ({
-                productId: item.id,
-                nom: item.nom,
-                prix: item.prix,
-                quantite: item.quantite,
-                image: item.image || ''
+                productId: String(item.id), // Ensure string type
+                nom: String(item.nom),
+                prix: Number(item.prix),    // Ensure number type
+                quantite: Number(item.quantite), // Ensure number type
+                image: String(item.image || '')
             }));
             
             // Try to save to API with correct format matching backend validation
@@ -1601,13 +1602,13 @@ class PharmacieGaherApp {
             try {
                 const apiPayload = {
                     numeroCommande: numeroCommande,
-                    client: clientData,  // Backend expects address fields directly in client object
-                    articles: articlesFormatted,  // Backend expects 'articles', not 'produits'
-                    sousTotal: sousTotal,
-                    fraisLivraison: fraisLivraison,
-                    total: total,
+                    client: clientData,  // Now includes ville field
+                    articles: articlesFormatted,  // Data types ensured
+                    sousTotal: Number(sousTotal),
+                    fraisLivraison: Number(fraisLivraison),
+                    total: Number(total),
                     modePaiement: 'Paiement à la livraison',
-                    commentaires: notes
+                    commentaires: notes || ''
                 };
                 
                 console.log('Sending API payload:', apiPayload);
