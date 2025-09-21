@@ -206,294 +206,57 @@ PharmacieGaherApp.prototype.renderProductRow = function(product) {
     `;
 };
 
-// Orders Management - ENHANCED with better debugging
-PharmacieGaherApp.prototype.loadAdminOrders = async function() {
+async function updateOrderStatus(orderId, newStatus) {
     try {
-        console.log('🔍 Starting to load admin orders...');
+        console.log('📦 Updating order status:', orderId, 'to', newStatus);
         
-        // Always start with localStorage orders
-        let orders = [...adminOrders];
-        console.log('📦 Local orders loaded:', orders.length);
+        // Update in localStorage
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const orderIndex = orders.findIndex(o => o._id === orderId || o.numeroCommande === orderId);
         
-        // Check authentication status first
-        const token = localStorage.getItem('token');
-        const currentUser = window.app?.currentUser;
-        
-        console.log('🔍 Auth check:', {
-            hasToken: !!token,
-            hasUser: !!currentUser,
-            userRole: currentUser?.role,
-            userEmail: currentUser?.email
-        });
-        
-        if (token && currentUser && currentUser.role === 'admin') {
-            console.log('✅ Admin authentication confirmed, calling API...');
-            
-            try {
-                // Test the API connection first
-                console.log('🔍 Testing API connection...');
-                const testResponse = await fetch(`${API_BASE_URL}/orders/test`);
-                console.log('🔍 Test response status:', testResponse.status);
-                
-                if (testResponse.ok) {
-                    const testData = await testResponse.json();
-                    console.log('✅ API test successful:', testData);
-                } else {
-                    console.log('❌ API test failed:', testResponse.status);
-                }
-                
-                // Now try the actual orders API call with fallback
-                console.log('🔍 Calling orders API with token...');
-                let data = null;
-                
-                // Try the admin endpoint first
-                try {
-                    data = await apiCall('/orders/admin');
-                    console.log('✅ Admin endpoint worked:', data);
-                } catch (adminError) {
-                    console.log('❌ Admin endpoint failed:', adminError.message);
-                    
-                    // Fallback to main endpoint
-                    try {
-                        data = await apiCall('/orders');
-                        console.log('✅ Main endpoint worked:', data);
-                    } catch (mainError) {
-                        console.log('❌ Main endpoint failed:', mainError.message);
-                        throw mainError;
-                    }
-                }
-                
-                console.log('✅ API response received:', {
-                    hasOrders: !!data.orders,
-                    ordersCount: data.orders?.length || 0,
-                    responseKeys: Object.keys(data)
-                });
-                
-                if (data && data.orders && data.orders.length > 0) {
-                    console.log('📦 API orders loaded:', data.orders.length);
-                    const apiOrders = data.orders.filter(apiOrder => 
-                        !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
-                    );
-                    orders = [...orders, ...apiOrders];
-                    console.log('📦 Total orders after merge:', orders.length);
-                } else {
-                    console.log('📦 No orders from API or empty response');
-                }
-                
-            } catch (error) {
-                console.log('❌ API call failed:', error.message);
-                
-                // If it's an authentication error, show appropriate message
-                if (error.message.includes('Session expirée') || error.message.includes('Accès refusé')) {
-                    console.log('🔑 Authentication issue detected');
-                } else {
-                    console.log('🌐 Network or server issue detected');
-                }
+        if (orderIndex > -1) {
+            orders[orderIndex].statut = newStatus;
+            if (newStatus === 'livrée') {
+                orders[orderIndex].dateLivraison = new Date().toISOString();
             }
-        } else {
-            console.log('❌ No valid admin authentication found');
+            localStorage.setItem('adminOrders', JSON.stringify(orders));
+            adminOrders = orders;
+            console.log('✅ Order status updated locally');
         }
         
-        // Sort orders by date, newest first
-        orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
+        // Try to update via API using admin endpoint
+        try {
+            await apiCall(`/admin/orders/${orderId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ 
+                    statut: newStatus,
+                    dateLivraison: newStatus === 'livrée' ? new Date().toISOString() : null
+                })
+            });
+            console.log('✅ Order status updated via admin API');
+        } catch (error) {
+            console.log('❌ Admin API update failed, but local update succeeded:', error.message);
+            if (error.message.includes('401') || error.message.includes('403')) {
+                window.handleApiError(error, 'Update Order Status');
+                return;
+            }
+        }
         
-        console.log('📊 Final orders count:', orders.length);
-        console.log('📊 Orders summary:', orders.map(o => ({
-            numero: o.numeroCommande,
-            client: `${o.client?.prenom} ${o.client?.nom}`,
-            total: o.total,
-            statut: o.statut,
-            date: new Date(o.dateCommande).toLocaleDateString()
-        })));
+        app.showToast('Statut de la commande mis à jour', 'success');
         
-        // Render the orders page
-        document.getElementById('adminContent').innerHTML = `
-            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
-                <div class="flex justify-between items-center mb-6">
-                    <div>
-                        <h2 class="text-2xl font-bold text-emerald-800">Gestion des commandes</h2>
-                        <p class="text-emerald-600">Total: ${orders.length} commande(s)</p>
-                    </div>
-                    <div class="flex gap-2">
-                        <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-semibold">
-                            ${orders.length} commande(s)
-                        </span>
-                        <button onclick="app.loadAdminOrders()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-all">
-                            <i class="fas fa-sync mr-2"></i>Actualiser
-                        </button>
-                        <button onclick="testApiConnection()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-all">
-                            <i class="fas fa-plug mr-2"></i>Test API
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Authentication Status -->
-                <div class="mb-6 p-4 rounded-xl ${token && currentUser && currentUser.role === 'admin' ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'}">
-                    <div class="flex items-center">
-                        <i class="fas ${token && currentUser && currentUser.role === 'admin' ? 'fa-check-circle text-green-600' : 'fa-exclamation-triangle text-yellow-600'} text-xl mr-3"></i>
-                        <div>
-                            <h4 class="font-semibold ${token && currentUser && currentUser.role === 'admin' ? 'text-green-800' : 'text-yellow-800'}">
-                                ${token && currentUser && currentUser.role === 'admin' ? 'Authentification admin active' : 'Authentification requise'}
-                            </h4>
-                            <p class="text-sm ${token && currentUser && currentUser.role === 'admin' ? 'text-green-700' : 'text-yellow-700'}">
-                                ${token && currentUser && currentUser.role === 'admin' 
-                                    ? `Connecté en tant que ${currentUser.email} (${currentUser.role})`
-                                    : 'Connectez-vous en tant qu\'administrateur pour voir toutes les commandes en temps réel'
-                                }
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                
-                ${orders.length === 0 ? `
-                    <div class="text-center py-16">
-                        <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
-                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande trouvée</h3>
-                        <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées par les clients</p>
-                        
-                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 max-w-md mx-auto mb-6">
-                            <h4 class="font-semibold text-blue-800 mb-2">💡 Pour tester:</h4>
-                            <ul class="text-sm text-blue-700 text-left space-y-1">
-                                <li>• Passez une commande en tant que client</li>
-                                <li>• Utilisez le bouton "Test API" ci-dessus</li>
-                                <li>• Vérifiez votre connexion admin</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="flex justify-center space-x-4">
-                            <button onclick="testApiConnection()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl">
-                                <i class="fas fa-plug mr-2"></i>Tester la connexion API
-                            </button>
-                            <button onclick="createTestOrder()" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl">
-                                <i class="fas fa-plus mr-2"></i>Créer une commande test
-                            </button>
-                        </div>
-                    </div>
-                ` : `
-                    <!-- Orders Table with Enhanced Information -->
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-emerald-50 border-b border-emerald-200">
-                                <tr>
-                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Commande</th>
-                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Client</th>
-                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Contact</th>
-                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Localisation</th>
-                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Date</th>
-                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Articles</th>
-                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Total</th>
-                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Statut</th>
-                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${orders.map(order => `
-                                    <tr class="border-b border-emerald-50 hover:bg-emerald-50/50 transition-colors">
-                                        <td class="py-4 px-6">
-                                            <div class="font-semibold text-emerald-800">#${order.numeroCommande}</div>
-                                            <div class="text-xs text-gray-500">${order._id ? 'ID: ' + order._id.substring(0, 8) + '...' : 'Local'}</div>
-                                            <div class="text-xs text-emerald-600">${order.modePaiement || 'Paiement à la livraison'}</div>
-                                        </td>
-                                        <td class="py-4 px-6">
-                                            <div class="font-medium text-gray-900">${order.client?.prenom} ${order.client?.nom}</div>
-                                            <div class="text-sm text-gray-600">${order.client?.email}</div>
-                                            <div class="text-xs ${order.client?.userId ? 'text-blue-600' : 'text-orange-600'}">
-                                                ${order.client?.userId ? '👤 Client enregistré' : '🎭 Client invité'}
-                                            </div>
-                                        </td>
-                                        <td class="py-4 px-6">
-                                            <div class="text-sm text-gray-900">📞 ${order.client?.telephone}</div>
-                                            <div class="text-xs text-gray-600 mt-1">📧 ${order.client?.email?.substring(0, 20)}${order.client?.email?.length > 20 ? '...' : ''}</div>
-                                        </td>
-                                        <td class="py-4 px-6">
-                                            <div class="text-sm text-gray-900">🏛️ ${order.client?.wilaya}</div>
-                                            ${order.client?.ville ? `<div class="text-xs text-gray-600">🏘️ ${order.client?.ville}</div>` : ''}
-                                            <div class="text-xs text-gray-500 mt-1">📍 ${order.client?.adresse?.substring(0, 30)}${order.client?.adresse?.length > 30 ? '...' : ''}</div>
-                                        </td>
-                                        <td class="py-4 px-6">
-                                            <div class="text-sm text-gray-900">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</div>
-                                            <div class="text-xs text-gray-500">${new Date(order.dateCommande).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
-                                            ${order.dateLivraison ? `<div class="text-xs text-green-600 mt-1">✅ Livré le ${new Date(order.dateLivraison).toLocaleDateString('fr-FR')}</div>` : ''}
-                                        </td>
-                                        <td class="py-4 px-6">
-                                            <div class="text-sm font-medium text-gray-900">${order.articles?.length || 0} article(s)</div>
-                                            <div class="text-xs text-gray-600">${order.articles?.reduce((total, article) => total + (article.quantite || 0), 0) || 0} unité(s)</div>
-                                            ${order.articles && order.articles.length > 0 ? `
-                                                <div class="text-xs text-emerald-600 mt-1">
-                                                    ${order.articles[0].nom?.substring(0, 20)}${order.articles[0].nom?.length > 20 ? '...' : ''}
-                                                    ${order.articles.length > 1 ? ` +${order.articles.length - 1}` : ''}
-                                                </div>
-                                            ` : ''}
-                                        </td>
-                                        <td class="py-4 px-6">
-                                            <div class="font-semibold text-emerald-700 text-lg">${order.total} DA</div>
-                                            <div class="text-xs text-gray-600">Sous-total: ${order.sousTotal || 0} DA</div>
-                                            <div class="text-xs text-gray-600">Livraison: ${order.fraisLivraison || 0} DA</div>
-                                            ${order.remise && order.remise.valeur > 0 ? `
-                                                <div class="text-xs text-red-600">🎯 Remise appliquée</div>
-                                            ` : ''}
-                                        </td>
-                                        <td class="py-4 px-6">
-                                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.statut)}">
-                                                ${getStatusLabel(order.statut)}
-                                            </span>
-                                            ${order.statutPaiement && order.statutPaiement !== 'en-attente' ? `
-                                                <div class="text-xs mt-1 ${order.statutPaiement === 'payé' ? 'text-green-600' : 'text-red-600'}">
-                                                    ${order.statutPaiement === 'payé' ? '💳 Payé' : '❌ Non payé'}
-                                                </div>
-                                            ` : ''}
-                                            ${order.commentaires ? `
-                                                <div class="text-xs text-blue-600 mt-1">💬 Commentaires</div>
-                                            ` : ''}
-                                        </td>
-                                        <td class="py-4 px-6">
-                                            <div class="flex items-center space-x-1">
-                                                <button onclick="viewOrderDetails('${order._id || order.numeroCommande}')" 
-                                                        class="text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-all"
-                                                        title="Voir détails complets">
-                                                    <i class="fas fa-eye"></i>
-                                                </button>
-                                                <button onclick="updateOrderStatus('${order._id || order.numeroCommande}', 'confirmée')" 
-                                                        class="text-green-600 hover:text-green-800 hover:bg-green-100 p-2 rounded-lg transition-all"
-                                                        title="Confirmer la commande">
-                                                    <i class="fas fa-check"></i>
-                                                </button>
-                                                <button onclick="printOrder('${order._id || order.numeroCommande}')" 
-                                                        class="text-purple-600 hover:text-purple-800 hover:bg-purple-100 p-2 rounded-lg transition-all"
-                                                        title="Imprimer">
-                                                    <i class="fas fa-print"></i>
-                                                </button>
-                                                <button onclick="deleteOrder('${order._id || order.numeroCommande}')" 
-                                                        class="text-red-600 hover:text-red-800 hover:bg-red-100 p-2 rounded-lg transition-all"
-                                                        title="Supprimer la commande">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `}
-            </div>
-        `;
+        // Close modal if open
+        closeOrderDetailModal();
+        
+        // Refresh orders list
+        if (adminCurrentSection === 'orders') {
+            app.loadAdminOrders();
+        }
         
     } catch (error) {
-        console.error('💥 Critical error in loadAdminOrders:', error);
-        document.getElementById('adminContent').innerHTML = `
-            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
-                <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur critique</h3>
-                <p class="text-red-700 mb-4">Impossible de charger les commandes</p>
-                <p class="text-red-600 text-sm mb-4">Erreur: ${error.message}</p>
-                <button onclick="app.loadAdminOrders()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-all">
-                    <i class="fas fa-redo mr-2"></i>Réessayer
-                </button>
-            </div>
-        `;
+        console.error('❌ Error updating order status:', error);
+        app.showToast('Erreur lors de la mise à jour du statut', 'error');
     }
-};
-
+}
 // Featured Products Management
 PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
     try {
@@ -2132,3 +1895,4 @@ async function createTestOrder() {
 }
 
 console.log('✅ Enhanced Admin.js loaded with complete order management and delete functionality');
+
