@@ -1,12 +1,16 @@
-// Fixed Configuration for Shifa Parapharmacie Frontend-Backend Connection
+// Fixed Configuration for Shifa Parapharmacie - Better Connection Handling
 const API_CONFIG = {
-    // Backend URL configuration - Using your provided URL
+    // Backend URL configuration
     BASE_URL: 'https://parapharmacie-gaher.onrender.com/api',
     
-    // Request configuration - REDUCED TIMEOUTS TO PREVENT HANGING
-    TIMEOUT: 8000, // 8 seconds instead of 30
-    RETRY_ATTEMPTS: 1, // Only 1 retry instead of 3
-    RETRY_DELAY: 1000, // 1 second instead of 2
+    // Reduced timeouts for faster fallback to local mode
+    TIMEOUT: 8000, // 8 seconds (reduced from 30)
+    RETRY_ATTEMPTS: 2, // Reduced from 3
+    RETRY_DELAY: 1000, // 1 second (reduced from 2)
+    
+    // Connection test settings
+    TEST_ENDPOINT: '/health',
+    CONNECTION_CHECK_INTERVAL: 30000, // Check every 30 seconds
     
     // Endpoints
     ENDPOINTS: {
@@ -36,14 +40,39 @@ const API_CONFIG = {
     }
 };
 
+// Connection status tracking
+let connectionStatus = {
+    isOnline: false,
+    lastCheck: null,
+    consecutiveFailures: 0
+};
+
 // Helper function to build API URLs
 function buildApiUrl(endpoint) {
     const url = API_CONFIG.BASE_URL + endpoint;
-    console.log(`🌐 API URL: ${url}`);
     return url;
 }
 
-// Enhanced API call function with FAST timeout
+// Quick connection test (reduced timeout)
+async function quickConnectionTest() {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // Quick 3s test
+        
+        const response = await fetch(buildApiUrl('/health'), {
+            method: 'GET',
+            signal: controller.signal,
+            mode: 'cors'
+        });
+        
+        clearTimeout(timeoutId);
+        return response.ok;
+    } catch (error) {
+        return false;
+    }
+}
+
+// Enhanced API call function with better error handling
 async function apiCall(endpoint, options = {}) {
     const url = buildApiUrl(endpoint);
     
@@ -71,14 +100,16 @@ async function apiCall(endpoint, options = {}) {
         }
     };
     
-    // Retry logic for Render cold starts - BUT WITH FASTER TIMEOUTS
+    // Quick connection check first
+    if (connectionStatus.consecutiveFailures >= 3) {
+        throw new Error('API temporarily unavailable - using local data');
+    }
+    
+    // Retry logic with shorter timeouts
     for (let attempt = 1; attempt <= API_CONFIG.RETRY_ATTEMPTS; attempt++) {
         try {
-            console.log(`🔄 API Call Attempt ${attempt}: ${finalOptions.method} ${url}`);
-            
             const controller = new AbortController();
             const timeoutId = setTimeout(() => {
-                console.log('⏱️ API call timeout, aborting...');
                 controller.abort();
             }, API_CONFIG.TIMEOUT);
             
@@ -89,7 +120,10 @@ async function apiCall(endpoint, options = {}) {
             
             clearTimeout(timeoutId);
             
-            console.log(`📡 Response: ${response.status} ${response.statusText}`);
+            // Reset failure counter on success
+            connectionStatus.consecutiveFailures = 0;
+            connectionStatus.isOnline = true;
+            connectionStatus.lastCheck = new Date();
             
             const contentType = response.headers.get('content-type');
             let data;
@@ -106,16 +140,13 @@ async function apiCall(endpoint, options = {}) {
             }
             
             if (!response.ok) {
-                console.error(`❌ HTTP Error ${response.status}:`, data);
-                
-                // Don't retry on client errors
+                // Don't retry on client errors (4xx)
                 if (response.status >= 400 && response.status < 500) {
-                    throw new Error(data.message || `Erreur HTTP: ${response.status}`);
+                    throw new Error(data.message || `Erreur client: ${response.status}`);
                 }
                 
                 // Retry on server errors if we have attempts left
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
                     continue;
                 }
@@ -123,29 +154,26 @@ async function apiCall(endpoint, options = {}) {
                 throw new Error(data.message || `Erreur serveur: ${response.status}`);
             }
             
-            console.log('✅ API Success');
             return data;
             
         } catch (error) {
-            console.error(`💥 API Call Error (Attempt ${attempt}):`, error.message);
+            // Increment failure counter
+            connectionStatus.consecutiveFailures++;
+            connectionStatus.isOnline = false;
             
             if (error.name === 'AbortError') {
-                console.log('⏱️ Request was aborted due to timeout');
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`⏱️ Timeout - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
                     continue;
                 } else {
-                    throw new Error('Le serveur met trop de temps à répondre. Le site fonctionne en mode local.');
+                    throw new Error('API timeout - using local data');
                 }
             } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                console.log('🌐 Network error detected');
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🌐 Network error - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
                     continue;
                 } else {
-                    throw new Error('Connexion impossible. Le site fonctionne en mode local.');
+                    throw new Error('Network error - using local data');
                 }
             }
             
@@ -153,156 +181,94 @@ async function apiCall(endpoint, options = {}) {
                 throw error;
             }
             
-            console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
             await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
         }
     }
 }
 
-// OPTIONAL: Test backend connection - DON'T BLOCK LOADING
+// Silent backend connection test (no console errors)
 async function testBackendConnection() {
     try {
-        console.log('🔍 Testing backend connection (non-blocking)...');
-        
-        // Add a very short timeout for this test
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 seconds max
-        
-        const response = await fetch(buildApiUrl('/health'), {
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-            const data = await response.json();
-            console.log('✅ Backend connection successful:', data);
-            return { success: true, data: data };
+        const response = await quickConnectionTest();
+        if (response) {
+            connectionStatus.isOnline = true;
+            connectionStatus.consecutiveFailures = 0;
+            connectionStatus.lastCheck = new Date();
+            return { success: true };
         } else {
-            throw new Error('Health check failed');
+            connectionStatus.isOnline = false;
+            connectionStatus.consecutiveFailures++;
+            return { success: false, error: 'Connection failed' };
         }
     } catch (error) {
-        console.warn('⚠️ Backend connection failed (site will work locally):', error.message);
+        connectionStatus.isOnline = false;
+        connectionStatus.consecutiveFailures++;
         return { success: false, error: error.message };
     }
 }
 
-// Create some demo products for immediate loading
-function createDemoProducts() {
-    const demoProducts = [
-        {
-            _id: 'demo_001',
-            nom: 'Vitamine C 1000mg',
-            description: 'Complément alimentaire à base de vitamine C pour renforcer le système immunitaire.',
-            prix: 1200,
-            stock: 25,
-            categorie: 'Vitalité',
-            marque: 'Shifa',
-            enVedette: true,
-            enPromotion: false,
-            actif: true,
-            dateAjout: new Date().toISOString()
-        },
-        {
-            _id: 'demo_002',
-            nom: 'Crème Hydratante Visage',
-            description: 'Crème hydratante pour tous types de peau, enrichie en acide hyaluronique.',
-            prix: 800,
-            prixOriginal: 1000,
-            stock: 15,
-            categorie: 'Visage',
-            marque: 'Natural Care',
-            enVedette: false,
-            enPromotion: true,
-            pourcentagePromotion: 20,
-            actif: true,
-            dateAjout: new Date().toISOString()
-        },
-        {
-            _id: 'demo_003',
-            nom: 'Shampooing Réparateur',
-            description: 'Shampooing réparateur pour cheveux abîmés et colorés.',
-            prix: 650,
-            stock: 30,
-            categorie: 'Cheveux',
-            marque: 'Hair Expert',
-            enVedette: true,
-            enPromotion: false,
-            actif: true,
-            dateAjout: new Date().toISOString()
-        },
-        {
-            _id: 'demo_004',
-            nom: 'Protéine Whey Sport',
-            description: 'Protéine en poudre pour sportifs, saveur vanille.',
-            prix: 2500,
-            stock: 12,
-            categorie: 'Sport',
-            marque: 'FitLife',
-            enVedette: false,
-            enPromotion: false,
-            actif: true,
-            dateAjout: new Date().toISOString()
-        },
-        {
-            _id: 'demo_005',
-            nom: 'Crème Solaire SPF50',
-            description: 'Protection solaire haute pour visage et corps, résistante à l\'eau.',
-            prix: 950,
-            stock: 20,
-            categorie: 'Solaire',
-            marque: 'SunCare',
-            enVedette: true,
-            enPromotion: false,
-            actif: true,
-            dateAjout: new Date().toISOString()
-        },
-        {
-            _id: 'demo_006',
-            nom: 'Lingettes Bébé Bio',
-            description: 'Lingettes douces et naturelles pour bébé, sans parfum.',
-            prix: 450,
-            prixOriginal: 550,
-            stock: 40,
-            categorie: 'Bébé',
-            marque: 'Baby Natural',
-            enVedette: false,
-            enPromotion: true,
-            pourcentagePromotion: 18,
-            actif: true,
-            dateAjout: new Date().toISOString()
-        }
-    ];
+// Periodic connection checker (silent)
+function startConnectionMonitoring() {
+    // Initial check
+    testBackendConnection();
     
-    // Save demo products to localStorage if not already present
-    const existingProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    if (existingProducts.length === 0) {
-        localStorage.setItem('demoProducts', JSON.stringify(demoProducts));
-        console.log('✅ Demo products created and saved to localStorage');
-    }
-    
-    return demoProducts;
+    // Periodic checks
+    setInterval(async () => {
+        await testBackendConnection();
+    }, API_CONFIG.CONNECTION_CHECK_INTERVAL);
 }
 
-// Initialize demo data and test connection in background
-function initializeConfig() {
-    console.log('🔧 Initializing configuration...');
+// Get connection status
+function getConnectionStatus() {
+    return {
+        isOnline: connectionStatus.isOnline,
+        lastCheck: connectionStatus.lastCheck,
+        consecutiveFailures: connectionStatus.consecutiveFailures
+    };
+}
+
+// Show connection status in UI
+function showConnectionStatus() {
+    const status = getConnectionStatus();
+    const statusElement = document.getElementById('connectionStatus');
     
-    // Create demo products first (immediate loading)
-    createDemoProducts();
+    if (statusElement) {
+        statusElement.innerHTML = status.isOnline 
+            ? '<span class="text-green-600"><i class="fas fa-wifi mr-1"></i>En ligne</span>'
+            : '<span class="text-orange-600"><i class="fas fa-wifi-slash mr-1"></i>Mode local</span>';
+    }
+}
+
+// Initialize connection monitoring when DOM loads
+document.addEventListener('DOMContentLoaded', () => {
+    startConnectionMonitoring();
     
-    // Test backend connection in background (don't wait for it)
-    setTimeout(() => {
-        testBackendConnection().then(result => {
-            if (result.success) {
-                console.log('✅ Backend is available for real-time data');
-            } else {
-                console.log('⚠️ Backend unavailable, using local data only');
-            }
-        });
-    }, 100);
-    
-    console.log('✅ Config initialized - Backend URL:', API_CONFIG.BASE_URL);
+    // Add connection status to page if container exists
+    const statusContainer = document.getElementById('connectionStatusContainer');
+    if (statusContainer) {
+        statusContainer.innerHTML = '<div id="connectionStatus" class="text-sm"></div>';
+        showConnectionStatus();
+        
+        // Update status display periodically
+        setInterval(showConnectionStatus, 5000);
+    }
+});
+
+// Optimized API call for critical operations
+async function criticalApiCall(endpoint, options = {}) {
+    try {
+        // Only try once for critical operations
+        const result = await apiCall(endpoint, { ...options, timeout: 5000 });
+        return result;
+    } catch (error) {
+        console.warn(`Critical API call failed for ${endpoint}, using local fallback`);
+        throw error;
+    }
+}
+
+// Check if we should attempt API calls
+function shouldAttemptApiCall() {
+    return connectionStatus.consecutiveFailures < 5;
 }
 
 // Export for global access
@@ -310,9 +276,18 @@ window.API_CONFIG = API_CONFIG;
 window.buildApiUrl = buildApiUrl;
 window.apiCall = apiCall;
 window.testBackendConnection = testBackendConnection;
-window.createDemoProducts = createDemoProducts;
+window.getConnectionStatus = getConnectionStatus;
+window.criticalApiCall = criticalApiCall;
+window.shouldAttemptApiCall = shouldAttemptApiCall;
 
-// Initialize immediately when script loads
-initializeConfig();
+console.log('✅ Config loaded with improved connection handling - Backend URL:', API_CONFIG.BASE_URL);
 
-console.log('✅ Fixed config loaded - Fast timeouts to prevent hanging');
+// Show initial connection status
+setTimeout(() => {
+    const status = getConnectionStatus();
+    if (status.isOnline) {
+        console.log('🟢 Backend connection: Online');
+    } else {
+        console.log('🟡 Backend connection: Offline - Using local data mode');
+    }
+}, 2000);
