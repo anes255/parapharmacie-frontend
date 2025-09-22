@@ -1,153 +1,423 @@
-// Fixed PharmacieGaherApp - Complete application with all pages
-class PharmacieGaherApp {
+// Enhanced Shifa Parapharmacie Application
+class ShifaApp {
     constructor() {
         this.currentUser = null;
         this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        this.allProducts = []; // Cache for all products
-        this.settings = {
-            couleurPrimaire: '#10b981',
-            couleurSecondaire: '#059669',
-            couleurAccent: '#34d399',
-            nomSite: 'Shifa - Parapharmacie',
-            fraisLivraison: 300,
-            livraisonGratuite: 5000
-        };
+        this.allProducts = [];
+        this.categories = [];
+        this.settings = {};
         this.currentPage = 'home';
+        this.isLoading = false;
         
-        this.init();
+        // State management
+        this.state = {
+            searchQuery: '',
+            activeCategory: null,
+            sortBy: 'dateAjout',
+            sortOrder: 'desc',
+            currentProductPage: 1,
+            productsPerPage: APP_CONFIG.UI.PRODUCTS_PER_PAGE
+        };
+        
+        // Bind methods
+        this.init = this.init.bind(this);
+        this.showPage = this.showPage.bind(this);
+        this.addToCart = this.addToCart.bind(this);
+        this.updateCartUI = this.updateCartUI.bind(this);
+        
+        console.log('🚀 Shifa App initialized');
     }
     
+    // Initialize application
     async init() {
         try {
-            await this.checkAuth();
-            await this.loadProductsCache(); // Load products from localStorage/API
-            this.initUI();
-            await this.showPage('home');
+            this.showLoading(true);
+            console.log('🔧 Initializing Shifa App...');
+            
+            // Initialize components in order
+            await this.checkAuthentication();
+            await this.loadSettings();
+            await this.loadCategories();
+            await this.loadProductsCache();
+            
+            // Initialize UI components
+            this.initializeEventHandlers();
+            this.initializeSearch();
             this.updateCartUI();
-            this.initSearch();
+            this.updateUserUI();
+            
+            // Load initial page
+            const urlParams = new URLSearchParams(window.location.search);
+            const initialPage = urlParams.get('page') || 'home';
+            await this.showPage(initialPage);
+            
+            // Set up periodic tasks
+            this.setupPeriodicTasks();
+            
+            console.log('✅ Shifa App initialization complete');
+            
         } catch (error) {
-            console.error('Erreur initialisation app:', error);
+            console.error('❌ App initialization error:', error);
             this.showToast('Erreur de chargement de l\'application', 'error');
+        } finally {
+            this.showLoading(false);
         }
     }
     
-    // New method to load and cache products
+    // Check user authentication status
+    async checkAuthentication() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.log('👤 No authentication token found');
+            return;
+        }
+        
+        try {
+            console.log('🔐 Verifying authentication...');
+            const response = await apiCall(API_CONFIG.ENDPOINTS.AUTH.PROFILE);
+            
+            if (response && response.id) {
+                this.currentUser = response;
+                console.log('✅ User authenticated:', this.currentUser.email);
+                
+                // Load user-specific data
+                if (APP_CONFIG.FEATURES.NOTIFICATIONS) {
+                    this.loadUserNotifications();
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Authentication verification failed:', error.message);
+            localStorage.removeItem('token');
+            this.currentUser = null;
+        }
+    }
+    
+    // Load application settings
+    async loadSettings() {
+        try {
+            console.log('⚙️ Loading app settings...');
+            const response = await apiCall(API_CONFIG.ENDPOINTS.SETTINGS.GET);
+            
+            if (response && response.settings) {
+                this.settings = response.settings;
+                console.log('✅ Settings loaded');
+                
+                // Update page title if needed
+                if (this.settings.siteName) {
+                    document.title = this.settings.siteName;
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to load settings, using defaults:', error.message);
+            this.settings = {
+                siteName: APP_CONFIG.SITE_NAME,
+                contact: APP_CONFIG.CONTACT,
+                shipping: {
+                    standardCost: APP_CONFIG.ECOMMERCE.STANDARD_SHIPPING_COST,
+                    freeShippingThreshold: APP_CONFIG.ECOMMERCE.FREE_SHIPPING_THRESHOLD
+                }
+            };
+        }
+    }
+    
+    // Load product categories
+    async loadCategories() {
+        try {
+            console.log('📂 Loading categories...');
+            const response = await apiCall(API_CONFIG.ENDPOINTS.PRODUCTS.CATEGORIES);
+            
+            if (response && response.categories) {
+                this.categories = response.categories;
+                console.log(`✅ ${this.categories.length} categories loaded`);
+            } else {
+                // Fallback to default categories
+                this.categories = Object.keys(APP_CONFIG.CATEGORIES).map(name => ({
+                    nom: name,
+                    count: 0,
+                    ...APP_CONFIG.CATEGORIES[name]
+                }));
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to load categories, using defaults:', error.message);
+            this.categories = Object.keys(APP_CONFIG.CATEGORIES).map(name => ({
+                nom: name,
+                count: 0,
+                ...APP_CONFIG.CATEGORIES[name]
+            }));
+        }
+    }
+    
+    // Load and cache products
     async loadProductsCache() {
         try {
-            console.log('Loading products cache...');
+            console.log('📦 Loading products cache...');
             
-            // Start with localStorage products
-            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            this.allProducts = [...localProducts];
-            
-            // Try to load from API and merge
-            try {
-                const response = await fetch(buildApiUrl('/products'));
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.products && data.products.length > 0) {
-                        // Merge API products with local ones, avoiding duplicates
-                        const localIds = localProducts.map(p => p._id);
-                        const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
-                        
-                        if (newApiProducts.length > 0) {
-                            this.allProducts = [...localProducts, ...newApiProducts];
-                            // Update localStorage with merged data
-                            localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
-                        }
-                    }
-                }
-            } catch (error) {
-                console.log('API unavailable, using local products only:', error.message);
+            // Try to load from localStorage first
+            const localProducts = JSON.parse(localStorage.getItem('productsCache') || '[]');
+            if (localProducts.length > 0) {
+                this.allProducts = localProducts;
+                console.log(`📦 Loaded ${localProducts.length} products from cache`);
             }
             
-            console.log(`Products cache loaded: ${this.allProducts.length} products`);
+            // Then try to load from API
+            try {
+                const response = await apiCall(API_CONFIG.ENDPOINTS.PRODUCTS.LIST + '?limit=100');
+                if (response && response.products && response.products.length > 0) {
+                    this.allProducts = response.products;
+                    
+                    // Update localStorage cache
+                    localStorage.setItem('productsCache', JSON.stringify(this.allProducts));
+                    console.log(`✅ ${this.allProducts.length} products loaded from API`);
+                }
+            } catch (apiError) {
+                console.warn('⚠️ API unavailable, using cached products:', apiError.message);
+                
+                // If no cached products and no API, create demo data
+                if (this.allProducts.length === 0) {
+                    this.allProducts = this.generateDemoProducts();
+                    localStorage.setItem('productsCache', JSON.stringify(this.allProducts));
+                    console.log('📦 Demo products generated');
+                }
+            }
             
         } catch (error) {
-            console.error('Error loading products cache:', error);
-            this.allProducts = [];
+            console.error('❌ Error loading products:', error);
+            this.allProducts = this.generateDemoProducts();
         }
     }
     
-    // New method to refresh products cache (called from admin when products are modified)
-    refreshProductsCache() {
-        console.log('Refreshing products cache...');
+    // Generate demo products for offline mode
+    generateDemoProducts() {
+        const demoProducts = [];
+        const categories = Object.keys(APP_CONFIG.CATEGORIES);
         
-        // Reload from localStorage
-        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        this.allProducts = [...localProducts];
-        
-        console.log(`Products cache refreshed: ${this.allProducts.length} products`);
-        
-        // If we're on the home page, refresh the displayed products
-        if (this.currentPage === 'home') {
-            this.refreshHomePage();
-        } else if (this.currentPage === 'products') {
-            // Refresh products page if we're on it
-            this.showPage('products');
-        }
-    }
-    
-    // New method to refresh home page content
-    refreshHomePage() {
-        console.log('Refreshing home page content...');
-        
-        // Refresh featured products
-        this.loadFeaturedProducts();
-        // Refresh promotion products  
-        this.loadPromotionProducts();
-    }
-    
-    async checkAuth() {
-        const token = localStorage.getItem('token');
-        if (token && window.authSystem) {
-            // Use auth system to validate token
-            const isValid = await window.authSystem.validateToken();
-            if (isValid && window.authSystem.currentUser) {
-                this.currentUser = window.authSystem.currentUser;
-                this.updateUserUI();
+        categories.forEach((category, categoryIndex) => {
+            const categoryInfo = APP_CONFIG.CATEGORIES[category];
+            
+            for (let i = 1; i <= 5; i++) {
+                const productId = `demo_${categoryIndex}_${i}`;
+                const basePrice = Math.floor(Math.random() * 3000) + 500;
+                const isPromotion = Math.random() < 0.3;
+                const isFeatured = Math.random() < 0.4;
+                
+                demoProducts.push({
+                    _id: productId,
+                    nom: `${category} Premium ${i}`,
+                    description: `Produit de qualité supérieure pour ${categoryInfo.description.toLowerCase()}. Formule avancée pour des résultats optimaux.`,
+                    prix: isPromotion ? Math.floor(basePrice * 0.8) : basePrice,
+                    prixOriginal: isPromotion ? basePrice : null,
+                    categorie: category,
+                    image: this.generateProductImage(category, productId),
+                    stock: Math.floor(Math.random() * 50) + 5,
+                    marque: ['Shifa', 'Premium', 'Natural', 'Bio'][Math.floor(Math.random() * 4)],
+                    enPromotion: isPromotion,
+                    pourcentagePromotion: isPromotion ? Math.floor((basePrice - Math.floor(basePrice * 0.8)) / basePrice * 100) : 0,
+                    enVedette: isFeatured,
+                    actif: true,
+                    dateAjout: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
+                    ingredients: 'Ingrédients naturels de haute qualité',
+                    modeEmploi: 'Suivre les instructions sur l\'emballage',
+                    precautions: 'Tenir hors de portée des enfants'
+                });
             }
+        });
+        
+        return demoProducts;
+    }
+    
+    // Generate product image placeholder
+    generateProductImage(category, productId) {
+        const categoryInfo = APP_CONFIG.CATEGORIES[category] || {};
+        const color = categoryInfo.color?.replace('#', '') || '10b981';
+        const initials = category.substring(0, 2).toUpperCase();
+        return `https://via.placeholder.com/300x300/${color}/ffffff?text=${encodeURIComponent(initials)}`;
+    }
+    
+    // Initialize event handlers
+    initializeEventHandlers() {
+        console.log('🔧 Setting up event handlers...');
+        
+        // Global click handler for dynamic content
+        document.addEventListener('click', this.handleGlobalClick.bind(this));
+        
+        // Search input handlers
+        const searchInputs = document.querySelectorAll('#searchInput, #mobileSearchInput');
+        searchInputs.forEach(input => {
+            if (input) {
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.performSearch(e.target.value);
+                    }
+                });
+                
+                // Real-time search suggestions
+                input.addEventListener('input', Utils.debounce((e) => {
+                    this.showSearchSuggestions(e.target.value);
+                }, 300));
+            }
+        });
+        
+        // Cart events
+        document.addEventListener('cart:updated', this.updateCartUI.bind(this));
+        document.addEventListener('auth:logout', this.handleLogout.bind(this));
+        document.addEventListener('auth:login', this.handleLogin.bind(this));
+        
+        // Window events
+        window.addEventListener('popstate', this.handlePopState.bind(this));
+        window.addEventListener('online', this.handleOnline.bind(this));
+        window.addEventListener('offline', this.handleOffline.bind(this));
+        
+        console.log('✅ Event handlers initialized');
+    }
+    
+    // Handle global clicks for dynamic content
+    handleGlobalClick(e) {
+        const target = e.target.closest('[onclick], [data-action]');
+        if (!target) return;
+        
+        // Handle data-action attributes
+        const action = target.getAttribute('data-action');
+        if (action) {
+            e.preventDefault();
+            this.handleAction(action, target);
         }
     }
     
-    initUI() {
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    this.performSearch(e.target.value);
+    // Handle dynamic actions
+    handleAction(action, element) {
+        const actionMap = {
+            'add-to-cart': () => {
+                const productId = element.getAttribute('data-product-id');
+                const quantity = parseInt(element.getAttribute('data-quantity')) || 1;
+                this.addToCart(productId, quantity);
+            },
+            'remove-from-cart': () => {
+                const productId = element.getAttribute('data-product-id');
+                this.removeFromCart(productId);
+            },
+            'update-cart-quantity': () => {
+                const productId = element.getAttribute('data-product-id');
+                const quantity = parseInt(element.getAttribute('data-quantity'));
+                this.updateCartQuantity(productId, quantity);
+            },
+            'show-product': () => {
+                const productId = element.getAttribute('data-product-id');
+                this.showPage('product', { id: productId });
+            },
+            'filter-category': () => {
+                const category = element.getAttribute('data-category');
+                this.filterByCategory(category);
+            }
+        };
+        
+        if (actionMap[action]) {
+            actionMap[action]();
+        }
+    }
+    
+    // Initialize search functionality
+    initializeSearch() {
+        // Prevent form submission on search
+        const searchForms = document.querySelectorAll('form[role="search"]');
+        searchForms.forEach(form => {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const input = form.querySelector('input[type="search"], input[placeholder*="recherch"]');
+                if (input && input.value.trim()) {
+                    this.performSearch(input.value.trim());
                 }
             });
-        }
-        
-        this.updateCartUI();
-        window.app = this; // Critical: Make globally available
+        });
     }
     
-    updateUserUI() {
-        const guestMenu = document.getElementById('guestMenu');
-        const userLoggedMenu = document.getElementById('userLoggedMenu');
-        const adminMenuLink = document.getElementById('adminMenuLink');
+    // Show search suggestions
+    showSearchSuggestions(query) {
+        const suggestionsContainer = document.getElementById('searchSuggestions');
+        if (!suggestionsContainer || !query || query.length < 2) {
+            if (suggestionsContainer) suggestionsContainer.classList.add('hidden');
+            return;
+        }
         
-        if (this.currentUser) {
-            if (guestMenu) guestMenu.style.display = 'none';
-            if (userLoggedMenu) userLoggedMenu.style.display = 'block';
-            
-            if (this.currentUser.role === 'admin' && adminMenuLink) {
-                adminMenuLink.style.display = 'block';
-            }
-        } else {
-            if (guestMenu) guestMenu.style.display = 'block';
-            if (userLoggedMenu) userLoggedMenu.style.display = 'none';
-            if (adminMenuLink) adminMenuLink.style.display = 'none';
+        // Filter products for suggestions
+        const suggestions = this.allProducts
+            .filter(product => 
+                product.actif !== false &&
+                (product.nom.toLowerCase().includes(query.toLowerCase()) ||
+                 product.description.toLowerCase().includes(query.toLowerCase()) ||
+                 product.categorie.toLowerCase().includes(query.toLowerCase()))
+            )
+            .slice(0, 5);
+        
+        if (suggestions.length === 0) {
+            suggestionsContainer.classList.add('hidden');
+            return;
+        }
+        
+        suggestionsContainer.innerHTML = suggestions.map(product => `
+            <div class="px-4 py-3 hover:bg-mint-50 cursor-pointer transition-colors" onclick="app.showPage('product', {id: '${product._id}'})">
+                <div class="flex items-center space-x-3">
+                    <img src="${this.getProductImage(product)}" alt="${product.nom}" class="w-10 h-10 object-cover rounded-lg">
+                    <div class="flex-1">
+                        <p class="font-medium text-forest-800">${product.nom}</p>
+                        <p class="text-sm text-mint-600">${product.categorie} • ${Utils.formatPrice(product.prix)}</p>
+                    </div>
+                </div>
+            </div>
+        `).join('') + `
+            <div class="px-4 py-3 border-t border-mint-100">
+                <button onclick="app.performSearch('${query}')" class="text-sm text-mint-600 hover:text-mint-700 font-medium">
+                    Voir tous les résultats pour "${query}" <i class="fas fa-arrow-right ml-1"></i>
+                </button>
+            </div>
+        `;
+        
+        suggestionsContainer.classList.remove('hidden');
+    }
+    
+    // Perform search
+    async performSearch(query) {
+        if (!query || query.trim().length < 2) {
+            this.showToast('Veuillez saisir au moins 2 caractères pour la recherche', 'warning');
+            return;
+        }
+        
+        this.state.searchQuery = query.trim();
+        await this.showPage('products', { search: this.state.searchQuery });
+        
+        // Hide suggestions
+        const suggestionsContainer = document.getElementById('searchSuggestions');
+        if (suggestionsContainer) {
+            suggestionsContainer.classList.add('hidden');
         }
     }
     
+    // Filter by category
+    async filterByCategory(category) {
+        this.state.activeCategory = category;
+        await this.showPage('products', { categorie: category });
+    }
+    
+    // Show page with enhanced routing
     async showPage(pageName, params = {}) {
+        if (this.isLoading) {
+            console.log('⏳ Page load in progress, skipping...');
+            return;
+        }
+        
         try {
-            this.showLoading();
+            this.showLoading(true);
+            this.isLoading = true;
+            
+            console.log(`📄 Loading page: ${pageName}`, params);
             this.currentPage = pageName;
             
+            // Update URL without reload
+            const url = new URL(window.location);
+            url.searchParams.set('page', pageName);
+            if (params.id) url.searchParams.set('id', params.id);
+            window.history.pushState({ page: pageName, params }, '', url);
+            
+            // Route to appropriate page loader
             switch (pageName) {
                 case 'home':
                     await this.loadHomePage();
@@ -156,12 +426,24 @@ class PharmacieGaherApp {
                     await this.loadProductsPage(params);
                     break;
                 case 'product':
+                    if (!params.id) {
+                        await this.showPage('products');
+                        return;
+                    }
                     await this.loadProductPage(params.id);
                     break;
                 case 'login':
+                    if (this.currentUser) {
+                        await this.showPage('profile');
+                        return;
+                    }
                     await this.loadLoginPage();
                     break;
                 case 'register':
+                    if (this.currentUser) {
+                        await this.showPage('profile');
+                        return;
+                    }
                     await this.loadRegisterPage();
                     break;
                 case 'profile':
@@ -171,817 +453,365 @@ class PharmacieGaherApp {
                     }
                     await this.loadProfilePage();
                     break;
-                case 'checkout':
-                    await this.loadCheckoutPage();
+                case 'orders':
+                    if (!this.currentUser) {
+                        await this.showPage('login');
+                        return;
+                    }
+                    await this.loadOrdersPage();
                     break;
-                case 'order-confirmation':
-                    await this.loadOrderConfirmationPage(params.orderNumber);
+                case 'checkout':
+                    if (this.cart.length === 0) {
+                        this.showToast('Votre panier est vide', 'warning');
+                        await this.showPage('products');
+                        return;
+                    }
+                    await this.loadCheckoutPage();
                     break;
                 case 'contact':
                     await this.loadContactPage();
                     break;
                 case 'admin':
                     if (!this.currentUser || this.currentUser.role !== 'admin') {
-                        this.showToast('Accès refusé', 'error');
+                        this.showToast('Accès administrateur requis', 'error');
                         await this.showPage('home');
                         return;
                     }
                     await this.loadAdminPage();
                     break;
                 default:
+                    console.warn(`⚠️ Unknown page: ${pageName}, redirecting to home`);
                     await this.loadHomePage();
             }
             
-            this.hideLoading();
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            // Initialize AOS animations if available
+            if (window.AOS) {
+                AOS.refresh();
+            }
+            
         } catch (error) {
-            console.error('Erreur chargement page:', error);
-            this.hideLoading();
+            console.error(`❌ Error loading page ${pageName}:`, error);
             this.showToast('Erreur de chargement de la page', 'error');
+            
+            // Fallback to home page
+            if (pageName !== 'home') {
+                await this.loadHomePage();
+            }
+        } finally {
+            this.showLoading(false);
+            this.isLoading = false;
         }
     }
     
+    // Load home page
     async loadHomePage() {
         const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <section class="hero-gradient text-white py-24 relative overflow-hidden">
-                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-green-600/30 to-teal-700/20"></div>
-                <div class="container mx-auto px-4 relative z-10">
-                    <div class="max-w-4xl mx-auto text-center">
-                        <div class="flex justify-center mb-8">
-                            <div class="w-40 h-40 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center shadow-2xl border-2 border-white/30 float-animation">
-                                <i class="fas fa-seedling text-7xl text-white drop-shadow-lg"></i>
-                            </div>
-                        </div>
-                        <h1 class="text-6xl md:text-8xl font-bold mb-4 bg-gradient-to-r from-white to-green-100 bg-clip-text text-transparent drop-shadow-2xl">
-                            Shifa
-                        </h1>
-                        <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-green-100">
-                            Parapharmacie
-                        </h2>
-                        <p class="text-xl md:text-2xl mb-12 opacity-90 text-green-50">
-                            Votre bien-être, notre mission naturelle
-                        </p>
-                        <div class="flex justify-center">
-                            <button onclick="app.showPage('products')" class="btn-primary bg-white text-emerald-600 hover:bg-green-50 text-lg px-10 py-5 transform hover:scale-105">
-                                <i class="fas fa-leaf mr-3"></i>
-                                Explorer nos produits naturels
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-50 to-transparent"></div>
-            </section>
-            
-            <!-- Categories Section -->
-            <section class="py-16 bg-gradient-to-br from-green-50 to-emerald-100">
-                <div class="container mx-auto px-4">
-                    <div class="text-center mb-12">
-                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Catégories</h2>
-                        <p class="text-xl text-emerald-600">Découvrez notre gamme complète de produits</p>
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="categoriesGrid">
-                        <!-- Categories will be loaded here -->
-                    </div>
-                </div>
-            </section>
-            
-            <!-- Featured Products -->
-            <section class="py-16 bg-white">
-                <div class="container mx-auto px-4">
-                    <div class="text-center mb-12">
-                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Coups de Cœur</h2>
-                        <p class="text-xl text-emerald-600">Produits sélectionnés pour vous</p>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="featuredProducts">
-                        <!-- Featured products will be loaded here -->
-                    </div>
-                </div>
-            </section>
-            
-            <!-- Promotions -->
-            <section class="py-16 bg-gradient-to-br from-red-50 to-pink-100">
-                <div class="container mx-auto px-4">
-                    <div class="text-center mb-12">
-                        <h2 class="text-4xl font-bold text-red-800 mb-4">Promotions</h2>
-                        <p class="text-xl text-red-600">Offres spéciales et réductions</p>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="promotionProducts">
-                        <!-- Promotion products will be loaded here -->
-                    </div>
-                </div>
-            </section>
-        `;
         
-        await this.loadCategories();
-        await this.loadFeaturedProducts();
-        await this.loadPromotionProducts();
-    }
-    
-    async loadCategories() {
-        // Show all 10 categories with Vitalité first
-        const mainPageCategories = [
-            { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
-            { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
-            { nom: 'Visage', description: 'Soins du visage', icon: 'fa-smile' },
-            { nom: 'Cheveux', description: 'Soins capillaires', icon: 'fa-cut' },
-            { nom: 'Solaire', description: 'Protection solaire', icon: 'fa-sun' },
-            { nom: 'Intime', description: 'Hygiène intime', icon: 'fa-heart' },
-            { nom: 'Soins', description: 'Soins corporels', icon: 'fa-spa' },
-            { nom: 'Bébé', description: 'Soins bébé', icon: 'fa-baby-carriage' },
-            { nom: 'Homme', description: 'Soins masculins', icon: 'fa-user-tie' },
-            { nom: 'Dentaire', description: 'Hygiène dentaire', icon: 'fa-tooth' }
-        ];
-        
-        const categoriesGrid = document.getElementById('categoriesGrid');
-        if (categoriesGrid) {
-            categoriesGrid.innerHTML = mainPageCategories.map((category, index) => `
-                <div class="category-card text-center cursor-pointer p-6 bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-sm rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 border border-emerald-200/50 ${index === 0 ? 'ring-2 ring-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100' : ''}"
-                     onclick="app.filterByCategory('${category.nom}')">
-                    <div class="category-icon mx-auto ${index === 0 ? 'pulse-slow' : ''}">
-                        <i class="fas ${category.icon} drop-shadow-lg"></i>
-                    </div>
-                    <h3 class="font-bold text-emerald-800 mb-2 text-sm lg:text-base">${category.nom}</h3>
-                    <p class="text-xs lg:text-sm text-emerald-600 font-medium">${category.description}</p>
-                    ${index === 0 ? '<div class="mt-2"><span class="text-xs bg-emerald-500 text-white px-2 py-1 rounded-full font-semibold">★ POPULAIRE</span></div>' : ''}
-                </div>
-            `).join('');
-        }
-    }
-    
-    async loadFeaturedProducts() {
-        console.log('Loading featured products...');
-        
-        // Use cached products and filter for featured products
-        const featuredProducts = this.allProducts.filter(p => p.enVedette && p.actif !== false);
-        
-        console.log(`Found ${featuredProducts.length} featured products`);
-        
-        const container = document.getElementById('featuredProducts');
-        if (container) {
-            if (featuredProducts.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-full text-center py-16">
-                        <i class="fas fa-star text-6xl text-emerald-200 mb-6"></i>
-                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit en vedette</h3>
-                        <p class="text-emerald-600 mb-8">Ajoutez des produits en vedette depuis l'administration</p>
-                        ${this.currentUser && this.currentUser.role === 'admin' ? `
-                        <button onclick="app.showPage('admin')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                            <i class="fas fa-cog mr-2"></i>Aller à l'administration
-                        </button>
-                        ` : ''}
-                    </div>
-                `;
-            } else {
-                container.innerHTML = featuredProducts.slice(0, 8).map(product => this.createProductCard(product)).join('');
-            }
-        }
-    }
-    
-    async loadPromotionProducts() {
-        console.log('Loading promotion products...');
-        
-        // Use cached products and filter for promotion products
-        const promotionProducts = this.allProducts.filter(p => p.enPromotion && p.actif !== false);
-        
-        console.log(`Found ${promotionProducts.length} promotion products`);
-        
-        const container = document.getElementById('promotionProducts');
-        if (container) {
-            if (promotionProducts.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-full text-center py-16">
-                        <i class="fas fa-tags text-6xl text-red-300 mb-6"></i>
-                        <h3 class="text-2xl font-bold text-red-800 mb-4">Aucune promotion active</h3>
-                        <p class="text-red-600 mb-8">Créez des promotions depuis l'administration</p>
-                    </div>
-                `;
-            } else {
-                container.innerHTML = promotionProducts.slice(0, 8).map(product => this.createProductCard(product)).join('');
-            }
-        }
-    }
-    
-    createProductCard(product) {
-        const isOutOfStock = product.stock === 0;
-        const hasPromotion = product.enPromotion && product.prixOriginal;
-        
-        let imageUrl;
-        if (product.image && product.image.startsWith('http')) {
-            imageUrl = product.image;
-        } else if (product.image && product.image.startsWith('data:image')) {
-            imageUrl = product.image;
-        } else if (product.image) {
-            imageUrl = `./images/products/${product.image}`;
-        } else {
-            const getCategoryColor = (category) => {
-                const colors = {
-                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
-                    'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
-                    'Dentaire': '6366f1'
-                };
-                return colors[category] || '10b981';
-            };
-            
-            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
-            const categoryColor = getCategoryColor(product.categorie);
-            imageUrl = `https://via.placeholder.com/300x300/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
-        }
-        
-        return `
-            <div class="product-card bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-2xl overflow-hidden transition-all duration-500 cursor-pointer relative border border-emerald-200/50 hover:border-emerald-400/60 ${isOutOfStock ? 'opacity-75' : ''}"
-                 onclick="app.showPage('product', {id: '${product._id}'})">
-                ${hasPromotion ? `<div class="badge-promotion absolute top-4 left-4 z-20">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
-                ${isOutOfStock ? `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10 rounded-2xl">
-                    <span class="text-white font-bold text-lg">Rupture de stock</span>
-                </div>` : ''}
-                
-                <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden relative">
-                    <img src="${imageUrl}" alt="${product.nom}" 
-                         class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                         onerror="this.src='https://via.placeholder.com/300x300/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
+        const heroContent = `
+            <section class="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-primary via-secondary to-mint-600">
+                <!-- Background Elements -->
+                <div class="absolute inset-0">
+                    <div class="absolute top-10 left-10 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-float"></div>
+                    <div class="absolute bottom-10 right-10 w-96 h-96 bg-mint-400/20 rounded-full blur-3xl animate-pulse-slow"></div>
+                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-accent/30 rounded-full blur-2xl animate-bounce-slow"></div>
                 </div>
                 
-                <div class="p-6">
-                    <h3 class="font-bold text-emerald-800 mb-3 text-lg line-clamp-2">${product.nom}</h3>
-                    <p class="text-sm text-emerald-600 mb-4 line-clamp-2">${product.description || 'Description du produit'}</p>
-                    
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center space-x-2">
-                            ${hasPromotion ? `
-                                <span class="text-sm text-gray-400 line-through">${product.prixOriginal} DA</span>
-                                <span class="text-xl font-bold text-red-600">${product.prix} DA</span>
-                            ` : `
-                                <span class="text-xl font-bold text-emerald-700">${product.prix} DA</span>
-                            `}
+                <div class="container mx-auto px-4 relative z-10 text-center">
+                    <div class="max-w-5xl mx-auto">
+                        <!-- Logo Animation -->
+                        <div class="flex justify-center mb-12" data-aos="zoom-in" data-aos-duration="1000">
+                            <div class="relative">
+                                <div class="w-48 h-48 bg-white/30 backdrop-blur-lg rounded-3xl flex items-center justify-center shadow-health-xl border-4 border-white/40 animate-float">
+                                    <i class="fas fa-leaf text-8xl text-white drop-shadow-2xl"></i>
+                                </div>
+                                <div class="absolute -inset-4 bg-gradient-to-r from-mint-400 to-accent rounded-3xl opacity-30 blur-xl animate-pulse-slow"></div>
+                            </div>
                         </div>
                         
-                        ${!isOutOfStock ? `
-                            <button onclick="event.stopPropagation(); addToCartFromCard('${product._id}')" 
-                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-5 py-2 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
-                                <i class="fas fa-cart-plus"></i>
-                            </button>
-                        ` : ''}
-                    </div>
-                    
-                    <div class="flex items-center justify-between text-sm">
-                        <span class="text-emerald-600">Stock: ${product.stock}</span>
-                        <span class="text-emerald-700 font-semibold">${product.marque || ''}</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadLoginPage() {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 py-12 px-4">
-                <div class="container mx-auto max-w-md">
-                    <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
-                        <!-- Header -->
-                        <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-8 text-white text-center">
-                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <i class="fas fa-user-circle text-3xl text-white"></i>
-                            </div>
-                            <h1 class="text-2xl font-bold">Connexion</h1>
-                            <p class="text-emerald-100 mt-2">Accédez à votre compte Shifa</p>
+                        <!-- Main Title -->
+                        <div data-aos="fade-up" data-aos-delay="200">
+                            <h1 class="text-7xl md:text-9xl font-black font-jakarta mb-6 bg-gradient-to-r from-white via-mint-100 to-sage-100 bg-clip-text text-transparent drop-shadow-2xl">
+                                Shifa
+                            </h1>
+                            <h2 class="text-3xl md:text-4xl font-bold mb-8 text-mint-100 font-jakarta">
+                                Parapharmacie Gaher
+                            </h2>
                         </div>
                         
-                        <!-- Login Form -->
-                        <div class="p-8">
-                            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-6">
-                                <div>
-                                    <label for="loginEmail" class="block text-sm font-medium text-gray-700 mb-2">
-                                        <i class="fas fa-envelope mr-2 text-emerald-500"></i>Email
-                                    </label>
-                                    <input type="email" id="loginEmail" name="email" required 
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:ring-emerald-400 focus:ring-opacity-20 transition-all"
-                                           placeholder="votre@email.com">
-                                </div>
-                                
-                                <div>
-                                    <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                                        <i class="fas fa-lock mr-2 text-emerald-500"></i>Mot de passe
-                                    </label>
-                                    <input type="password" id="loginPassword" name="password" required 
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:ring-emerald-400 focus:ring-opacity-20 transition-all"
-                                           placeholder="Votre mot de passe">
-                                </div>
-                                
-                                <button type="submit" 
-                                        class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
-                                    <i class="fas fa-sign-in-alt mr-2"></i>Se connecter
-                                </button>
-                            </form>
-                            
-                            <!-- Demo Info -->
-                            <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                                <h3 class="text-sm font-semibold text-blue-800 mb-2">Comptes de démonstration:</h3>
-                                <div class="text-sm text-blue-700 space-y-1">
-                                    <p><strong>Admin:</strong> pharmaciegaher@gmail.com / admin123</p>
-                                    <p><strong>Client:</strong> client@example.com / client123</p>
-                                </div>
-                            </div>
-                            
-                            <!-- Registration Link -->
-                            <div class="text-center mt-6">
-                                <p class="text-gray-600">Pas encore de compte ?</p>
-                                <button onclick="app.showPage('register')" 
-                                        class="text-emerald-600 hover:text-emerald-700 font-semibold mt-2 hover:underline">
-                                    Créer un compte
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Initialize auth system if needed
-        if (!window.authSystem) {
-            window.authSystem = new AuthenticationSystem();
-        }
-    }
-    
-    async loadRegisterPage() {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 py-12 px-4">
-                <div class="container mx-auto max-w-2xl">
-                    <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
-                        <!-- Header -->
-                        <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-8 text-white text-center">
-                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <i class="fas fa-user-plus text-3xl text-white"></i>
-                            </div>
-                            <h1 class="text-2xl font-bold">Inscription</h1>
-                            <p class="text-emerald-100 mt-2">Créez votre compte Shifa</p>
-                        </div>
-                        
-                        <!-- Registration Form -->
-                        <div class="p-8">
-                            <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-6">
-                                <!-- Personal Info -->
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label for="registerPrenom" class="block text-sm font-medium text-gray-700 mb-2">
-                                            <i class="fas fa-user mr-2 text-emerald-500"></i>Prénom *
-                                        </label>
-                                        <input type="text" id="registerPrenom" name="prenom" required 
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
-                                    </div>
-                                    <div>
-                                        <label for="registerNom" class="block text-sm font-medium text-gray-700 mb-2">
-                                            <i class="fas fa-user mr-2 text-emerald-500"></i>Nom *
-                                        </label>
-                                        <input type="text" id="registerNom" name="nom" required 
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label for="registerEmail" class="block text-sm font-medium text-gray-700 mb-2">
-                                        <i class="fas fa-envelope mr-2 text-emerald-500"></i>Email *
-                                    </label>
-                                    <input type="email" id="registerEmail" name="email" required 
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
-                                </div>
-                                
-                                <div>
-                                    <label for="registerTelephone" class="block text-sm font-medium text-gray-700 mb-2">
-                                        <i class="fas fa-phone mr-2 text-emerald-500"></i>Téléphone *
-                                    </label>
-                                    <input type="tel" id="registerTelephone" name="telephone" required 
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                           placeholder="+213 555 123 456">
-                                </div>
-                                
-                                <div>
-                                    <label for="registerPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                                        <i class="fas fa-lock mr-2 text-emerald-500"></i>Mot de passe *
-                                    </label>
-                                    <input type="password" id="registerPassword" name="password" required 
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
-                                </div>
-                                
-                                <div>
-                                    <label for="registerAdresse" class="block text-sm font-medium text-gray-700 mb-2">
-                                        <i class="fas fa-map-marker-alt mr-2 text-emerald-500"></i>Adresse
-                                    </label>
-                                    <input type="text" id="registerAdresse" name="adresse" 
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
-                                </div>
-                                
-                                <div>
-                                    <label for="registerWilaya" class="block text-sm font-medium text-gray-700 mb-2">
-                                        <i class="fas fa-map mr-2 text-emerald-500"></i>Wilaya *
-                                    </label>
-                                    <select id="registerWilaya" name="wilaya" required 
-                                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
-                                        <option value="">Sélectionnez votre wilaya</option>
-                                        <option value="Alger">Alger</option>
-                                        <option value="Blida">Blida</option>
-                                        <option value="Tipaza">Tipaza</option>
-                                        <option value="Boumerdès">Boumerdès</option>
-                                        <option value="Médéa">Médéa</option>
-                                    </select>
-                                </div>
-                                
-                                <button type="submit" 
-                                        class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
-                                    <i class="fas fa-user-plus mr-2"></i>Créer mon compte
-                                </button>
-                            </form>
-                            
-                            <!-- Login Link -->
-                            <div class="text-center mt-6">
-                                <p class="text-gray-600">Déjà un compte ?</p>
-                                <button onclick="app.showPage('login')" 
-                                        class="text-emerald-600 hover:text-emerald-700 font-semibold mt-2 hover:underline">
-                                    Se connecter
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadCheckoutPage() {
-        if (this.cart.length === 0) {
-            this.showToast('Votre panier est vide', 'warning');
-            this.showPage('products');
-            return;
-        }
-        
-        const mainContent = document.getElementById('mainContent');
-        const sousTotal = this.getCartTotal();
-        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
-        const total = sousTotal + fraisLivraison;
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <!-- Header -->
-                <div class="text-center mb-8">
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">Finaliser votre commande</h1>
-                    <p class="text-xl text-emerald-600">Un dernier pas avant la livraison</p>
-                </div>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Form Column -->
-                    <div class="lg:col-span-2">
-                        <div class="bg-white rounded-2xl shadow-xl border border-emerald-200/50 p-8">
-                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Informations de livraison</h2>
-                            
-                            <form id="checkoutForm" class="space-y-6">
-                                <!-- Personal Info -->
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label for="checkoutPrenom" class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
-                                        <input type="text" id="checkoutPrenom" name="prenom" required 
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                               value="${this.currentUser?.prenom || ''}">
-                                    </div>
-                                    <div>
-                                        <label for="checkoutNom" class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
-                                        <input type="text" id="checkoutNom" name="nom" required 
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                               value="${this.currentUser?.nom || ''}">
-                                    </div>
-                                </div>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label for="checkoutEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                                        <input type="email" id="checkoutEmail" name="email" required 
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                               value="${this.currentUser?.email || ''}">
-                                    </div>
-                                    <div>
-                                        <label for="checkoutTelephone" class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
-                                        <input type="tel" id="checkoutTelephone" name="telephone" required 
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                               value="${this.currentUser?.telephone || ''}" placeholder="+213 555 123 456">
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label for="checkoutAdresse" class="block text-sm font-semibold text-gray-700 mb-2">Adresse complète *</label>
-                                    <input type="text" id="checkoutAdresse" name="adresse" required 
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                           value="${this.currentUser?.adresse || ''}" placeholder="Rue, numéro, quartier...">
-                                </div>
-                                
-                                <div>
-                                    <label for="checkoutWilaya" class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
-                                    <select id="checkoutWilaya" name="wilaya" required 
-                                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
-                                        <option value="">Sélectionnez votre wilaya</option>
-                                        <option value="Alger" ${this.currentUser?.wilaya === 'Alger' ? 'selected' : ''}>Alger (250 DA)</option>
-                                        <option value="Blida" ${this.currentUser?.wilaya === 'Blida' ? 'selected' : ''}>Blida (250 DA)</option>
-                                        <option value="Boumerdès" ${this.currentUser?.wilaya === 'Boumerdès' ? 'selected' : ''}>Boumerdès (250 DA)</option>
-                                        <option value="Tipaza" ${this.currentUser?.wilaya === 'Tipaza' ? 'selected' : ''}>Tipaza (200 DA)</option>
-                                        <option value="Médéa" ${this.currentUser?.wilaya === 'Médéa' ? 'selected' : ''}>Médéa (300 DA)</option>
-                                        <option value="Autre">Autre wilaya (350 DA)</option>
-                                    </select>
-                                </div>
-                                
-                                <!-- Payment Method -->
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-4">Mode de paiement *</label>
-                                    <div class="space-y-3">
-                                        <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:border-emerald-400 cursor-pointer transition-all">
-                                            <input type="radio" name="modePaiement" value="Paiement à la livraison" checked 
-                                                   class="text-emerald-600 focus:ring-emerald-500">
-                                            <div class="ml-3">
-                                                <div class="font-medium text-gray-900">
-                                                    <i class="fas fa-hand-holding-usd mr-2 text-emerald-500"></i>
-                                                    Paiement à la livraison
-                                                </div>
-                                                <div class="text-sm text-gray-500">Payez en espèces lors de la réception</div>
-                                            </div>
-                                        </label>
-                                        
-                                        <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:border-emerald-400 cursor-pointer transition-all">
-                                            <input type="radio" name="modePaiement" value="Carte bancaire" disabled 
-                                                   class="text-emerald-600 focus:ring-emerald-500">
-                                            <div class="ml-3">
-                                                <div class="font-medium text-gray-400">
-                                                    <i class="fas fa-credit-card mr-2"></i>
-                                                    Carte bancaire (Bientôt disponible)
-                                                </div>
-                                                <div class="text-sm text-gray-400">Paiement sécurisé en ligne</div>
-                                            </div>
-                                        </label>
-                                    </div>
-                                    <div id="paymentMethodInfo"></div>
-                                </div>
-                                
-                                <!-- Comments -->
-                                <div>
-                                    <label for="checkoutCommentaires" class="block text-sm font-semibold text-gray-700 mb-2">Commentaires (optionnel)</label>
-                                    <textarea id="checkoutCommentaires" name="commentaires" rows="3" 
-                                              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
-                                              placeholder="Instructions de livraison, allergies, etc."></textarea>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    
-                    <!-- Order Summary Column -->
-                    <div class="lg:col-span-1">
-                        <div class="bg-white rounded-2xl shadow-xl border border-emerald-200/50 p-6 sticky top-8">
-                            <h3 class="text-xl font-bold text-emerald-800 mb-6">Résumé de la commande</h3>
-                            
-                            <!-- Cart Items -->
-                            <div class="space-y-4 mb-6">
-                                ${this.cart.map(item => `
-                                    <div class="flex items-center space-x-3 p-3 bg-emerald-50/50 rounded-lg">
-                                        <img src="${item.image}" alt="${item.nom}" class="w-12 h-12 object-cover rounded-lg">
-                                        <div class="flex-1">
-                                            <h4 class="font-medium text-emerald-800 text-sm">${item.nom}</h4>
-                                            <p class="text-emerald-600 text-sm">${item.quantite} × ${item.prix} DA</p>
-                                        </div>
-                                        <span class="font-semibold text-emerald-700">${item.quantite * item.prix} DA</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            
-                            <!-- Pricing -->
-                            <div class="border-t border-emerald-200 pt-4 space-y-3">
-                                <div class="flex justify-between text-emerald-700">
-                                    <span>Sous-total:</span>
-                                    <span id="checkoutSousTotal">${sousTotal} DA</span>
-                                </div>
-                                <div class="flex justify-between text-emerald-700">
-                                    <span>Frais de livraison:</span>
-                                    <span id="checkoutFraisLivraison">${fraisLivraison} DA</span>
-                                </div>
-                                ${sousTotal >= 5000 ? '<div class="text-green-600 text-sm font-medium"><i class="fas fa-truck mr-1"></i>Livraison gratuite !</div>' : ''}
-                                <div class="flex justify-between font-bold text-lg text-emerald-800 border-t border-emerald-200 pt-3">
-                                    <span>Total:</span>
-                                    <span id="checkoutTotal">${total} DA</span>
-                                </div>
-                            </div>
-                            
-                            <!-- Shipping Message -->
-                            <div id="shippingMessage" class="mt-4"></div>
-                            
-                            <!-- Submit Button -->
-                            <button onclick="app.processOrder()" 
-                                    class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 mt-6">
-                                <i class="fas fa-check mr-2"></i>Confirmer la commande
-                            </button>
-                            
-                            <p class="text-xs text-gray-500 mt-4 text-center">
-                                En confirmant, vous acceptez nos conditions de vente
+                        <!-- Subtitle -->
+                        <div data-aos="fade-up" data-aos-delay="400">
+                            <p class="text-xl md:text-2xl mb-12 text-mint-50 font-medium leading-relaxed max-w-3xl mx-auto">
+                                🌿 Votre bien-être naturel commence ici<br>
+                                <span class="text-lg opacity-90">Découvrez notre sélection premium de produits de santé et beauté</span>
                             </p>
                         </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Initialize checkout system
-        if (window.initCheckout) {
-            window.initCheckout();
-        }
-    }
-    
-    // Process order method that calls the checkout system
-    async processOrder() {
-        if (window.checkoutSystem) {
-            return await window.checkoutSystem.processOrder();
-        } else {
-            this.showToast('Système de commande non disponible', 'error');
-        }
-    }
-    
-    async loadOrderConfirmationPage(orderNumber) {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-16">
-                <div class="max-w-2xl mx-auto text-center">
-                    <div class="bg-white rounded-2xl shadow-xl border border-emerald-200/50 p-12">
-                        <!-- Success Icon -->
-                        <div class="w-24 h-24 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full flex items-center justify-center mx-auto mb-8">
-                            <i class="fas fa-check text-white text-4xl"></i>
-                        </div>
                         
-                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
-                        <p class="text-xl text-emerald-600 mb-8">
-                            Merci pour votre confiance. Votre commande a été enregistrée avec succès.
-                        </p>
-                        
-                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-8">
-                            <h3 class="text-lg font-bold text-emerald-800 mb-2">Numéro de commande</h3>
-                            <p class="text-2xl font-bold text-emerald-600">#${orderNumber}</p>
-                        </div>
-                        
-                        <div class="space-y-4 text-left mb-8">
-                            <div class="flex items-start space-x-3">
-                                <i class="fas fa-truck text-emerald-500 mt-1"></i>
-                                <div>
-                                    <h4 class="font-semibold text-emerald-800">Livraison</h4>
-                                    <p class="text-emerald-600">Votre commande sera livrée sous 24-48h</p>
-                                </div>
-                            </div>
-                            
-                            <div class="flex items-start space-x-3">
-                                <i class="fas fa-phone text-emerald-500 mt-1"></i>
-                                <div>
-                                    <h4 class="font-semibold text-emerald-800">Contact</h4>
-                                    <p class="text-emerald-600">Nous vous appellerons pour confirmer la livraison</p>
-                                </div>
-                            </div>
-                            
-                            <div class="flex items-start space-x-3">
-                                <i class="fas fa-hand-holding-usd text-emerald-500 mt-1"></i>
-                                <div>
-                                    <h4 class="font-semibold text-emerald-800">Paiement</h4>
-                                    <p class="text-emerald-600">Paiement à la livraison en espèces</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                            <button onclick="app.showPage('home')" 
-                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                                <i class="fas fa-home mr-2"></i>Retour à l'accueil
-                            </button>
-                            
+                        <!-- CTA Buttons -->
+                        <div class="flex flex-col sm:flex-row gap-6 justify-center items-center" data-aos="fade-up" data-aos-delay="600">
                             <button onclick="app.showPage('products')" 
-                                    class="border-2 border-emerald-500 text-emerald-600 font-bold py-3 px-8 rounded-xl hover:bg-emerald-500 hover:text-white transition-all">
-                                <i class="fas fa-shopping-bag mr-2"></i>Continuer mes achats
+                                    class="group bg-white text-primary hover:bg-mint-50 px-12 py-5 rounded-2xl font-bold text-xl transition-all duration-300 shadow-health-lg hover:shadow-health-xl transform hover:scale-105 flex items-center">
+                                <i class="fas fa-shopping-bag mr-3 group-hover:scale-110 transition-transform"></i>
+                                Explorer nos produits
+                                <i class="fas fa-arrow-right ml-3 group-hover:translate-x-1 transition-transform"></i>
+                            </button>
+                            
+                            <button onclick="app.showPage('contact')" 
+                                    class="group bg-white/20 backdrop-blur-md text-white border-2 border-white/40 hover:bg-white/30 px-12 py-5 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105">
+                                <i class="fas fa-phone mr-3 group-hover:scale-110 transition-transform"></i>
+                                Nous contacter
                             </button>
                         </div>
+                        
+                        <!-- Stats or Features -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16" data-aos="fade-up" data-aos-delay="800">
+                            <div class="bg-white/20 backdrop-blur-md rounded-2xl p-6 border border-white/30">
+                                <div class="text-4xl font-bold text-white mb-2">${this.allProducts.length}+</div>
+                                <div class="text-mint-100">Produits disponibles</div>
+                            </div>
+                            <div class="bg-white/20 backdrop-blur-md rounded-2xl p-6 border border-white/30">
+                                <div class="text-4xl font-bold text-white mb-2">48h</div>
+                                <div class="text-mint-100">Livraison rapide</div>
+                            </div>
+                            <div class="bg-white/20 backdrop-blur-md rounded-2xl p-6 border border-white/30">
+                                <div class="text-4xl font-bold text-white mb-2">100%</div>
+                                <div class="text-mint-100">Produits authentiques</div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadContactPage() {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
-                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
                 </div>
                 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    <div class="space-y-8">
-                        <div>
-                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnées</h2>
-                            
-                            <div class="space-y-6">
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-map-marker-alt text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Adresse</h3>
-                                        <p class="text-gray-600">Tipaza, Algérie</p>
-                                    </div>
-                                </div>
-                                
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-phone text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Téléphone</h3>
-                                        <p class="text-gray-600">+213 123 456 789</p>
-                                    </div>
-                                </div>
-                                
-                                <div class="flex items-start space-x-4">
-                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-envelope text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">Email</h3>
-                                        <a href="mailto:pharmaciegaher@gmail.com" class="text-primary hover:text-secondary">
-                                            pharmaciegaher@gmail.com
-                                        </a>
-                                    </div>
-                                </div>
+                <!-- Scroll indicator -->
+                <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white animate-bounce">
+                    <i class="fas fa-chevron-down text-2xl"></i>
+                </div>
+            </section>
+        `;
+        
+        const categoriesContent = await this.generateCategoriesSection();
+        const featuredContent = await this.generateFeaturedSection();
+        const promotionsContent = await this.generatePromotionsSection();
+        
+        mainContent.innerHTML = heroContent + categoriesContent + featuredContent + promotionsContent;
+    }
+    
+    // Generate categories section
+    async generateCategoriesSection() {
+        const categoriesHtml = this.categories.slice(0, 10).map((category, index) => `
+            <div class="group cursor-pointer" onclick="app.filterByCategory('${category.nom}')" data-aos="fade-up" data-aos-delay="${index * 100}">
+                <div class="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-health hover:shadow-health-lg transition-all duration-500 border border-mint-200/50 hover:border-mint-400/60 transform hover:scale-105 hover:-translate-y-2">
+                    <div class="text-center">
+                        <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br ${this.getCategoryGradient(category.nom)} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                            <i class="${APP_CONFIG.CATEGORIES[category.nom]?.icon || 'fas fa-pills'} text-3xl text-white"></i>
+                        </div>
+                        <h3 class="font-bold text-xl text-forest-800 mb-2 group-hover:text-primary transition-colors">${category.nom}</h3>
+                        <p class="text-mint-600 text-sm font-medium">${APP_CONFIG.CATEGORIES[category.nom]?.description || 'Produits de qualité'}</p>
+                        ${category.count ? `<div class="mt-3 text-xs text-mint-500 font-semibold">${category.count} produits</div>` : ''}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        return `
+            <section class="py-20 bg-gradient-to-br from-sage-50 to-mint-50">
+                <div class="container mx-auto px-4">
+                    <div class="text-center mb-16" data-aos="fade-up">
+                        <h2 class="text-5xl font-black text-forest-800 mb-6 font-jakarta">Nos Spécialités</h2>
+                        <p class="text-xl text-mint-600 max-w-2xl mx-auto">
+                            Découvrez notre large gamme de produits soigneusement sélectionnés pour votre bien-être
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                        ${categoriesHtml}
+                    </div>
+                </div>
+            </section>
+        `;
+    }
+    
+    // Generate featured products section
+    async generateFeaturedSection() {
+        const featuredProducts = this.allProducts
+            .filter(p => p.enVedette && p.actif !== false && p.stock > 0)
+            .slice(0, 8);
+        
+        if (featuredProducts.length === 0) {
+            return `
+                <section class="py-20 bg-white">
+                    <div class="container mx-auto px-4">
+                        <div class="text-center" data-aos="fade-up">
+                            <h2 class="text-5xl font-black text-forest-800 mb-6 font-jakarta">Nos Coups de Cœur</h2>
+                            <div class="bg-mint-50 rounded-2xl p-12 border border-mint-200">
+                                <i class="fas fa-heart text-6xl text-mint-300 mb-6"></i>
+                                <p class="text-xl text-mint-600">Découvrez bientôt nos produits coups de cœur</p>
                             </div>
                         </div>
                     </div>
+                </section>
+            `;
+        }
+        
+        const productsHtml = featuredProducts.map((product, index) => 
+            this.generateProductCard(product, index * 100)
+        ).join('');
+        
+        return `
+            <section class="py-20 bg-white">
+                <div class="container mx-auto px-4">
+                    <div class="text-center mb-16" data-aos="fade-up">
+                        <h2 class="text-5xl font-black text-forest-800 mb-6 font-jakarta">Nos Coups de Cœur</h2>
+                        <p class="text-xl text-mint-600 max-w-2xl mx-auto">
+                            Sélection spéciale de nos experts pour votre santé et votre beauté
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                        ${productsHtml}
+                    </div>
+                    <div class="text-center mt-12" data-aos="fade-up" data-aos-delay="400">
+                        <button onclick="app.showPage('products')" 
+                                class="bg-gradient-to-r from-primary to-secondary text-white px-10 py-4 rounded-2xl font-bold text-lg hover:from-secondary hover:to-mint-600 transition-all duration-300 shadow-health hover:shadow-health-lg transform hover:scale-105">
+                            Voir tous les produits <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        `;
+    }
+    
+    // Generate promotions section
+    async generatePromotionsSection() {
+        const promotionProducts = this.allProducts
+            .filter(p => p.enPromotion && p.actif !== false && p.stock > 0)
+            .slice(0, 8);
+        
+        if (promotionProducts.length === 0) {
+            return '';
+        }
+        
+        const productsHtml = promotionProducts.map((product, index) => 
+            this.generateProductCard(product, index * 100)
+        ).join('');
+        
+        return `
+            <section class="py-20 bg-gradient-to-br from-red-50 to-pink-50">
+                <div class="container mx-auto px-4">
+                    <div class="text-center mb-16" data-aos="fade-up">
+                        <h2 class="text-5xl font-black text-red-800 mb-6 font-jakarta">🏷️ Promotions Exceptionnelles</h2>
+                        <p class="text-xl text-red-600 max-w-2xl mx-auto">
+                            Profitez de nos offres spéciales à durée limitée
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                        ${productsHtml}
+                    </div>
+                </div>
+            </section>
+        `;
+    }
+    
+    // Generate product card HTML
+    generateProductCard(product, delay = 0) {
+        const isOutOfStock = product.stock === 0;
+        const hasPromotion = product.enPromotion && product.prixOriginal;
+        const imageUrl = this.getProductImage(product);
+        
+        return `
+            <div class="group cursor-pointer" onclick="app.showPage('product', {id: '${product._id}'})" data-aos="fade-up" data-aos-delay="${delay}">
+                <div class="bg-white/90 backdrop-blur-sm rounded-3xl overflow-hidden shadow-health hover:shadow-health-lg transition-all duration-500 border border-mint-200/50 hover:border-mint-400/60 transform hover:scale-105 hover:-translate-y-2 ${isOutOfStock ? 'opacity-75' : ''}">
+                    ${hasPromotion ? `
+                        <div class="absolute top-4 left-4 z-20 bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1 rounded-xl text-sm font-bold shadow-lg">
+                            -${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%
+                        </div>
+                    ` : ''}
                     
-                    <div class="bg-white rounded-lg shadow-lg p-8">
-                        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Envoyez-nous un message</h2>
+                    ${isOutOfStock ? `
+                        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-10 rounded-3xl">
+                            <div class="text-white font-bold text-lg text-center">
+                                <i class="fas fa-exclamation-triangle text-3xl mb-2"></i>
+                                <div>Rupture de stock</div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="aspect-square bg-gradient-to-br from-mint-50 to-sage-50 relative overflow-hidden">
+                        <img src="${imageUrl}" alt="${product.nom}" 
+                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                             onerror="this.src='${this.generateProductImage(product.categorie, product._id)}'">
+                    </div>
+                    
+                    <div class="p-6">
+                        <h3 class="font-bold text-xl text-forest-800 mb-3 group-hover:text-primary transition-colors line-clamp-2">${product.nom}</h3>
+                        <p class="text-mint-600 text-sm mb-4 line-clamp-2">${product.description || 'Produit de qualité premium'}</p>
                         
-                        <form id="contactForm" onsubmit="handleContactForm(event)" class="space-y-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="contactName" class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
-                                    <input type="text" id="contactName" name="name" required class="form-input" placeholder="Votre nom complet">
-                                </div>
-                                <div>
-                                    <label for="contactEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                                    <input type="email" id="contactEmail" name="email" required class="form-input" placeholder="votre@email.com">
-                                </div>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-2">
+                                ${hasPromotion ? `
+                                    <span class="text-sm text-gray-400 line-through">${Utils.formatPrice(product.prixOriginal)}</span>
+                                    <span class="text-2xl font-black text-red-600">${Utils.formatPrice(product.prix)}</span>
+                                ` : `
+                                    <span class="text-2xl font-black text-forest-800">${Utils.formatPrice(product.prix)}</span>
+                                `}
                             </div>
                             
-                            <div>
-                                <label for="contactMessage" class="block text-sm font-medium text-gray-700 mb-2">Message *</label>
-                                <textarea id="contactMessage" name="message" rows="5" required class="form-input resize-none" placeholder="Votre message..."></textarea>
-                            </div>
-                            
-                            <button type="submit" class="w-full btn-primary py-3" id="contactSubmitBtn">
-                                <span id="contactSubmitText">Envoyer le message</span>
-                                <i id="contactSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
-                            </button>
-                        </form>
+                            ${!isOutOfStock ? `
+                                <button onclick="event.stopPropagation(); app.addToCart('${product._id}')" 
+                                        class="group/btn bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-xl hover:from-secondary hover:to-mint-600 transition-all duration-300 shadow-health hover:shadow-health-lg transform hover:scale-110">
+                                    <i class="fas fa-cart-plus group-hover/btn:scale-125 transition-transform"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="flex items-center text-mint-600">
+                                <i class="fas fa-box mr-1"></i>
+                                Stock: ${product.stock}
+                            </span>
+                            ${product.marque ? `<span class="text-forest-700 font-semibold">${product.marque}</span>` : ''}
+                        </div>
                     </div>
                 </div>
             </div>
         `;
     }
     
-    async filterByCategory(category) {
-        await this.showPage('products', { categorie: category });
-    }
-    
-    async performSearch(query) {
-        if (query.trim()) {
-            await this.showPage('products', { search: query });
+    // Get product image URL
+    getProductImage(product) {
+        if (product.image && product.image.startsWith('data:image')) {
+            return product.image;
+        } else if (product.image && product.image.startsWith('http')) {
+            return product.image;
+        } else if (product.image) {
+            return `./images/products/${product.image}`;
+        } else {
+            return this.generateProductImage(product.categorie, product._id);
         }
     }
     
-    initSearch() {
-        const searchInput = document.getElementById('searchInput');
-        let searchTimeout;
-        
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(() => {
-                    if (e.target.value.trim()) {
-                        this.performSearch(e.target.value);
-                    }
-                }, 500);
-            });
-        }
+    // Get category gradient classes
+    getCategoryGradient(category) {
+        const gradients = {
+            'Vitalité': 'from-green-400 to-green-600',
+            'Sport': 'from-red-400 to-red-600',
+            'Visage': 'from-pink-400 to-pink-600',
+            'Cheveux': 'from-amber-400 to-amber-600',
+            'Solaire': 'from-orange-400 to-orange-600',
+            'Intime': 'from-rose-400 to-rose-600',
+            'Soins': 'from-emerald-400 to-emerald-600',
+            'Bébé': 'from-cyan-400 to-cyan-600',
+            'Homme': 'from-blue-400 to-blue-600',
+            'Dentaire': 'from-indigo-400 to-indigo-600'
+        };
+        return gradients[category] || 'from-green-400 to-green-600';
     }
     
-    // ADD TO CART FUNCTIONALITY - FIXED
+    // Add to cart functionality
     async addToCart(productId, quantity = 1) {
         try {
-            console.log('Adding to cart:', productId, quantity);
+            console.log('🛒 Adding to cart:', productId, 'quantity:', quantity);
             
-            // Find product in our cached products
             const product = this.allProducts.find(p => p._id === productId);
-            
             if (!product) {
                 throw new Error('Produit non trouvé');
             }
@@ -996,31 +826,8 @@ class PharmacieGaherApp {
                 return;
             }
             
-            // Generate image URL
-            const getCategoryColor = (category) => {
-                const colors = {
-                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
-                    'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
-                    'Dentaire': '6366f1'
-                };
-                return colors[category] || '10b981';
-            };
-            
-            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
-            const categoryColor = getCategoryColor(product.categorie);
-            let imageUrl;
-            
-            if (product.image && product.image.startsWith('data:image')) {
-                imageUrl = product.image;
-            } else if (product.image && product.image.startsWith('http')) {
-                imageUrl = product.image;
-            } else {
-                imageUrl = `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
-            }
-            
-            // Check if product already in cart
             const existingIndex = this.cart.findIndex(item => item.id === productId);
+            const imageUrl = this.getProductImage(product);
             
             if (existingIndex > -1) {
                 const newQuantity = this.cart[existingIndex].quantite + quantity;
@@ -1049,28 +856,40 @@ class PharmacieGaherApp {
             this.updateCartUI();
             this.showToast(`${product.nom} ajouté au panier`, 'success');
             
+            // Dispatch cart updated event
+            document.dispatchEvent(new CustomEvent('cart:updated', { detail: this.cart }));
+            
         } catch (error) {
-            console.error('Erreur ajout au panier:', error);
+            console.error('❌ Add to cart error:', error);
             this.showToast('Erreur lors de l\'ajout au panier', 'error');
         }
     }
     
+    // Update cart UI
     updateCartUI() {
         const cartCount = document.getElementById('cartCount');
+        const cartItemsCount = document.getElementById('cartItemsCount');
+        
         if (cartCount) {
             const totalItems = this.cart.reduce((sum, item) => sum + item.quantite, 0);
             cartCount.textContent = totalItems;
             
             if (totalItems > 0) {
-                cartCount.classList.add('pulse');
-            } else {
-                cartCount.classList.remove('pulse');
+                cartCount.classList.add('animate-pulse');
+                setTimeout(() => cartCount.classList.remove('animate-pulse'), 1000);
             }
+        }
+        
+        if (cartItemsCount) {
+            const totalItems = this.cart.reduce((sum, item) => sum + item.quantite, 0);
+            cartItemsCount.textContent = totalItems === 0 ? '0 articles' : 
+                totalItems === 1 ? '1 article' : `${totalItems} articles`;
         }
         
         this.updateCartSidebar();
     }
     
+    // Update cart sidebar
     updateCartSidebar() {
         const cartItems = document.getElementById('cartItems');
         const cartSummary = document.getElementById('cartSummary');
@@ -1079,9 +898,15 @@ class PharmacieGaherApp {
         
         if (this.cart.length === 0) {
             cartItems.innerHTML = `
-                <div class="text-emerald-600 text-center py-8">
-                    <i class="fas fa-shopping-cart text-4xl mb-4 opacity-50"></i>
-                    <p>Votre panier est vide</p>
+                <div class="text-center py-16">
+                    <div class="w-24 h-24 bg-mint-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-shopping-cart text-4xl text-mint-400"></i>
+                    </div>
+                    <p class="text-xl font-semibold text-forest-700 mb-2">Votre panier est vide</p>
+                    <p class="text-mint-600">Découvrez nos produits de qualité</p>
+                    <button onclick="app.showPage('products'); toggleCart();" class="mt-6 bg-gradient-to-r from-primary to-secondary text-white px-8 py-3 rounded-xl hover:from-secondary hover:to-mint-600 transition-all duration-300 shadow-health font-medium">
+                        Explorer nos produits
+                    </button>
                 </div>
             `;
             if (cartSummary) cartSummary.classList.add('hidden');
@@ -1089,22 +914,27 @@ class PharmacieGaherApp {
         }
         
         cartItems.innerHTML = this.cart.map(item => `
-            <div class="cart-item">
-                <div class="flex items-center space-x-3">
+            <div class="bg-white/50 backdrop-blur-sm rounded-2xl p-4 border border-mint-200/50 hover:border-mint-400/60 transition-all shadow-sm hover:shadow-health">
+                <div class="flex items-center space-x-4">
                     <img src="${item.image}" alt="${item.nom}" 
-                         class="w-16 h-16 object-cover rounded-lg">
+                         class="w-16 h-16 object-cover rounded-xl shadow-sm">
                     <div class="flex-1">
-                        <h4 class="font-medium text-emerald-800">${item.nom}</h4>
-                        <p class="text-sm text-emerald-600">${item.prix} DA</p>
-                        <div class="flex items-center space-x-2 mt-1">
-                            <div class="quantity-selector">
-                                <button onclick="app.updateCartQuantity('${item.id}', ${item.quantite - 1})">-</button>
-                                <input type="number" value="${item.quantite}" min="1" 
-                                       onchange="app.updateCartQuantity('${item.id}', parseInt(this.value))">
-                                <button onclick="app.updateCartQuantity('${item.id}', ${item.quantite + 1})">+</button>
+                        <h4 class="font-semibold text-forest-800 text-sm mb-1 line-clamp-1">${item.nom}</h4>
+                        <p class="text-primary font-bold text-lg">${Utils.formatPrice(item.prix)}</p>
+                        <div class="flex items-center space-x-2 mt-2">
+                            <div class="flex items-center bg-mint-100 rounded-xl overflow-hidden">
+                                <button onclick="app.updateCartQuantity('${item.id}', ${item.quantite - 1})" 
+                                        class="px-3 py-1 text-primary hover:bg-primary hover:text-white transition-colors">
+                                    <i class="fas fa-minus text-sm"></i>
+                                </button>
+                                <span class="px-3 py-1 text-forest-800 font-semibold min-w-12 text-center">${item.quantite}</span>
+                                <button onclick="app.updateCartQuantity('${item.id}', ${item.quantite + 1})" 
+                                        class="px-3 py-1 text-primary hover:bg-primary hover:text-white transition-colors">
+                                    <i class="fas fa-plus text-sm"></i>
+                                </button>
                             </div>
                             <button onclick="app.removeFromCart('${item.id}')" 
-                                    class="text-red-500 hover:text-red-700 ml-2">
+                                    class="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
                                 <i class="fas fa-trash text-sm"></i>
                             </button>
                         </div>
@@ -1117,20 +947,24 @@ class PharmacieGaherApp {
         if (cartSummary) cartSummary.classList.remove('hidden');
     }
     
-    async updateCartTotals() {
+    // Update cart totals
+    updateCartTotals() {
         const sousTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
-        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
+        const freeShippingThreshold = this.settings.shipping?.freeShippingThreshold || APP_CONFIG.ECOMMERCE.FREE_SHIPPING_THRESHOLD;
+        const shippingCost = this.settings.shipping?.standardCost || APP_CONFIG.ECOMMERCE.STANDARD_SHIPPING_COST;
+        const fraisLivraison = sousTotal >= freeShippingThreshold ? 0 : shippingCost;
         const total = sousTotal + fraisLivraison;
         
         const cartSubtotal = document.getElementById('cartSubtotal');
         const cartShipping = document.getElementById('cartShipping');
         const cartTotal = document.getElementById('cartTotal');
         
-        if (cartSubtotal) cartSubtotal.textContent = `${sousTotal} DA`;
-        if (cartShipping) cartShipping.textContent = `${fraisLivraison} DA`;
-        if (cartTotal) cartTotal.textContent = `${total} DA`;
+        if (cartSubtotal) cartSubtotal.textContent = Utils.formatPrice(sousTotal);
+        if (cartShipping) cartShipping.textContent = Utils.formatPrice(fraisLivraison);
+        if (cartTotal) cartTotal.textContent = Utils.formatPrice(total);
     }
     
+    // Update cart quantity
     updateCartQuantity(productId, newQuantity) {
         const itemIndex = this.cart.findIndex(item => item.id === productId);
         
@@ -1153,6 +987,7 @@ class PharmacieGaherApp {
         this.updateCartUI();
     }
     
+    // Remove from cart
     removeFromCart(productId) {
         const itemIndex = this.cart.findIndex(item => item.id === productId);
         
@@ -1165,276 +1000,151 @@ class PharmacieGaherApp {
         }
     }
     
-    clearCart() {
-        this.cart = [];
-        this.saveCart();
-        this.updateCartUI();
-        this.showToast('Panier vidé', 'success');
-    }
-    
+    // Save cart to localStorage
     saveCart() {
         localStorage.setItem('cart', JSON.stringify(this.cart));
     }
     
-    getCartTotal() {
-        return this.cart.reduce((total, item) => total + (item.prix * item.quantite), 0);
-    }
-    
-    getCartItemCount() {
-        return this.cart.reduce((count, item) => count + item.quantite, 0);
-    }
-    
-    logout() {
-        if (window.authSystem) {
-            window.authSystem.logout();
-        }
-        this.currentUser = null;
-        this.updateUserUI();
-        this.showToast('Déconnexion réussie', 'success');
-        this.showPage('home');
-    }
-    
-    // ADMIN METHODS - These need to be part of the main app class
-    async loadAdminPage() {
-        if (!this.currentUser || this.currentUser.role !== 'admin') {
-            this.showToast('Accès refusé - Droits administrateur requis', 'error');
-            this.showPage('home');
-            return;
-        }
-
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <!-- Admin Header -->
-                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                        <div>
-                            <h1 class="text-4xl font-bold text-emerald-800 mb-2">Panel d'Administration</h1>
-                            <p class="text-emerald-600 text-lg">Gestion complète de Shifa - Parapharmacie</p>
-                        </div>
-                        <div class="flex items-center space-x-4">
-                            <div class="text-right">
-                                <p class="text-sm text-emerald-500">Connecté en tant que</p>
-                                <p class="font-bold text-emerald-800 text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
-                                <p class="text-sm text-emerald-600">${this.currentUser.email}</p>
-                            </div>
-                            <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/30">
-                                <i class="fas fa-user-shield text-white text-2xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Navigation Admin -->
-                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 mb-8 overflow-hidden">
-                    <nav class="flex flex-wrap">
-                        <button onclick="switchAdminSection('dashboard')" 
-                                class="admin-nav-btn dashboard flex-1 min-w-max px-6 py-4 text-sm font-bold bg-gradient-to-r from-emerald-500 to-green-600 text-white">
-                            <i class="fas fa-chart-line mr-2"></i>Tableau de bord
-                        </button>
-                        <button onclick="switchAdminSection('products')" 
-                                class="admin-nav-btn products flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
-                            <i class="fas fa-pills mr-2"></i>Produits
-                        </button>
-                        <button onclick="switchAdminSection('orders')" 
-                                class="admin-nav-btn orders flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
-                            <i class="fas fa-shopping-bag mr-2"></i>Commandes
-                        </button>
-                        <button onclick="switchAdminSection('featured')" 
-                                class="admin-nav-btn featured flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
-                            <i class="fas fa-star mr-2"></i>Coups de Coeur
-                        </button>
-                        <button onclick="switchAdminSection('cleanup')" 
-                                class="admin-nav-btn cleanup flex-1 min-w-max px-6 py-4 text-sm font-semibold text-red-700 hover:bg-red-50 transition-all">
-                            <i class="fas fa-broom mr-2"></i>Nettoyage
-                        </button>
-                    </nav>
-                </div>
-                
-                <!-- Admin Content -->
-                <div id="adminContent" class="min-h-96">
-                    <!-- Content will be loaded here -->
-                </div>
-            </div>
-        `;
-        
-        await this.loadAdminDashboard();
-    }
-    
-    async loadAdminDashboard() {
-        try {
-            // Get stats from localStorage and cached products
-            const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-            const products = this.allProducts;
-            
-            let stats = {
-                totalProducts: products.length,
-                totalOrders: adminOrders.length,
-                pendingOrders: adminOrders.filter(o => o.statut === 'en-attente').length,
-                totalUsers: 1,
-                monthlyRevenue: adminOrders.reduce((sum, o) => sum + (o.total || 0), 0)
-            };
-
-            try {
-                const data = await apiCall('/admin/dashboard');
-                if (data && data.stats) {
-                    stats = { ...stats, ...data.stats };
-                }
-            } catch (error) {
-                console.log('API unavailable, using local stats');
-            }
-            
-            document.getElementById('adminContent').innerHTML = `
-                <!-- Statistics -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-6 shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-semibold text-blue-600 uppercase tracking-wide">Produits</p>
-                                <p class="text-3xl font-bold text-blue-800">${stats.totalProducts}</p>
-                                <p class="text-xs text-blue-500 mt-1">Total actifs</p>
-                            </div>
-                            <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center">
-                                <i class="fas fa-pills text-white text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-2xl p-6 shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-semibold text-green-600 uppercase tracking-wide">Commandes</p>
-                                <p class="text-3xl font-bold text-green-800">${stats.totalOrders}</p>
-                                <p class="text-xs text-green-500 mt-1">Total reçues</p>
-                            </div>
-                            <div class="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center">
-                                <i class="fas fa-shopping-bag text-white text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-6 shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-semibold text-yellow-600 uppercase tracking-wide">En attente</p>
-                                <p class="text-3xl font-bold text-yellow-800">${stats.pendingOrders}</p>
-                                <p class="text-xs text-yellow-500 mt-1">Commandes</p>
-                            </div>
-                            <div class="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl flex items-center justify-center">
-                                <i class="fas fa-clock text-white text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-2xl p-6 shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-semibold text-purple-600 uppercase tracking-wide">Revenus</p>
-                                <p class="text-3xl font-bold text-purple-800">${stats.monthlyRevenue} DA</p>
-                                <p class="text-xs text-purple-500 mt-1">Ce mois</p>
-                            </div>
-                            <div class="w-14 h-14 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center">
-                                <i class="fas fa-coins text-white text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Quick Actions -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('products')">
-                        <i class="fas fa-plus-circle text-4xl mb-4"></i>
-                        <h3 class="text-xl font-bold mb-2">Gérer les produits</h3>
-                        <p class="text-emerald-100">Ajouter, modifier et gérer vos produits</p>
-                    </div>
-                    
-                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('orders')">
-                        <i class="fas fa-shopping-bag text-4xl mb-4"></i>
-                        <h3 class="text-xl font-bold mb-2">Commandes</h3>
-                        <p class="text-blue-100">Voir et gérer les commandes</p>
-                    </div>
-                    
-                    <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('featured')">
-                        <i class="fas fa-star text-4xl mb-4"></i>
-                        <h3 class="text-xl font-bold mb-2">Coups de Coeur</h3>
-                        <p class="text-yellow-100">Gérer les produits mis en avant</p>
-                    </div>
-                    
-                    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('cleanup')">
-                        <i class="fas fa-broom text-4xl mb-4"></i>
-                        <h3 class="text-xl font-bold mb-2">Nettoyage</h3>
-                        <p class="text-red-100">Supprimer produits indésirables</p>
-                    </div>
-                </div>
-            `;
-            
-        } catch (error) {
-            console.error('Error loading dashboard:', error);
-            document.getElementById('adminContent').innerHTML = `
-                <div class="bg-red-50 border border-red-200 rounded-xl p-6">
-                    <p class="text-red-800">Erreur de chargement du tableau de bord</p>
-                </div>
-            `;
-        }
-    }
-    
-    showLoading() {
+    // Show loading state
+    showLoading(show = true) {
         const spinner = document.getElementById('loadingSpinner');
         if (spinner) {
-            spinner.classList.remove('hidden');
+            spinner.classList.toggle('hidden', !show);
         }
     }
     
-    hideLoading() {
-        const spinner = document.getElementById('loadingSpinner');
-        if (spinner) {
-            spinner.classList.add('hidden');
-        }
-    }
-    
-    showToast(message, type = 'info') {
+    // Show toast notification
+    showToast(message, type = 'info', duration = APP_CONFIG.UI.TOAST_DURATION) {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+        
         const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
+        toast.className = `toast-notification transform translate-x-full transition-all duration-300 mb-3 p-4 rounded-2xl shadow-health-lg backdrop-blur-md border ${this.getToastClasses(type)}`;
+        
         toast.innerHTML = `
-            <div class="flex items-center">
+            <div class="flex items-center space-x-3">
                 <div class="flex-shrink-0">
-                    <i class="fas ${this.getToastIcon(type)} mr-3"></i>
+                    <i class="${this.getToastIcon(type)} text-xl"></i>
                 </div>
                 <div class="flex-1">
-                    <p class="text-sm font-medium text-gray-900">${message}</p>
+                    <p class="font-semibold">${message}</p>
                 </div>
-                <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-400 hover:text-gray-600">
+                <button onclick="this.parentElement.parentElement.remove()" class="text-current hover:opacity-70 transition-opacity">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
         `;
         
-        const container = document.getElementById('toastContainer');
-        if (container) {
-            container.appendChild(toast);
-            
-            setTimeout(() => toast.classList.add('show'), 100);
-            
-            setTimeout(() => {
-                if (toast.parentElement) {
-                    toast.remove();
-                }
-            }, 5000);
-        }
+        container.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => toast.classList.remove('translate-x-full'), 100);
+        
+        // Auto remove
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }
+        }, duration);
     }
     
+    // Get toast classes by type
+    getToastClasses(type) {
+        const classes = {
+            'info': 'bg-blue-50/90 text-blue-800 border-blue-200',
+            'success': 'bg-green-50/90 text-green-800 border-green-200',
+            'error': 'bg-red-50/90 text-red-800 border-red-200',
+            'warning': 'bg-yellow-50/90 text-yellow-800 border-yellow-200'
+        };
+        return classes[type] || classes.info;
+    }
+    
+    // Get toast icon by type
     getToastIcon(type) {
         const icons = {
-            'info': 'fa-info-circle',
-            'success': 'fa-check-circle',
-            'error': 'fa-exclamation-circle',
-            'warning': 'fa-exclamation-triangle'
+            'info': 'fas fa-info-circle',
+            'success': 'fas fa-check-circle',
+            'error': 'fas fa-exclamation-circle',
+            'warning': 'fas fa-exclamation-triangle'
         };
         return icons[type] || icons.info;
     }
     
-    // Method to check if user is authenticated for protected actions
+    // Update user UI
+    updateUserUI() {
+        const guestMenu = document.getElementById('guestMenu');
+        const userLoggedMenu = document.getElementById('userLoggedMenu');
+        const adminMenuLink = document.getElementById('adminMenuLink');
+        const userWelcome = document.getElementById('userWelcome');
+        const userRole = document.getElementById('userRole');
+        
+        if (this.currentUser) {
+            if (guestMenu) guestMenu.style.display = 'none';
+            if (userLoggedMenu) userLoggedMenu.style.display = 'block';
+            
+            if (userWelcome) {
+                userWelcome.textContent = `${this.currentUser.prenom} ${this.currentUser.nom}`;
+            }
+            
+            if (userRole) {
+                userRole.textContent = this.currentUser.role === 'admin' ? 'Administrateur' : 'Client';
+            }
+            
+            if (this.currentUser.role === 'admin' && adminMenuLink) {
+                adminMenuLink.classList.remove('hidden');
+            }
+        } else {
+            if (guestMenu) guestMenu.style.display = 'block';
+            if (userLoggedMenu) userLoggedMenu.style.display = 'none';
+            if (adminMenuLink) adminMenuLink.classList.add('hidden');
+        }
+    }
+    
+    // Handle events
+    handlePopState(event) {
+        if (event.state && event.state.page) {
+            this.showPage(event.state.page, event.state.params || {});
+        }
+    }
+    
+    handleOnline() {
+        this.showToast('Connexion rétablie', 'success');
+        // Retry failed requests or refresh data
+        this.loadProductsCache();
+    }
+    
+    handleOffline() {
+        this.showToast('Mode hors ligne activé', 'warning');
+    }
+    
+    handleLogin(event) {
+        this.currentUser = event.detail.user;
+        this.updateUserUI();
+    }
+    
+    handleLogout() {
+        this.currentUser = null;
+        this.updateUserUI();
+        this.showPage('home');
+    }
+    
+    // Setup periodic tasks
+    setupPeriodicTasks() {
+        // Refresh products cache periodically
+        setInterval(() => {
+            if (navigator.onLine) {
+                this.loadProductsCache();
+            }
+        }, 5 * 60 * 1000); // 5 minutes
+        
+        // Clean old cache entries
+        setInterval(() => {
+            window.cacheManager.clear();
+        }, 30 * 60 * 1000); // 30 minutes
+    }
+    
+    // Utility methods
     requireAuth() {
         if (!this.currentUser) {
             this.showToast('Veuillez vous connecter pour continuer', 'warning');
@@ -1444,7 +1154,6 @@ class PharmacieGaherApp {
         return true;
     }
     
-    // Method to check if user is admin
     requireAdmin() {
         if (!this.currentUser || this.currentUser.role !== 'admin') {
             this.showToast('Accès administrateur requis', 'error');
@@ -1454,39 +1163,19 @@ class PharmacieGaherApp {
         return true;
     }
     
-    // Enhanced error handling for authentication
-    handleAuthError(error, context = '') {
-        console.error(`Auth Error ${context}:`, error);
+    logout() {
+        localStorage.removeItem('token');
+        this.currentUser = null;
+        this.updateUserUI();
+        this.showToast('Déconnexion réussie', 'success');
+        this.showPage('home');
         
-        if (error.message.includes('401') || error.message.includes('Token invalide')) {
-            // Token expired or invalid
-            localStorage.removeItem('token');
-            this.currentUser = null;
-            this.updateUserUI();
-            this.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
-            this.showPage('login');
-        } else if (error.message.includes('403')) {
-            this.showToast('Accès refusé', 'error');
-        } else if (error.message.includes('404')) {
-            this.showToast('Ressource non trouvée', 'error');
-        } else if (error.message.includes('500')) {
-            this.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
-        } else {
-            this.showToast(error.message || 'Une erreur est survenue', 'error');
-        }
+        // Dispatch logout event
+        document.dispatchEvent(new CustomEvent('auth:logout'));
     }
 }
 
-// Global functions - CRITICAL FIXES
-function addToCartFromCard(productId, quantity = 1) {
-    console.log('Add to cart from card called:', productId);
-    if (window.app && typeof window.app.addToCart === 'function') {
-        window.app.addToCart(productId, quantity);
-    } else {
-        console.error('App not available');
-    }
-}
-
+// Global functions for backward compatibility and ease of use
 function showPage(page, params) {
     if (window.app) {
         window.app.showPage(page, params);
@@ -1496,6 +1185,12 @@ function showPage(page, params) {
 function filterByCategory(category) {
     if (window.app) {
         window.app.filterByCategory(category);
+    }
+}
+
+function addToCartFromCard(productId, quantity = 1) {
+    if (window.app) {
+        window.app.addToCart(productId, quantity);
     }
 }
 
@@ -1511,8 +1206,15 @@ function toggleCart() {
     const cartOverlay = document.getElementById('cartOverlay');
     
     if (cartSidebar && cartOverlay) {
-        cartSidebar.classList.toggle('translate-x-full');
-        cartOverlay.classList.toggle('hidden');
+        const isOpen = !cartSidebar.classList.contains('translate-x-full');
+        
+        if (isOpen) {
+            cartSidebar.classList.add('translate-x-full');
+            cartOverlay.classList.add('hidden');
+        } else {
+            cartSidebar.classList.remove('translate-x-full');
+            cartOverlay.classList.remove('hidden');
+        }
     }
 }
 
@@ -1528,43 +1230,20 @@ function proceedToCheckout() {
     }
 }
 
-function handleContactForm(event) {
-    event.preventDefault();
-    
-    const submitBtn = document.getElementById('contactSubmitBtn');
-    const submitText = document.getElementById('contactSubmitText');
-    const submitSpinner = document.getElementById('contactSubmitSpinner');
-    
-    submitBtn.disabled = true;
-    submitText.textContent = 'Envoi en cours...';
-    submitSpinner.classList.remove('hidden');
-    
-    setTimeout(() => {
-        submitBtn.disabled = false;
-        submitText.textContent = 'Envoyer le message';
-        submitSpinner.classList.add('hidden');
-        
-        event.target.reset();
-        
-        if (window.app) {
-            window.app.showToast('Message envoyé avec succès !', 'success');
-        }
-    }, 2000);
-}
-
 function logout() {
     if (window.app) {
         window.app.logout();
     }
 }
 
-// Initialize app
+// Initialize app when DOM is loaded
 let app;
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('Initializing app...');
-    app = new PharmacieGaherApp();
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 Initializing Shifa App...');
+    app = new ShifaApp();
     window.app = app;
-    console.log('App initialized and made globally available');
+    await app.init();
+    console.log('✅ Shifa App ready!');
 });
 
-console.log('✅ Fixed app.js loaded with complete functionality');
+console.log('✅ Enhanced app.js loaded successfully');
