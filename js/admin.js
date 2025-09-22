@@ -1,18 +1,13 @@
-// Complete Admin Panel with Full Product Management and Order System - FIXED VERSION
+// Complete Admin Panel with Fixed Order Management and Delete Functionality
 
 // Global variables
 let adminCurrentSection = 'dashboard';
 let currentEditingProduct = null;
 let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
 
-// API Configuration
-const API_BASE_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:5000/api'
-    : 'https://parapharmacie-gaher.onrender.com/api';
-
 // Helper function to make API calls
 async function apiCall(endpoint, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = `${API_CONFIG.BASE_URL}${endpoint}`;
     
     const defaultOptions = {
         headers: {
@@ -38,22 +33,6 @@ async function apiCall(endpoint, options = {}) {
     const response = await fetch(url, finalOptions);
     
     if (!response.ok) {
-        if (response.status === 401) {
-            // Token expired or invalid
-            localStorage.removeItem('token');
-            if (window.app) {
-                window.app.currentUser = null;
-                window.app.updateUserUI();
-                window.app.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
-                window.app.showPage('login');
-            }
-            throw new Error('Session expirée');
-        } else if (response.status === 403) {
-            throw new Error('Accès refusé - Droits administrateur requis');
-        } else if (response.status === 404) {
-            throw new Error('Ressource non trouvée');
-        }
-        
         const error = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
         throw new Error(error.message || `HTTP error! status: ${response.status}`);
     }
@@ -206,47 +185,41 @@ PharmacieGaherApp.prototype.renderProductRow = function(product) {
     `;
 };
 
+// FIXED Orders Management with API Integration and Delete Functionality
 PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
-        console.log('📦 Loading admin orders...');
+        console.log('Loading orders from admin panel...');
         
         // Always start with localStorage orders
         let orders = [...adminOrders];
-        console.log('📦 Local orders loaded:', orders.length);
+        console.log('Local orders loaded:', orders.length);
         
-        // Try to merge with API orders using correct admin endpoint
+        // Try to merge with API orders
         try {
-            console.log('🔍 Calling admin orders API with token...');
-            const data = await apiCall('/admin/orders');
-            
+            console.log('🔌 Attempting to fetch orders from API...');
+            const data = await apiCall('/orders');
             if (data && data.orders && data.orders.length > 0) {
-                console.log('✅ Admin API orders loaded:', data.orders.length);
-                const apiOrders = data.orders.filter(apiOrder => 
-                    !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
+                console.log('✅ API orders loaded:', data.orders.length);
+                
+                // Merge API orders with local ones, avoiding duplicates by numeroCommande
+                const localOrderNumbers = orders.map(o => o.numeroCommande);
+                const newApiOrders = data.orders.filter(apiOrder => 
+                    !localOrderNumbers.includes(apiOrder.numeroCommande)
                 );
-                orders = [...orders, ...apiOrders];
-                console.log('📦 Merged orders total:', orders.length);
-            } else {
-                console.log('📦 No orders from API or empty response');
+                
+                if (newApiOrders.length > 0) {
+                    orders = [...orders, ...newApiOrders];
+                    console.log(`✅ Merged ${newApiOrders.length} new API orders`);
+                }
             }
         } catch (error) {
-            console.log('❌ Admin API unavailable, using only local orders:', error.message);
-            // Check if it's an auth error
-            if (error.message.includes('401') || error.message.includes('403')) {
-                window.handleApiError(error, 'Admin Orders');
-                return;
-            }
+            console.log('⚠️ API orders unavailable:', error.message);
         }
         
         // Sort by date, newest first
         orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
         
-        console.log('📊 Final orders count:', orders.length);
-        console.log('📊 Orders summary:', orders.map(o => ({ 
-            num: o.numeroCommande, 
-            status: o.statut, 
-            total: o.total 
-        })));
+        console.log('Total orders to display:', orders.length);
         
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
@@ -322,6 +295,11 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                                                         title="Confirmer">
                                                     <i class="fas fa-check"></i>
                                                 </button>
+                                                <button onclick="deleteOrder('${order._id || order.numeroCommande}')" 
+                                                        class="text-red-600 hover:text-red-800 hover:bg-red-100 p-2 rounded-lg transition-all"
+                                                        title="Supprimer">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -334,7 +312,7 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
         `;
         
     } catch (error) {
-        console.error('❌ Error loading admin orders:', error);
+        console.error('Error loading orders:', error);
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-red-50 border border-red-200 rounded-xl p-6">
                 <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur de chargement des commandes</h3>
@@ -471,16 +449,33 @@ PharmacieGaherApp.prototype.generatePlaceholderImage = function(product) {
 // Cleanup Section
 PharmacieGaherApp.prototype.loadCleanupSection = async function() {
     try {
+        const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        
         document.getElementById('adminContent').innerHTML = `
             <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
                 <h2 class="text-2xl font-bold text-red-800 mb-6">Nettoyage de la base de données</h2>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-4">Statistiques de stockage</h3>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <p><strong>Commandes locales:</strong> ${adminOrders.length}</p>
+                            <p><strong>Produits locaux:</strong> ${products.length}</p>
+                        </div>
+                        <div>
+                            <p><strong>Taille estimée:</strong> ~${Math.round((JSON.stringify(adminOrders).length + JSON.stringify(products).length) / 1024)} KB</p>
+                            <p><strong>Limite recommandée:</strong> 20 commandes max</p>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
                     <div class="flex items-center">
                         <i class="fas fa-check-circle text-green-600 text-2xl mr-4"></i>
                         <div>
-                            <h3 class="text-lg font-semibold text-green-800">Base de données propre</h3>
-                            <p class="text-green-600">Aucun produit problématique détecté</p>
+                            <h3 class="text-lg font-semibold text-green-800">Actions de maintenance</h3>
+                            <p class="text-green-600">Optimisez les performances de votre parapharmacie</p>
                         </div>
                     </div>
                 </div>
@@ -488,13 +483,13 @@ PharmacieGaherApp.prototype.loadCleanupSection = async function() {
                 <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
                     <h3 class="text-lg font-semibold text-blue-800 mb-4">Actions de maintenance</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button onclick="refreshProductCache()" 
+                        <button onclick="cleanOldOrders()" 
                                 class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl">
-                            <i class="fas fa-sync mr-2"></i>Actualiser le cache
+                            <i class="fas fa-broom mr-2"></i>Nettoyer anciennes commandes
                         </button>
-                        <button onclick="validateAllProducts()" 
+                        <button onclick="refreshProductCache()" 
                                 class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl">
-                            <i class="fas fa-check-double mr-2"></i>Valider tous les produits
+                            <i class="fas fa-sync mr-2"></i>Actualiser le cache
                         </button>
                     </div>
                 </div>
@@ -503,8 +498,12 @@ PharmacieGaherApp.prototype.loadCleanupSection = async function() {
                     <h3 class="text-lg font-semibold text-red-800 mb-4">Actions dangereuses</h3>
                     <p class="text-red-600 mb-4">Attention : Les actions ci-dessous sont irréversibles.</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button onclick="clearAllProducts()" 
+                        <button onclick="clearAllOrders()" 
                                 class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl">
+                            <i class="fas fa-trash-alt mr-2"></i>Supprimer toutes les commandes
+                        </button>
+                        <button onclick="clearAllProducts()" 
+                                class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-xl">
                             <i class="fas fa-trash-alt mr-2"></i>Supprimer tous les produits
                         </button>
                     </div>
@@ -541,7 +540,7 @@ window.addOrderToDemo = function(orderData) {
             commentaires: orderData.commentaires || ''
         };
         
-        // Add to localStorage
+        // Add to localStorage with size management
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         
         // Check for duplicates based on numeroCommande
@@ -551,6 +550,12 @@ window.addOrderToDemo = function(orderData) {
             orders[existingIndex] = validOrder;
         } else {
             orders.unshift(validOrder);
+            
+            // Keep only last 20 orders to prevent storage issues
+            if (orders.length > 20) {
+                orders = orders.slice(0, 20);
+                console.log('Trimmed orders to prevent storage overflow');
+            }
         }
         
         localStorage.setItem('adminOrders', JSON.stringify(orders));
@@ -559,15 +564,98 @@ window.addOrderToDemo = function(orderData) {
         adminOrders = orders;
         
         console.log('Order added successfully. Total orders:', orders.length);
-        console.log('Order details:', validOrder);
         
         return validOrder;
         
     } catch (error) {
         console.error('Error adding order to demo:', error);
+        
+        // If storage quota exceeded, try to clear some space
+        if (error.name === 'QuotaExceededError') {
+            try {
+                console.log('Storage quota exceeded, cleaning up...');
+                let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+                orders = orders.slice(0, 10); // Keep only 10 most recent
+                localStorage.setItem('adminOrders', JSON.stringify(orders));
+                
+                // Try to add the order again
+                orders.unshift(orderData);
+                localStorage.setItem('adminOrders', JSON.stringify(orders));
+                adminOrders = orders;
+                
+                console.log('Order added after cleanup');
+                return orderData;
+            } catch (retryError) {
+                console.error('Failed to save order even after cleanup:', retryError);
+                return null;
+            }
+        }
+        
         return null;
     }
 };
+
+// NEW: Delete Order Function
+async function deleteOrder(orderIdentifier) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ? Cette action est irréversible.')) {
+        return;
+    }
+    
+    try {
+        console.log('Deleting order:', orderIdentifier);
+        
+        let orderDeleted = false;
+        
+        // Try to delete from API first if it has an _id (not just numeroCommande)
+        if (orderIdentifier.length === 24 || orderIdentifier.includes('demo') === false) {
+            try {
+                await apiCall(`/orders/${orderIdentifier}`, {
+                    method: 'DELETE'
+                });
+                console.log('✅ Order deleted from API');
+                orderDeleted = true;
+            } catch (apiError) {
+                console.log('⚠️ API delete failed:', apiError.message);
+            }
+        }
+        
+        // Always try to delete from localStorage
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const initialLength = orders.length;
+        
+        // Filter out the order by both _id and numeroCommande
+        orders = orders.filter(o => 
+            o._id !== orderIdentifier && 
+            o.numeroCommande !== orderIdentifier
+        );
+        
+        if (orders.length < initialLength) {
+            localStorage.setItem('adminOrders', JSON.stringify(orders));
+            adminOrders = orders;
+            orderDeleted = true;
+            console.log('✅ Order deleted from local storage');
+        }
+        
+        if (orderDeleted) {
+            if (window.app) {
+                window.app.showToast('Commande supprimée avec succès', 'success');
+            }
+            
+            // Refresh orders list
+            if (adminCurrentSection === 'orders') {
+                window.app.loadAdminOrders();
+            }
+        } else {
+            throw new Error('Commande non trouvée');
+        }
+        
+    } catch (error) {
+        console.error('Error deleting order:', error);
+        if (window.app) {
+            window.app.showToast('Erreur lors de la suppression: ' + error.message, 'error');
+        }
+    }
+}
 
 // Helper functions for order management
 function getStatusColor(statut) {
@@ -1139,7 +1227,7 @@ async function deleteProduct(productId) {
     }
 }
 
-// Order detail modal - Enhanced with complete information
+// Order detail modal
 async function viewOrderDetails(orderId) {
     try {
         console.log('Viewing order details for:', orderId);
@@ -1160,296 +1248,88 @@ async function viewOrderDetails(orderId) {
         }
         
         if (order) {
-            // Create detailed order modal with enhanced information
+            // Create detailed order modal
             document.body.insertAdjacentHTML('beforeend', `
                 <div id="orderDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div class="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
-                        <div class="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-green-50">
-                            <div>
-                                <h3 class="text-2xl font-bold text-emerald-800">Commande #${order.numeroCommande}</h3>
-                                <p class="text-emerald-600">ID: ${order._id || 'Local'}</p>
-                            </div>
+                    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                            <h3 class="text-2xl font-bold text-emerald-800">Commande #${order.numeroCommande}</h3>
                             <button onclick="closeOrderDetailModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
                         
                         <div class="p-6 overflow-y-auto max-h-[75vh]">
-                            <!-- Order Status and Quick Actions -->
-                            <div class="bg-gray-50 rounded-xl p-4 mb-6">
-                                <div class="flex justify-between items-center">
-                                    <div>
-                                        <h4 class="font-semibold text-gray-800 mb-2">Statut actuel</h4>
-                                        <span class="inline-block px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(order.statut)}">
-                                            ${getStatusLabel(order.statut)}
-                                        </span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <select id="newOrderStatus" class="px-3 py-2 border border-gray-300 rounded-lg">
-                                            <option value="en-attente" ${order.statut === 'en-attente' ? 'selected' : ''}>En attente</option>
-                                            <option value="confirmée" ${order.statut === 'confirmée' ? 'selected' : ''}>Confirmée</option>
-                                            <option value="préparée" ${order.statut === 'préparée' ? 'selected' : ''}>Préparée</option>
-                                            <option value="expédiée" ${order.statut === 'expédiée' ? 'selected' : ''}>Expédiée</option>
-                                            <option value="livrée" ${order.statut === 'livrée' ? 'selected' : ''}>Livrée</option>
-                                            <option value="annulée" ${order.statut === 'annulée' ? 'selected' : ''}>Annulée</option>
-                                        </select>
-                                        <button onclick="updateOrderStatusFromModal('${order._id || order.numeroCommande}')" 
-                                                class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg">
-                                            Mettre à jour
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Customer and Order Information Grid -->
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                                <!-- Customer Information -->
-                                <div class="bg-blue-50 rounded-xl p-6">
-                                    <h4 class="font-semibold text-blue-800 mb-4 flex items-center">
-                                        <i class="fas fa-user mr-2"></i>Informations client
-                                    </h4>
-                                    <div class="space-y-3 text-sm">
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-blue-700">Nom complet:</span>
-                                            <span class="text-blue-900">${order.client?.prenom} ${order.client?.nom}</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-blue-700">Email:</span>
-                                            <span class="text-blue-900">${order.client?.email}</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-blue-700">Téléphone:</span>
-                                            <span class="text-blue-900">${order.client?.telephone}</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-blue-700">Adresse:</span>
-                                            <span class="text-blue-900 text-right">${order.client?.adresse}</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-blue-700">Wilaya:</span>
-                                            <span class="text-blue-900">${order.client?.wilaya}</span>
-                                        </div>
-                                        ${order.client?.ville ? `
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-blue-700">Ville:</span>
-                                            <span class="text-blue-900">${order.client?.ville}</span>
-                                        </div>
-                                        ` : ''}
-                                        ${order.client?.codePostal ? `
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-blue-700">Code postal:</span>
-                                            <span class="text-blue-900">${order.client?.codePostal}</span>
-                                        </div>
-                                        ` : ''}
-                                        ${order.client?.userId ? `
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-blue-700">Type:</span>
-                                            <span class="text-blue-900">Client enregistré</span>
-                                        </div>
-                                        ` : `
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-blue-700">Type:</span>
-                                            <span class="text-blue-900">Client invité</span>
-                                        </div>
-                                        `}
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                                <div>
+                                    <h4 class="font-semibold text-emerald-800 mb-4">Informations client</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <p><strong>Nom:</strong> ${order.client?.prenom} ${order.client?.nom}</p>
+                                        <p><strong>Email:</strong> ${order.client?.email}</p>
+                                        <p><strong>Téléphone:</strong> ${order.client?.telephone}</p>
+                                        <p><strong>Adresse:</strong> ${order.client?.adresse}</p>
+                                        <p><strong>Wilaya:</strong> ${order.client?.wilaya}</p>
                                     </div>
                                 </div>
                                 
-                                <!-- Order Information -->
-                                <div class="bg-emerald-50 rounded-xl p-6">
-                                    <h4 class="font-semibold text-emerald-800 mb-4 flex items-center">
-                                        <i class="fas fa-shopping-bag mr-2"></i>Détails commande
-                                    </h4>
-                                    <div class="space-y-3 text-sm">
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-emerald-700">Date commande:</span>
-                                            <span class="text-emerald-900">${new Date(order.dateCommande).toLocaleDateString('fr-FR')} à ${new Date(order.dateCommande).toLocaleTimeString('fr-FR')}</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-emerald-700">Mode de paiement:</span>
-                                            <span class="text-emerald-900">${order.modePaiement}</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-emerald-700">Statut paiement:</span>
-                                            <span class="text-emerald-900">${order.statutPaiement || 'En attente'}</span>
-                                        </div>
-                                        ${order.dateConfirmation ? `
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-emerald-700">Date confirmation:</span>
-                                            <span class="text-emerald-900">${new Date(order.dateConfirmation).toLocaleDateString('fr-FR')}</span>
-                                        </div>
-                                        ` : ''}
-                                        ${order.dateExpedition ? `
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-emerald-700">Date expédition:</span>
-                                            <span class="text-emerald-900">${new Date(order.dateExpedition).toLocaleDateString('fr-FR')}</span>
-                                        </div>
-                                        ` : ''}
-                                        ${order.dateLivraison ? `
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-emerald-700">Date livraison:</span>
-                                            <span class="text-emerald-900">${new Date(order.dateLivraison).toLocaleDateString('fr-FR')}</span>
-                                        </div>
-                                        ` : ''}
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-emerald-700">Nombre d'articles:</span>
-                                            <span class="text-emerald-900">${order.articles?.length || 0}</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="font-medium text-emerald-700">Quantité totale:</span>
-                                            <span class="text-emerald-900">${order.articles?.reduce((total, article) => total + (article.quantite || 0), 0) || 0}</span>
-                                        </div>
+                                <div>
+                                    <h4 class="font-semibold text-emerald-800 mb-4">Détails commande</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <p><strong>Date:</strong> ${new Date(order.dateCommande).toLocaleDateString('fr-FR')} à ${new Date(order.dateCommande).toLocaleTimeString('fr-FR')}</p>
+                                        <p><strong>Statut:</strong> <span class="px-2 py-1 rounded text-xs ${getStatusColor(order.statut)}">${getStatusLabel(order.statut)}</span></p>
+                                        <p><strong>Paiement:</strong> ${order.modePaiement}</p>
+                                        ${order.commentaires ? `<p><strong>Commentaires:</strong> ${order.commentaires}</p>` : ''}
                                     </div>
                                 </div>
                             </div>
                             
-                            <!-- Comments Section -->
-                            ${order.commentaires || order.notesAdmin ? `
-                            <div class="bg-yellow-50 rounded-xl p-6 mb-6">
-                                <h4 class="font-semibold text-yellow-800 mb-4 flex items-center">
-                                    <i class="fas fa-sticky-note mr-2"></i>Commentaires et notes
-                                </h4>
-                                ${order.commentaires ? `
-                                <div class="mb-3">
-                                    <h5 class="font-medium text-yellow-700 mb-1">Commentaires client:</h5>
-                                    <p class="text-yellow-900 text-sm bg-white p-3 rounded-lg">${order.commentaires}</p>
-                                </div>
-                                ` : ''}
-                                ${order.notesAdmin ? `
-                                <div>
-                                    <h5 class="font-medium text-yellow-700 mb-1">Notes admin:</h5>
-                                    <p class="text-yellow-900 text-sm bg-white p-3 rounded-lg">${order.notesAdmin}</p>
-                                </div>
-                                ` : ''}
-                            </div>
-                            ` : ''}
-                            
-                            <!-- Articles List -->
                             <div class="mb-6">
-                                <h4 class="font-semibold text-gray-800 mb-4 flex items-center">
-                                    <i class="fas fa-list mr-2"></i>Articles commandés
-                                </h4>
+                                <h4 class="font-semibold text-emerald-800 mb-4">Articles commandés</h4>
                                 <div class="space-y-3">
-                                    ${order.articles?.map((article, index) => `
-                                        <div class="flex items-center space-x-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                                            <div class="flex-shrink-0">
-                                                <img src="${article.image || 'https://via.placeholder.com/64x64/10b981/ffffff?text=' + encodeURIComponent((article.nom || '').substring(0, 2))}" 
-                                                     alt="${article.nom}" 
-                                                     class="w-16 h-16 object-cover rounded-lg border-2 border-gray-300 shadow-sm">
-                                            </div>
-                                            <div class="flex-1 min-w-0">
-                                                <h5 class="font-medium text-gray-900 truncate">${article.nom}</h5>
-                                                <p class="text-sm text-gray-600">
-                                                    Prix unitaire: <span class="font-medium">${article.prix} DA</span>
-                                                </p>
-                                                <p class="text-sm text-gray-600">
-                                                    Quantité: <span class="font-medium">${article.quantite}</span>
-                                                </p>
-                                                ${article.productId ? `<p class="text-xs text-gray-500">ID: ${article.productId}</p>` : ''}
+                                    ${order.articles?.map(article => `
+                                        <div class="flex items-center space-x-4 p-4 bg-emerald-50/50 rounded-xl border border-emerald-200/50">
+                                            <img src="${article.image || 'https://via.placeholder.com/64x64/10b981/ffffff?text=' + encodeURIComponent((article.nom || '').substring(0, 2))}" 
+                                                 alt="${article.nom}" 
+                                                 class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200">
+                                            <div class="flex-1">
+                                                <h5 class="font-medium text-emerald-800">${article.nom}</h5>
+                                                <p class="text-sm text-emerald-600">Quantité: ${article.quantite} × ${article.prix} DA</p>
                                             </div>
                                             <div class="text-right">
-                                                <p class="text-lg font-semibold text-gray-900">${(article.quantite || 0) * (article.prix || 0)} DA</p>
-                                                <p class="text-sm text-gray-500">Sous-total</p>
+                                                <p class="font-medium text-emerald-800">${(article.quantite || 0) * (article.prix || 0)} DA</p>
                                             </div>
                                         </div>
-                                    `).join('') || '<p class="text-gray-500 text-center py-8">Aucun article dans cette commande</p>'}
+                                    `).join('') || '<p class="text-gray-500">Aucun article</p>'}
                                 </div>
                             </div>
                             
-                            <!-- Order Total -->
-                            <div class="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-6 border border-emerald-200">
-                                <h4 class="font-semibold text-emerald-800 mb-4">Récapitulatif financier</h4>
-                                <div class="space-y-3">
-                                    <div class="flex justify-between text-emerald-700">
-                                        <span>Sous-total articles:</span>
-                                        <span class="font-medium">${order.sousTotal || 0} DA</span>
+                            <div class="border-t border-emerald-200 pt-4">
+                                <div class="space-y-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-emerald-600">Sous-total:</span>
+                                        <span class="text-emerald-800">${order.sousTotal || 0} DA</span>
                                     </div>
-                                    <div class="flex justify-between text-emerald-700">
-                                        <span>Frais de livraison:</span>
-                                        <span class="font-medium">${order.fraisLivraison || 0} DA</span>
+                                    <div class="flex justify-between">
+                                        <span class="text-emerald-600">Frais de livraison:</span>
+                                        <span class="text-emerald-800">${order.fraisLivraison || 0} DA</span>
                                     </div>
-                                    ${order.remise && order.remise.valeur > 0 ? `
-                                    <div class="flex justify-between text-red-600">
-                                        <span>Remise ${order.remise.type === 'pourcentage' ? `(${order.remise.valeur}%)` : ''}:</span>
-                                        <span class="font-medium">-${order.remise.type === 'pourcentage' ? Math.round(order.sousTotal * order.remise.valeur / 100) : order.remise.valeur} DA</span>
-                                    </div>
-                                    ${order.remise.codePromo ? `
-                                    <div class="flex justify-between text-red-600 text-sm">
-                                        <span>Code promo:</span>
-                                        <span>${order.remise.codePromo}</span>
-                                    </div>
-                                    ` : ''}
-                                    ` : ''}
-                                    <hr class="border-emerald-300">
-                                    <div class="flex justify-between text-xl font-bold text-emerald-800">
-                                        <span>Total à payer:</span>
-                                        <span>${order.total || 0} DA</span>
+                                    <div class="flex justify-between text-lg font-semibold border-t border-emerald-200 pt-2">
+                                        <span class="text-emerald-800">Total:</span>
+                                        <span class="text-emerald-600">${order.total || 0} DA</span>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <!-- Shipping Information if available -->
-                            ${order.informationsLivraison && (order.informationsLivraison.transporteur || order.informationsLivraison.numeroSuivi) ? `
-                            <div class="bg-purple-50 rounded-xl p-6 mt-6 border border-purple-200">
-                                <h4 class="font-semibold text-purple-800 mb-4 flex items-center">
-                                    <i class="fas fa-truck mr-2"></i>Informations de livraison
-                                </h4>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                    ${order.informationsLivraison.transporteur ? `
-                                    <div class="flex justify-between">
-                                        <span class="font-medium text-purple-700">Transporteur:</span>
-                                        <span class="text-purple-900">${order.informationsLivraison.transporteur}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${order.informationsLivraison.numeroSuivi ? `
-                                    <div class="flex justify-between">
-                                        <span class="font-medium text-purple-700">Numéro de suivi:</span>
-                                        <span class="text-purple-900">${order.informationsLivraison.numeroSuivi}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${order.informationsLivraison.delaiEstime ? `
-                                    <div class="flex justify-between">
-                                        <span class="font-medium text-purple-700">Délai estimé:</span>
-                                        <span class="text-purple-900">${order.informationsLivraison.delaiEstime}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${order.informationsLivraison.fraisLivraisonReel ? `
-                                    <div class="flex justify-between">
-                                        <span class="font-medium text-purple-700">Frais réels:</span>
-                                        <span class="text-purple-900">${order.informationsLivraison.fraisLivraisonReel} DA</span>
-                                    </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                            ` : ''}
                         </div>
                         
-                        <!-- Action Buttons -->
-                        <div class="flex justify-between items-center space-x-4 p-6 border-t border-gray-200 bg-gray-50">
-                            <div class="flex space-x-2">
-                                <button onclick="printOrder('${order._id || order.numeroCommande}')" 
-                                        class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all">
-                                    <i class="fas fa-print mr-2"></i>Imprimer
-                                </button>
-                                <button onclick="exportOrderToPDF('${order._id || order.numeroCommande}')" 
-                                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all">
-                                    <i class="fas fa-file-pdf mr-2"></i>PDF
-                                </button>
-                            </div>
-                            <div class="flex space-x-2">
-                                <button onclick="deleteOrder('${order._id || order.numeroCommande}')" 
-                                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all">
-                                    <i class="fas fa-trash mr-2"></i>Supprimer
-                                </button>
-                                <button onclick="closeOrderDetailModal()" 
-                                        class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all">
-                                    Fermer
-                                </button>
-                                <button onclick="updateOrderStatusFromModal('${order._id || order.numeroCommande}')" 
-                                        class="px-6 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-lg hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                                    <i class="fas fa-check mr-2"></i>Mettre à jour le statut
-                                </button>
-                            </div>
+                        <div class="flex justify-end space-x-4 p-6 border-t border-gray-200">
+                            <button onclick="closeOrderDetailModal()" 
+                                    class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
+                                Fermer
+                            </button>
+                            <button onclick="updateOrderStatus('${order._id || order.numeroCommande}', 'confirmée')" 
+                                    class="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-lg">
+                                Confirmer la commande
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1476,7 +1356,7 @@ function closeOrderDetailModal() {
 
 async function updateOrderStatus(orderId, newStatus) {
     try {
-        console.log('📦 Updating order status:', orderId, 'to', newStatus);
+        console.log('Updating order status:', orderId, 'to', newStatus);
         
         // Update in localStorage
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
@@ -1489,25 +1369,21 @@ async function updateOrderStatus(orderId, newStatus) {
             }
             localStorage.setItem('adminOrders', JSON.stringify(orders));
             adminOrders = orders;
-            console.log('✅ Order status updated locally');
+            console.log('Order status updated locally');
         }
         
-        // Try to update via API using admin endpoint
+        // Try to update via API
         try {
-            await apiCall(`/admin/orders/${orderId}`, {
+            await apiCall(`/orders/${orderId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ 
                     statut: newStatus,
                     dateLivraison: newStatus === 'livrée' ? new Date().toISOString() : null
                 })
             });
-            console.log('✅ Order status updated via admin API');
+            console.log('Order status updated via API');
         } catch (error) {
-            console.log('❌ Admin API update failed, but local update succeeded:', error.message);
-            if (error.message.includes('401') || error.message.includes('403')) {
-                window.handleApiError(error, 'Update Order Status');
-                return;
-            }
+            console.log('API update failed, but local update succeeded');
         }
         
         app.showToast('Statut de la commande mis à jour', 'success');
@@ -1521,54 +1397,47 @@ async function updateOrderStatus(orderId, newStatus) {
         }
         
     } catch (error) {
-        console.error('❌ Error updating order status:', error);
+        console.error('Error updating order status:', error);
         app.showToast('Erreur lors de la mise à jour du statut', 'error');
     }
 }
-// Delete order function
-async function deleteOrder(orderId) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ? Cette action est irréversible.')) {
-        return;
-    }
-    
+
+// NEW Cleanup functions
+async function cleanOldOrders() {
     try {
-        console.log('Deleting order:', orderId);
-        
-        // Delete from localStorage first
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         const initialCount = orders.length;
-        orders = orders.filter(o => o._id !== orderId && o.numeroCommande !== orderId);
-        localStorage.setItem('adminOrders', JSON.stringify(orders));
         
-        // Update global variable
+        // Keep only the 20 most recent orders
+        orders = orders.slice(0, 20);
+        
+        localStorage.setItem('adminOrders', JSON.stringify(orders));
         adminOrders = orders;
         
-        const localDeleteSuccess = orders.length < initialCount;
-        console.log('Order deleted locally:', localDeleteSuccess);
+        const removed = initialCount - orders.length;
+        app.showToast(`${removed} anciennes commandes supprimées. ${orders.length} commandes conservées.`, 'success');
         
-        // Try to delete from API
-        try {
-            await apiCall(`/orders/${orderId}`, {
-                method: 'DELETE'
-            });
-            console.log('Order deleted from API successfully');
-        } catch (error) {
-            console.log('API delete failed, but order deleted locally:', error);
+        if (adminCurrentSection === 'cleanup') {
+            app.loadCleanupSection();
         }
+    } catch (error) {
+        console.error('Error cleaning old orders:', error);
+        app.showToast('Erreur lors du nettoyage', 'error');
+    }
+}
+
+async function clearAllOrders() {
+    if (confirm('ATTENTION: Cette action supprimera TOUTES les commandes. Êtes-vous absolument sûr ?')) {
+        localStorage.removeItem('adminOrders');
+        adminOrders = [];
         
-        app.showToast('Commande supprimée avec succès', 'success');
+        app.showToast('Toutes les commandes ont été supprimées', 'success');
         
-        // Close modal if open
-        closeOrderDetailModal();
-        
-        // Refresh orders list
         if (adminCurrentSection === 'orders') {
             app.loadAdminOrders();
+        } else if (adminCurrentSection === 'cleanup') {
+            app.loadCleanupSection();
         }
-        
-    } catch (error) {
-        console.error('Error deleting order:', error);
-        app.showToast('Erreur lors de la suppression de la commande', 'error');
     }
 }
 
@@ -1661,38 +1530,6 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
-// Error handling for API calls
-window.handleApiError = function(error, context = '') {
-    console.error(`❌ API Error ${context}:`, error);
-    
-    if (error.message.includes('401') || error.message.includes('Token invalide')) {
-        // Token expired or invalid
-        localStorage.removeItem('token');
-        if (window.app) {
-            window.app.currentUser = null;
-            window.app.updateUserUI();
-            window.app.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
-            window.app.showPage('login');
-        }
-    } else if (error.message.includes('403')) {
-        if (window.app) {
-            window.app.showToast('Accès refusé', 'error');
-        }
-    } else if (error.message.includes('404')) {
-        if (window.app) {
-            window.app.showToast('Ressource non trouvée', 'error');
-        }
-    } else if (error.message.includes('500')) {
-        if (window.app) {
-            window.app.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
-        }
-    } else {
-        if (window.app) {
-            window.app.showToast(error.message || 'Une erreur est survenue', 'error');
-        }
-    }
-};
-
 // Export functions for global access
 window.switchAdminSection = switchAdminSection;
 window.openAddProductModal = openAddProductModal;
@@ -1701,291 +1538,15 @@ window.closeProductModal = closeProductModal;
 window.saveProduct = saveProduct;
 window.toggleFeatured = toggleFeatured;
 window.deleteProduct = deleteProduct;
+window.deleteOrder = deleteOrder;
+window.cleanOldOrders = cleanOldOrders;
+window.clearAllOrders = clearAllOrders;
 window.refreshProductCache = refreshProductCache;
 window.validateAllProducts = validateAllProducts;
 window.clearAllProducts = clearAllProducts;
 window.viewOrderDetails = viewOrderDetails;
 window.updateOrderStatus = updateOrderStatus;
-window.deleteOrder = deleteOrder;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
-window.updateOrderStatusFromModal = updateOrderStatusFromModal;
-window.printOrder = printOrder;
-window.exportOrderToPDF = exportOrderToPDF;
 
-// Additional helper functions for enhanced order management
-function updateOrderStatusFromModal(orderId) {
-    const newStatus = document.getElementById('newOrderStatus').value;
-    if (newStatus) {
-        updateOrderStatus(orderId, newStatus);
-    }
-}
-
-function printOrder(orderId) {
-    // Find the order
-    const order = adminOrders.find(o => o._id === orderId || o.numeroCommande === orderId);
-    if (!order) {
-        app.showToast('Commande non trouvée', 'error');
-        return;
-    }
-    
-    // Create a printable version
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Commande #${order.numeroCommande}</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                .header { text-align: center; margin-bottom: 30px; }
-                .section { margin-bottom: 20px; }
-                .section h3 { color: #059669; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-                .total { font-weight: bold; font-size: 1.2em; }
-                table { width: 100%; border-collapse: collapse; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>Shifa - Parapharmacie</h1>
-                <h2>Commande #${order.numeroCommande}</h2>
-                <p>Date: ${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</p>
-            </div>
-            
-            <div class="grid">
-                <div class="section">
-                    <h3>Informations Client</h3>
-                    <p><strong>Nom:</strong> ${order.client?.prenom} ${order.client?.nom}</p>
-                    <p><strong>Email:</strong> ${order.client?.email}</p>
-                    <p><strong>Téléphone:</strong> ${order.client?.telephone}</p>
-                    <p><strong>Adresse:</strong> ${order.client?.adresse}</p>
-                    <p><strong>Wilaya:</strong> ${order.client?.wilaya}</p>
-                </div>
-                
-                <div class="section">
-                    <h3>Détails Commande</h3>
-                    <p><strong>Statut:</strong> ${getStatusLabel(order.statut)}</p>
-                    <p><strong>Mode de paiement:</strong> ${order.modePaiement}</p>
-                    <p><strong>Nombre d'articles:</strong> ${order.articles?.length || 0}</p>
-                </div>
-            </div>
-            
-            <div class="section">
-                <h3>Articles Commandés</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Article</th>
-                            <th>Prix unitaire</th>
-                            <th>Quantité</th>
-                            <th>Sous-total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${order.articles?.map(article => `
-                            <tr>
-                                <td>${article.nom}</td>
-                                <td>${article.prix} DA</td>
-                                <td>${article.quantite}</td>
-                                <td>${(article.quantite || 0) * (article.prix || 0)} DA</td>
-                            </tr>
-                        `).join('') || '<tr><td colspan="4">Aucun article</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="section">
-                <h3>Récapitulatif</h3>
-                <p>Sous-total: ${order.sousTotal || 0} DA</p>
-                <p>Frais de livraison: ${order.fraisLivraison || 0} DA</p>
-                <p class="total">Total: ${order.total || 0} DA</p>
-            </div>
-            
-            ${order.commentaires ? `
-            <div class="section">
-                <h3>Commentaires</h3>
-                <p>${order.commentaires}</p>
-            </div>
-            ` : ''}
-            
-            <script>
-                window.onload = function() {
-                    window.print();
-                    window.onafterprint = function() {
-                        window.close();
-                    };
-                };
-            </script>
-        </body>
-        </html>
-    `);
-    printWindow.document.close();
-}
-
-function exportOrderToPDF(orderId) {
-    // For now, this will trigger the print dialog
-    // In a real implementation, you could use libraries like jsPDF
-    app.showToast('Fonction PDF en développement. Utilisez l\'impression pour le moment.', 'info');
-    printOrder(orderId);
-}
-
-// Test API connection function
-async function testApiConnection() {
-    console.log('🔍 Testing API connection...');
-    app.showToast('Test de connexion API en cours...', 'info');
-    
-    try {
-        // Test 1: Basic server health
-        console.log('🔍 Test 1: Server health check');
-        const healthResponse = await fetch(`${API_BASE_URL}/health`);
-        console.log('Health response:', healthResponse.status);
-        
-        if (!healthResponse.ok) {
-            throw new Error(`Server health check failed: ${healthResponse.status}`);
-        }
-        
-        const healthData = await healthResponse.json();
-        console.log('Health data:', healthData);
-        
-        // Test 2: Orders test endpoint
-        console.log('🔍 Test 2: Orders test endpoint');
-        const testResponse = await fetch(`${API_BASE_URL}/orders/test`);
-        console.log('Orders test response:', testResponse.status);
-        
-        if (!testResponse.ok) {
-            throw new Error(`Orders test failed: ${testResponse.status}`);
-        }
-        
-        const testData = await testResponse.json();
-        console.log('Orders test data:', testData);
-        
-        // Test 3: Authentication check
-        console.log('🔍 Test 3: Authentication check');
-        const token = localStorage.getItem('token');
-        const currentUser = window.app?.currentUser;
-        
-        console.log('Auth status:', {
-            hasToken: !!token,
-            hasUser: !!currentUser,
-            userRole: currentUser?.role
-        });
-        
-        if (token && currentUser && currentUser.role === 'admin') {
-            // Test 4: Authenticated orders endpoint
-            console.log('🔍 Test 4: Authenticated orders endpoint');
-            const ordersResponse = await fetch(`${API_BASE_URL}/orders`, {
-                headers: {
-                    'x-auth-token': token,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            console.log('Orders response:', ordersResponse.status);
-            
-            if (ordersResponse.ok) {
-                const ordersData = await ordersResponse.json();
-                console.log('Orders data:', ordersData);
-                
-                app.showToast(`✅ API connectée! ${ordersData.orders?.length || 0} commandes trouvées`, 'success');
-                
-                // Refresh the orders page
-                app.loadAdminOrders();
-            } else {
-                const errorData = await ordersResponse.json().catch(() => ({ message: 'Unknown error' }));
-                console.log('Orders error:', errorData);
-                throw new Error(`Orders API failed: ${ordersResponse.status} - ${errorData.message}`);
-            }
-        } else {
-            app.showToast('⚠️ API accessible mais authentification manquante', 'warning');
-        }
-        
-    } catch (error) {
-        console.error('❌ API test failed:', error);
-        app.showToast(`❌ Test API échoué: ${error.message}`, 'error');
-    }
-}
-
-// Create test order function
-async function createTestOrder() {
-    console.log('🔍 Creating test order...');
-    app.showToast('Création d\'une commande test...', 'info');
-    
-    try {
-        const testOrder = {
-            numeroCommande: `TEST${Date.now()}`,
-            client: {
-                prenom: 'Test',
-                nom: 'Client',
-                email: 'test@example.com',
-                telephone: '+213555123456',
-                adresse: '123 Rue Test',
-                wilaya: 'Alger'
-            },
-            articles: [
-                {
-                    productId: 'test-product-1',
-                    nom: 'Produit Test',
-                    prix: 500,
-                    quantite: 1,
-                    image: ''
-                }
-            ],
-            sousTotal: 500,
-            fraisLivraison: 200,
-            total: 700,
-            modePaiement: 'Paiement à la livraison',
-            commentaires: 'Commande de test créée depuis l\'admin'
-        };
-        
-        // Add to localStorage first
-        const validOrder = {
-            _id: Date.now().toString(),
-            ...testOrder,
-            statut: 'en-attente',
-            dateCommande: new Date().toISOString()
-        };
-        
-        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        orders.unshift(validOrder);
-        localStorage.setItem('adminOrders', JSON.stringify(orders));
-        adminOrders = orders;
-        
-        console.log('✅ Test order added to localStorage');
-        
-        // Try to add to API as well
-        try {
-            const response = await fetch(`${API_BASE_URL}/orders`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(testOrder)
-            });
-            
-            if (response.ok) {
-                const apiData = await response.json();
-                console.log('✅ Test order added to API:', apiData);
-                app.showToast('✅ Commande test créée avec succès!', 'success');
-            } else {
-                console.log('⚠️ API creation failed, but local order created');
-                app.showToast('✅ Commande test créée localement', 'warning');
-            }
-        } catch (apiError) {
-            console.log('⚠️ API unavailable, but local order created');
-            app.showToast('✅ Commande test créée localement', 'warning');
-        }
-        
-        // Refresh the orders page
-        app.loadAdminOrders();
-        
-    } catch (error) {
-        console.error('❌ Test order creation failed:', error);
-        app.showToast(`❌ Échec création commande test: ${error.message}`, 'error');
-    }
-}
-
-console.log('✅ Enhanced Admin.js loaded with complete order management and delete functionality');
-
+console.log('✅ Fixed Admin.js loaded with order delete functionality and storage management');
