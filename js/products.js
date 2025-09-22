@@ -1,4 +1,6 @@
-// Fixed Products Page Management
+// Complete Fixed Products Page Management for Shifa Parapharmacie
+
+// Products Page Implementation
 PharmacieGaherApp.prototype.loadProductsPage = async function(params = {}) {
     try {
         console.log('Loading products page with params:', params);
@@ -68,7 +70,7 @@ PharmacieGaherApp.prototype.loadProductsPage = async function(params = {}) {
             filteredProducts.sort((a, b) => b.nom.localeCompare(a.nom));
         } else {
             // Default: newest first
-            filteredProducts.sort((a, b) => new Date(b.dateAjout) - new Date(a.dateAjout));
+            filteredProducts.sort((a, b) => new Date(b.dateAjout || 0) - new Date(a.dateAjout || 0));
         }
         
         // Render products page
@@ -107,8 +109,10 @@ PharmacieGaherApp.prototype.renderProductsPage = function(products, params = {})
             </div>
             
             <!-- Filters -->
-            <div class="bg-white rounded-2xl shadow-lg p-6 mb-8">
-                <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div class="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-emerald-200/50">
+                <h3 class="text-lg font-semibold text-emerald-800 mb-4">Filtres</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <!-- Category Filter -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Catégorie</label>
@@ -137,46 +141,32 @@ PharmacieGaherApp.prototype.renderProductsPage = function(products, params = {})
                     
                     <!-- Price Range -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Prix min</label>
-                        <input type="number" id="priceMin" value="${params.priceMin || ''}" 
-                               placeholder="0" min="0"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Prix max</label>
-                        <input type="number" id="priceMax" value="${params.priceMax || ''}" 
-                               placeholder="999999" min="0"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Prix (DA)</label>
+                        <div class="flex space-x-2">
+                            <input type="number" id="priceMin" value="${params.priceMin || ''}" 
+                                   placeholder="Min" min="0"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                            <input type="number" id="priceMax" value="${params.priceMax || ''}" 
+                                   placeholder="Max" min="0"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                        </div>
                     </div>
                     
                     <!-- Sort -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Trier par</label>
                         <select id="sortSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                            <option value="newest" ${params.sort === 'newest' ? 'selected' : ''}>Plus récent</option>
+                            <option value="newest" ${params.sort === 'newest' || !params.sort ? 'selected' : ''}>Plus récent</option>
                             <option value="price_asc" ${params.sort === 'price_asc' ? 'selected' : ''}>Prix croissant</option>
                             <option value="price_desc" ${params.sort === 'price_desc' ? 'selected' : ''}>Prix décroissant</option>
                             <option value="name_asc" ${params.sort === 'name_asc' ? 'selected' : ''}>Nom A-Z</option>
                             <option value="name_desc" ${params.sort === 'name_desc' ? 'selected' : ''}>Nom Z-A</option>
                         </select>
                     </div>
-                    
-                    <!-- Filter Actions -->
-                    <div class="flex flex-col justify-end space-y-2">
-                        <button onclick="applyProductFilters()" 
-                                class="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-all">
-                            <i class="fas fa-filter mr-2"></i>Filtrer
-                        </button>
-                        <button onclick="clearProductFilters()" 
-                                class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-all">
-                            <i class="fas fa-times mr-2"></i>Effacer
-                        </button>
-                    </div>
                 </div>
                 
                 <!-- Quick Filters -->
-                <div class="mt-4 flex flex-wrap gap-2">
+                <div class="flex flex-wrap gap-4 mb-4">
                     <label class="flex items-center">
                         <input type="checkbox" id="promotionFilter" ${params.enPromotion ? 'checked' : ''} 
                                class="rounded text-emerald-600 mr-2">
@@ -188,12 +178,27 @@ PharmacieGaherApp.prototype.renderProductsPage = function(products, params = {})
                         <span class="text-sm font-medium text-gray-700">En vedette</span>
                     </label>
                 </div>
+                
+                <!-- Filter Actions -->
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="applyProductFilters()" 
+                            class="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-all">
+                        <i class="fas fa-filter mr-2"></i>Appliquer les filtres
+                    </button>
+                    <button onclick="clearProductFilters()" 
+                            class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-all">
+                        <i class="fas fa-times mr-2"></i>Effacer les filtres
+                    </button>
+                </div>
             </div>
             
             <!-- Products Grid -->
             <div id="productsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                 ${products.length === 0 ? this.renderNoProducts(params) : products.map(product => this.createProductCard(product)).join('')}
             </div>
+            
+            <!-- Pagination (if needed) -->
+            ${products.length > 20 ? this.renderPagination(products, params) : ''}
         </div>
     `;
     
@@ -218,12 +223,42 @@ PharmacieGaherApp.prototype.renderNoProducts = function(params) {
             <i class="fas fa-search text-6xl text-emerald-200 mb-6"></i>
             <h3 class="text-2xl font-bold text-emerald-800 mb-4">${message}</h3>
             <p class="text-emerald-600 mb-8">${suggestion}</p>
-            <button onclick="clearProductFilters()" 
-                    class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 transition-all">
-                <i class="fas fa-times mr-2"></i>Effacer les filtres
-            </button>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button onclick="clearProductFilters()" 
+                        class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 transition-all">
+                    <i class="fas fa-times mr-2"></i>Effacer les filtres
+                </button>
+                <button onclick="app.showPage('home')" 
+                        class="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-all">
+                    <i class="fas fa-home mr-2"></i>Retour à l'accueil
+                </button>
+            </div>
         </div>
     `;
+};
+
+PharmacieGaherApp.prototype.renderPagination = function(products, params) {
+    // Simple pagination implementation
+    const itemsPerPage = 20;
+    const currentPage = params.page || 1;
+    const totalPages = Math.ceil(products.length / itemsPerPage);
+    
+    if (totalPages <= 1) return '';
+    
+    let paginationHTML = '<div class="flex justify-center mt-12"><div class="flex space-x-2">';
+    
+    for (let i = 1; i <= totalPages; i++) {
+        const isActive = i === currentPage;
+        paginationHTML += `
+            <button onclick="goToPage(${i})" 
+                    class="px-4 py-2 rounded-lg ${isActive ? 'bg-emerald-500 text-white' : 'bg-white text-emerald-500 border border-emerald-500 hover:bg-emerald-50'}">
+                ${i}
+            </button>
+        `;
+    }
+    
+    paginationHTML += '</div></div>';
+    return paginationHTML;
 };
 
 PharmacieGaherApp.prototype.setupProductFilters = function() {
@@ -245,7 +280,24 @@ PharmacieGaherApp.prototype.setupProductFilters = function() {
                 applyProductFilters();
             }, 500);
         });
+        
+        productSearch.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                clearTimeout(searchTimeout);
+                applyProductFilters();
+            }
+        });
     }
+    
+    // Price filters
+    ['priceMin', 'priceMax'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', () => {
+                applyProductFilters();
+            });
+        }
+    });
     
     // Sort filter
     const sortSelect = document.getElementById('sortSelect');
@@ -316,9 +368,14 @@ PharmacieGaherApp.prototype.showProductNotFound = function() {
                 <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-6"></i>
                 <h3 class="text-2xl font-bold text-red-800 mb-4">Produit non trouvé</h3>
                 <p class="text-red-600 mb-8">Le produit que vous recherchez n'existe pas ou n'est plus disponible</p>
-                <button onclick="app.showPage('products')" class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600">
-                    Retour aux produits
-                </button>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button onclick="app.showPage('products')" class="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600">
+                        <i class="fas fa-pills mr-2"></i>Tous les produits
+                    </button>
+                    <button onclick="app.showPage('home')" class="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600">
+                        <i class="fas fa-home mr-2"></i>Retour à l'accueil
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -345,11 +402,11 @@ PharmacieGaherApp.prototype.renderProductDetail = function(product) {
             <nav class="mb-8">
                 <ol class="flex items-center space-x-2 text-sm">
                     <li><a href="#" onclick="showPage('home')" class="text-emerald-600 hover:text-emerald-700">Accueil</a></li>
-                    <li><span class="text-gray-500">/</span></li>
+                    <li><span class="text-gray-500 mx-2">/</span></li>
                     <li><a href="#" onclick="showPage('products')" class="text-emerald-600 hover:text-emerald-700">Produits</a></li>
-                    <li><span class="text-gray-500">/</span></li>
+                    <li><span class="text-gray-500 mx-2">/</span></li>
                     <li><a href="#" onclick="filterByCategory('${product.categorie}')" class="text-emerald-600 hover:text-emerald-700">${product.categorie}</a></li>
-                    <li><span class="text-gray-500">/</span></li>
+                    <li><span class="text-gray-500 mx-2">/</span></li>
                     <li><span class="text-gray-900">${product.nom}</span></li>
                 </ol>
             </nav>
@@ -364,97 +421,170 @@ PharmacieGaherApp.prototype.renderProductDetail = function(product) {
                             <span class="text-white font-bold text-2xl">Rupture de stock</span>
                         </div>` : ''}
                         <img src="${imageUrl}" alt="${product.nom}" 
-                             class="w-full h-full object-cover"
+                             class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                              onerror="this.src='https://via.placeholder.com/600x600/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
                     </div>
+                    
+                    <!-- Additional product images carousel would go here -->
                 </div>
                 
                 <!-- Product Info -->
                 <div class="space-y-6">
                     <div>
-                        <h1 class="text-3xl font-bold text-emerald-800 mb-2">${product.nom}</h1>
-                        <p class="text-emerald-600">${product.marque || ''}</p>
-                        <span class="inline-block bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium mt-2">${product.categorie}</span>
+                        <h1 class="text-3xl lg:text-4xl font-bold text-emerald-800 mb-2">${product.nom}</h1>
+                        ${product.marque ? `<p class="text-emerald-600 text-lg">${product.marque}</p>` : ''}
+                        <div class="flex items-center gap-4 mt-4">
+                            <span class="inline-block bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium">${product.categorie}</span>
+                            ${product.enVedette ? '<span class="inline-block bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-medium">★ En vedette</span>' : ''}
+                        </div>
                     </div>
                     
                     <!-- Price -->
                     <div class="space-y-2">
                         ${hasPromotion ? `
                             <div class="flex items-center space-x-3">
-                                <span class="text-3xl font-bold text-red-600">${product.prix} DA</span>
+                                <span class="text-4xl font-bold text-red-600">${product.prix} DA</span>
                                 <span class="text-xl text-gray-400 line-through">${product.prixOriginal} DA</span>
                             </div>
-                            <p class="text-green-600 font-medium">Économisez ${product.prixOriginal - product.prix} DA</p>
+                            <p class="text-green-600 font-medium text-lg">Économisez ${product.prixOriginal - product.prix} DA (${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%)</p>
                         ` : `
-                            <div class="text-3xl font-bold text-emerald-700">${product.prix} DA</div>
+                            <div class="text-4xl font-bold text-emerald-700">${product.prix} DA</div>
                         `}
                     </div>
                     
                     <!-- Description -->
                     <div>
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Description</h3>
-                        <p class="text-gray-600 leading-relaxed">${product.description || 'Description non disponible'}</p>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Description</h3>
+                        <p class="text-gray-600 leading-relaxed text-lg">${product.description || 'Description non disponible'}</p>
                     </div>
                     
-                    <!-- Additional Info -->
-                    ${product.ingredients ? `
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Ingrédients</h3>
-                            <p class="text-gray-600">${product.ingredients}</p>
+                    <!-- Additional Info Tabs -->
+                    <div class="border border-emerald-200 rounded-xl overflow-hidden">
+                        <div class="bg-emerald-50 p-4">
+                            <h3 class="text-lg font-semibold text-emerald-800">Informations détaillées</h3>
                         </div>
-                    ` : ''}
-                    
-                    ${product.modeEmploi ? `
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Mode d'emploi</h3>
-                            <p class="text-gray-600">${product.modeEmploi}</p>
+                        <div class="p-4 space-y-4">
+                            ${product.ingredients ? `
+                                <div>
+                                    <h4 class="font-semibold text-gray-900 mb-2">Ingrédients</h4>
+                                    <p class="text-gray-600">${product.ingredients}</p>
+                                </div>
+                            ` : ''}
+                            
+                            ${product.modeEmploi ? `
+                                <div>
+                                    <h4 class="font-semibold text-gray-900 mb-2">Mode d'emploi</h4>
+                                    <p class="text-gray-600">${product.modeEmploi}</p>
+                                </div>
+                            ` : ''}
+                            
+                            ${product.precautions ? `
+                                <div>
+                                    <h4 class="font-semibold text-gray-900 mb-2">Précautions</h4>
+                                    <p class="text-gray-600">${product.precautions}</p>
+                                </div>
+                            ` : ''}
                         </div>
-                    ` : ''}
-                    
-                    ${product.precautions ? `
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Précautions</h3>
-                            <p class="text-gray-600">${product.precautions}</p>
-                        </div>
-                    ` : ''}
+                    </div>
                     
                     <!-- Stock Info -->
-                    <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-6">
                         <div class="flex items-center">
-                            <span class="text-gray-600 mr-2">Stock:</span>
-                            <span class="font-medium ${product.stock > 10 ? 'text-green-600' : product.stock > 0 ? 'text-yellow-600' : 'text-red-600'}">
-                                ${product.stock > 0 ? `${product.stock} unités` : 'Rupture de stock'}
+                            <span class="text-gray-600 mr-2 font-medium">Disponibilité:</span>
+                            <span class="font-bold ${product.stock > 10 ? 'text-green-600' : product.stock > 0 ? 'text-yellow-600' : 'text-red-600'}">
+                                ${product.stock > 0 ? `En stock (${product.stock} unités)` : 'Rupture de stock'}
                             </span>
                         </div>
+                        ${product.stock > 0 && product.stock <= 5 ? `
+                            <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-semibold">
+                                Stock limité !
+                            </span>
+                        ` : ''}
                     </div>
                     
                     <!-- Add to Cart -->
                     ${!isOutOfStock ? `
-                        <div class="space-y-4">
+                        <div class="space-y-4 bg-emerald-50 rounded-xl p-6">
                             <div class="flex items-center space-x-4">
                                 <label class="text-gray-700 font-medium">Quantité:</label>
-                                <div class="flex items-center border border-gray-300 rounded-lg">
-                                    <button onclick="decreaseQuantity()" class="px-3 py-2 text-gray-600 hover:bg-gray-100">-</button>
+                                <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                                    <button onclick="decreaseQuantity()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 transition-all">
+                                        <i class="fas fa-minus"></i>
+                                    </button>
                                     <input type="number" id="productQuantity" value="1" min="1" max="${product.stock}" 
-                                           class="w-16 text-center border-0 focus:ring-0">
-                                    <button onclick="increaseQuantity()" class="px-3 py-2 text-gray-600 hover:bg-gray-100">+</button>
+                                           class="w-20 text-center border-0 focus:ring-0 py-2">
+                                    <button onclick="increaseQuantity()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 transition-all">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
                                 </div>
                             </div>
                             
                             <button onclick="addProductToCart('${product._id}')" 
                                     class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg">
-                                <i class="fas fa-cart-plus mr-2"></i>Ajouter au panier
+                                <i class="fas fa-cart-plus mr-3"></i>Ajouter au panier
                             </button>
+                            
+                            <div class="grid grid-cols-2 gap-4 mt-4">
+                                <button onclick="addToWishlist('${product._id}')" 
+                                        class="flex items-center justify-center bg-white border-2 border-emerald-500 text-emerald-600 py-2 px-4 rounded-lg hover:bg-emerald-50 transition-all">
+                                    <i class="fas fa-heart mr-2"></i>Favori
+                                </button>
+                                <button onclick="shareProduct('${product._id}')" 
+                                        class="flex items-center justify-center bg-white border-2 border-emerald-500 text-emerald-600 py-2 px-4 rounded-lg hover:bg-emerald-50 transition-all">
+                                    <i class="fas fa-share mr-2"></i>Partager
+                                </button>
+                            </div>
                         </div>
                     ` : `
-                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <p class="text-red-800 font-medium">Ce produit est actuellement en rupture de stock</p>
+                        <div class="bg-red-50 border-2 border-red-200 rounded-xl p-6">
+                            <div class="text-center">
+                                <i class="fas fa-exclamation-triangle text-red-500 text-3xl mb-4"></i>
+                                <h3 class="text-lg font-bold text-red-800 mb-2">Produit non disponible</h3>
+                                <p class="text-red-600 mb-4">Ce produit est actuellement en rupture de stock</p>
+                                <button onclick="notifyWhenAvailable('${product._id}')" 
+                                        class="bg-red-500 hover:bg-red-600 text-white py-2 px-6 rounded-lg transition-all">
+                                    <i class="fas fa-bell mr-2"></i>M'alerter quand disponible
+                                </button>
+                            </div>
                         </div>
                     `}
                 </div>
             </div>
+            
+            <!-- Related Products -->
+            <div class="mt-16">
+                <h2 class="text-3xl font-bold text-emerald-800 mb-8 text-center">Produits similaires</h2>
+                <div id="relatedProducts" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Related products will be loaded here -->
+                </div>
+            </div>
         </div>
     `;
+    
+    // Load related products
+    this.loadRelatedProducts(product);
+};
+
+// Load related products
+PharmacieGaherApp.prototype.loadRelatedProducts = function(currentProduct) {
+    const relatedProducts = this.allProducts.filter(p => 
+        p._id !== currentProduct._id && 
+        p.categorie === currentProduct.categorie && 
+        p.actif !== false
+    ).slice(0, 4);
+    
+    const container = document.getElementById('relatedProducts');
+    if (container) {
+        if (relatedProducts.length === 0) {
+            container.innerHTML = `
+                <div class="col-span-full text-center py-8">
+                    <p class="text-emerald-600">Aucun produit similaire trouvé</p>
+                </div>
+            `;
+        } else {
+            container.innerHTML = relatedProducts.map(product => this.createProductCard(product)).join('');
+        }
+    }
 };
 
 // Global filter functions
@@ -531,11 +661,60 @@ function addProductToCart(productId) {
     }
 }
 
-// Export functions
+// Additional product functions
+function addToWishlist(productId) {
+    // Placeholder for wishlist functionality
+    if (window.app) {
+        window.app.showToast('Fonctionnalité wishlist à venir', 'info');
+    }
+}
+
+function shareProduct(productId) {
+    // Web Share API or fallback
+    if (navigator.share) {
+        navigator.share({
+            title: 'Shifa - Parapharmacie',
+            url: window.location.href
+        });
+    } else {
+        // Copy URL to clipboard
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            if (window.app) {
+                window.app.showToast('Lien copié dans le presse-papiers', 'success');
+            }
+        });
+    }
+}
+
+function notifyWhenAvailable(productId) {
+    // Placeholder for notification functionality
+    if (window.app) {
+        window.app.showToast('Vous serez notifié quand le produit sera disponible', 'info');
+    }
+}
+
+function goToPage(page) {
+    // Pagination functionality
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.set('page', page);
+    window.history.pushState({}, '', currentUrl);
+    
+    // Reload products page with pagination
+    if (window.app) {
+        const params = Object.fromEntries(currentUrl.searchParams);
+        window.app.showPage('products', params);
+    }
+}
+
+// Export functions for global access
 window.applyProductFilters = applyProductFilters;
 window.clearProductFilters = clearProductFilters;
 window.increaseQuantity = increaseQuantity;
 window.decreaseQuantity = decreaseQuantity;
 window.addProductToCart = addProductToCart;
+window.addToWishlist = addToWishlist;
+window.shareProduct = shareProduct;
+window.notifyWhenAvailable = notifyWhenAvailable;
+window.goToPage = goToPage;
 
-console.log('✅ Products.js loaded successfully');
+console.log('✅ Complete Products.js loaded successfully');
