@@ -1,532 +1,774 @@
-// Shopping Cart Functionality for Shifa Parapharmacie
-
-// Cart related CSS that should be in styles.css
-const cartStyles = `
-    .cart-item {
-        @apply p-4 bg-emerald-50/50 rounded-xl border border-emerald-200/50 mb-3;
-    }
-    
-    .quantity-selector {
-        @apply flex items-center border border-emerald-200 rounded-lg overflow-hidden;
-    }
-    
-    .quantity-selector button {
-        @apply w-8 h-8 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all flex items-center justify-center font-bold;
-    }
-    
-    .quantity-selector input {
-        @apply w-12 text-center border-0 bg-white text-emerald-800 font-medium;
-        -moz-appearance: textfield;
-    }
-    
-    .quantity-selector input::-webkit-outer-spin-button,
-    .quantity-selector input::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-    
-    .badge-promotion {
-        @apply bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full;
-    }
-    
-    .category-card {
-        @apply hover:scale-105 transition-all duration-300;
-    }
-    
-    .category-icon {
-        @apply w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mb-4 text-emerald-600 text-2xl;
-    }
-    
-    .pulse-slow {
-        animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
-    
-    .float-animation {
-        animation: float 6s ease-in-out infinite;
-    }
-    
-    @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-20px); }
-    }
-    
-    .hero-gradient {
-        background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);
-    }
-    
-    .btn-primary {
-        @apply bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl;
-    }
-    
-    .form-input {
-        @apply w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all;
-    }
-    
-    .toast {
-        @apply fixed top-4 right-4 z-50 bg-white border-l-4 rounded-lg shadow-lg p-4 mb-2 opacity-0 translate-x-full transition-all duration-300;
-        min-width: 300px;
-    }
-    
-    .toast.show {
-        @apply opacity-100 translate-x-0;
-    }
-    
-    .toast.success {
-        @apply border-green-500;
-    }
-    
-    .toast.error {
-        @apply border-red-500;
-    }
-    
-    .toast.warning {
-        @apply border-yellow-500;
-    }
-    
-    .toast.info {
-        @apply border-blue-500;
-    }
-    
-    .line-clamp-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-    
-    .product-card {
-        @apply hover:scale-[1.02] transition-all duration-300;
-    }
-`;
-
-// Inject styles if they don't exist
-function injectCartStyles() {
-    if (!document.getElementById('cart-styles')) {
-        const style = document.createElement('style');
-        style.id = 'cart-styles';
-        style.textContent = cartStyles;
-        document.head.appendChild(style);
-    }
-}
-
-// Initialize cart styles when script loads
-injectCartStyles();
-
-// Cart management functions that extend the main app
-PharmacieGaherApp.prototype.initializeCart = function() {
-    // Load cart from localStorage
-    this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    
-    // Update cart UI
-    this.updateCartUI();
-    
-    // Set up cart event listeners
-    this.setupCartEventListeners();
-};
-
-PharmacieGaherApp.prototype.setupCartEventListeners = function() {
-    // Cart sidebar toggle
-    const cartToggleBtn = document.querySelector('[onclick="toggleCart()"]');
-    if (cartToggleBtn) {
-        cartToggleBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.toggleCartSidebar();
-        });
-    }
-    
-    // Cart overlay click to close
-    const cartOverlay = document.getElementById('cartOverlay');
-    if (cartOverlay) {
-        cartOverlay.addEventListener('click', () => {
-            this.closeCartSidebar();
-        });
-    }
-    
-    // Close cart with escape key
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            this.closeCartSidebar();
-        }
-    });
-};
-
-PharmacieGaherApp.prototype.toggleCartSidebar = function() {
-    const cartSidebar = document.getElementById('cartSidebar');
-    const cartOverlay = document.getElementById('cartOverlay');
-    
-    if (cartSidebar && cartOverlay) {
-        const isOpen = !cartSidebar.classList.contains('translate-x-full');
+// Enhanced Shopping Cart Management for Shifa Parapharmacie
+class CartManager {
+    constructor() {
+        this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        this.settings = {
+            freeShippingThreshold: APP_CONFIG.ECOMMERCE.FREE_SHIPPING_THRESHOLD,
+            standardShippingCost: APP_CONFIG.ECOMMERCE.STANDARD_SHIPPING_COST,
+            currency: APP_CONFIG.ECOMMERCE.CURRENCY
+        };
         
-        if (isOpen) {
-            this.closeCartSidebar();
-        } else {
-            this.openCartSidebar();
-        }
+        console.log('🛒 CartManager initialized');
+        this.updateCartDisplay();
     }
-};
-
-PharmacieGaherApp.prototype.openCartSidebar = function() {
-    const cartSidebar = document.getElementById('cartSidebar');
-    const cartOverlay = document.getElementById('cartOverlay');
     
-    if (cartSidebar && cartOverlay) {
-        cartSidebar.classList.remove('translate-x-full');
-        cartOverlay.classList.remove('hidden');
-        document.body.style.overflow = 'hidden'; // Prevent body scroll
-        
-        // Update cart content when opening
-        this.updateCartSidebar();
-    }
-};
-
-PharmacieGaherApp.prototype.closeCartSidebar = function() {
-    const cartSidebar = document.getElementById('cartSidebar');
-    const cartOverlay = document.getElementById('cartOverlay');
-    
-    if (cartSidebar && cartOverlay) {
-        cartSidebar.classList.add('translate-x-full');
-        cartOverlay.classList.add('hidden');
-        document.body.style.overflow = 'auto'; // Restore body scroll
-    }
-};
-
-// Enhanced add to cart with better error handling
-PharmacieGaherApp.prototype.addToCartWithValidation = async function(productId, quantity = 1, showToast = true) {
-    try {
-        console.log('Adding to cart with validation:', productId, quantity);
-        
-        // Find product in cached products
-        const product = this.allProducts.find(p => p._id === productId);
-        
-        if (!product) {
-            throw new Error('Produit non trouvé');
-        }
-        
-        // Validate stock
-        if (product.stock === 0) {
-            throw new Error('Ce produit est en rupture de stock');
-        }
-        
-        if (quantity <= 0) {
-            throw new Error('Quantité invalide');
-        }
-        
-        if (quantity > product.stock) {
-            throw new Error(`Stock insuffisant. Maximum disponible: ${product.stock}`);
-        }
-        
-        // Check if adding this quantity would exceed stock
-        const existingItem = this.cart.find(item => item.id === productId);
-        const currentQuantity = existingItem ? existingItem.quantite : 0;
-        const totalQuantity = currentQuantity + quantity;
-        
-        if (totalQuantity > product.stock) {
-            throw new Error(`Stock insuffisant. Vous avez déjà ${currentQuantity} dans votre panier. Maximum: ${product.stock}`);
-        }
-        
-        // Generate image URL for cart item
-        let imageUrl = product.image;
-        if (!imageUrl || (!imageUrl.startsWith('http') && !imageUrl.startsWith('data:image'))) {
-            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
-            const categoryColors = {
-                'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
-                'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-                'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
-                'Dentaire': '6366f1'
-            };
-            const color = categoryColors[product.categorie] || '10b981';
-            imageUrl = `https://via.placeholder.com/64x64/${color}/ffffff?text=${encodeURIComponent(initials)}`;
-        }
-        
-        // Add or update cart item
-        if (existingItem) {
-            existingItem.quantite = totalQuantity;
-        } else {
-            const cartItem = {
-                id: product._id,
-                nom: product.nom,
-                prix: product.prix,
-                image: imageUrl,
-                quantite: quantity,
-                stock: product.stock,
-                categorie: product.categorie || 'Général'
-            };
+    // Add item to cart
+    async addToCart(productId, quantity = 1, options = {}) {
+        try {
+            console.log('🛒 Adding to cart:', { productId, quantity, options });
+            
+            // Find product
+            const product = this.findProductById(productId);
+            if (!product) {
+                throw new Error('Produit non trouvé');
+            }
+            
+            // Validate stock
+            if (!this.validateStock(product, quantity)) {
+                return false;
+            }
+            
+            // Check if item already in cart
+            const existingItemIndex = this.cart.findIndex(item => item.id === productId);
+            
+            if (existingItemIndex > -1) {
+                return this.updateCartItemQuantity(existingItemIndex, 
+                    this.cart[existingItemIndex].quantite + quantity);
+            }
+            
+            // Create new cart item
+            const cartItem = this.createCartItem(product, quantity, options);
             this.cart.push(cartItem);
+            
+            this.saveCart();
+            this.updateCartDisplay();
+            
+            // Show success notification
+            this.showCartNotification(`${product.nom} ajouté au panier`, 'success', product);
+            
+            // Trigger cart updated event
+            this.dispatchCartEvent('cart:item-added', { item: cartItem, cart: this.cart });
+            
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Add to cart error:', error);
+            window.app?.showToast(error.message || 'Erreur lors de l\'ajout au panier', 'error');
+            return false;
         }
-        
-        // Save and update UI
-        this.saveCart();
-        this.updateCartUI();
-        
-        if (showToast) {
-            this.showToast(`${product.nom} ajouté au panier`, 'success');
-        }
-        
-        return true;
-        
-    } catch (error) {
-        console.error('Error adding to cart:', error);
-        if (showToast) {
-            this.showToast(error.message, 'error');
-        }
-        return false;
     }
-};
-
-// Enhanced cart quantity update with validation
-PharmacieGaherApp.prototype.updateCartQuantityWithValidation = function(productId, newQuantity) {
-    try {
+    
+    // Remove item from cart
+    removeFromCart(productId) {
         const itemIndex = this.cart.findIndex(item => item.id === productId);
         
         if (itemIndex === -1) {
-            throw new Error('Article non trouvé dans le panier');
+            console.warn('⚠️ Item not found in cart:', productId);
+            return false;
         }
         
-        const item = this.cart[itemIndex];
+        const removedItem = this.cart[itemIndex];
+        this.cart.splice(itemIndex, 1);
         
-        // If quantity is 0 or negative, remove item
-        if (newQuantity <= 0) {
-            this.removeFromCart(productId);
-            return;
-        }
-        
-        // Validate against stock
-        if (newQuantity > item.stock) {
-            this.showToast(`Stock insuffisant. Maximum disponible: ${item.stock}`, 'error');
-            return;
-        }
-        
-        // Update quantity
-        item.quantite = newQuantity;
         this.saveCart();
-        this.updateCartUI();
+        this.updateCartDisplay();
         
-    } catch (error) {
-        console.error('Error updating cart quantity:', error);
-        this.showToast(error.message, 'error');
+        // Show notification
+        this.showCartNotification(`${removedItem.nom} retiré du panier`, 'info');
+        
+        // Trigger event
+        this.dispatchCartEvent('cart:item-removed', { item: removedItem, cart: this.cart });
+        
+        return true;
     }
-};
-
-// Enhanced remove from cart
-PharmacieGaherApp.prototype.removeFromCartWithConfirmation = function(productId, showConfirmation = false) {
-    const itemIndex = this.cart.findIndex(item => item.id === productId);
     
-    if (itemIndex > -1) {
-        const item = this.cart[itemIndex];
+    // Update item quantity
+    updateQuantity(productId, newQuantity) {
+        const itemIndex = this.cart.findIndex(item => item.id === productId);
         
-        if (showConfirmation) {
-            if (!confirm(`Êtes-vous sûr de vouloir retirer "${item.nom}" du panier ?`)) {
-                return;
+        if (itemIndex === -1) {
+            console.warn('⚠️ Item not found in cart:', productId);
+            return false;
+        }
+        
+        if (newQuantity <= 0) {
+            return this.removeFromCart(productId);
+        }
+        
+        return this.updateCartItemQuantity(itemIndex, newQuantity);
+    }
+    
+    // Update cart item quantity (internal method)
+    updateCartItemQuantity(itemIndex, newQuantity) {
+        const item = this.cart[itemIndex];
+        const product = this.findProductById(item.id);
+        
+        if (!product) {
+            console.error('❌ Product not found for cart item:', item.id);
+            return false;
+        }
+        
+        // Validate stock
+        if (newQuantity > product.stock) {
+            window.app?.showToast(
+                `Stock insuffisant. Maximum disponible: ${product.stock}`, 
+                'warning'
+            );
+            return false;
+        }
+        
+        const oldQuantity = item.quantite;
+        item.quantite = newQuantity;
+        item.sousTotal = item.prix * newQuantity;
+        
+        this.saveCart();
+        this.updateCartDisplay();
+        
+        // Show notification for significant changes
+        if (Math.abs(newQuantity - oldQuantity) > 1) {
+            this.showCartNotification(
+                `Quantité mise à jour: ${item.nom} (${newQuantity})`, 
+                'info'
+            );
+        }
+        
+        // Trigger event
+        this.dispatchCartEvent('cart:item-updated', { 
+            item, 
+            oldQuantity, 
+            newQuantity, 
+            cart: this.cart 
+        });
+        
+        return true;
+    }
+    
+    // Clear entire cart
+    clearCart() {
+        const itemCount = this.cart.length;
+        
+        if (itemCount === 0) {
+            window.app?.showToast('Le panier est déjà vide', 'info');
+            return;
+        }
+        
+        this.cart = [];
+        this.saveCart();
+        this.updateCartDisplay();
+        
+        this.showCartNotification(`Panier vidé (${itemCount} articles supprimés)`, 'info');
+        
+        // Trigger event
+        this.dispatchCartEvent('cart:cleared', { itemCount });
+    }
+    
+    // Get cart totals
+    getCartTotals() {
+        const items = this.cart.reduce((sum, item) => sum + item.quantite, 0);
+        const subtotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+        
+        // Calculate shipping
+        const shipping = this.calculateShipping(subtotal);
+        const total = subtotal + shipping.cost;
+        
+        // Calculate savings (promotions)
+        const savings = this.calculateSavings();
+        
+        return {
+            items,
+            subtotal,
+            shipping,
+            total,
+            savings,
+            currency: this.settings.currency,
+            freeShippingThreshold: this.settings.freeShippingThreshold,
+            amountForFreeShipping: shipping.cost > 0 ? 
+                Math.max(0, this.settings.freeShippingThreshold - subtotal) : 0
+        };
+    }
+    
+    // Calculate shipping cost
+    calculateShipping(subtotal) {
+        const isFree = subtotal >= this.settings.freeShippingThreshold;
+        
+        return {
+            cost: isFree ? 0 : this.settings.standardShippingCost,
+            isFree,
+            method: isFree ? 'Livraison gratuite' : 'Livraison standard',
+            estimatedDays: isFree ? '2-3 jours' : '3-5 jours'
+        };
+    }
+    
+    // Calculate total savings from promotions
+    calculateSavings() {
+        return this.cart.reduce((total, item) => {
+            if (item.prixOriginal && item.prixOriginal > item.prix) {
+                return total + ((item.prixOriginal - item.prix) * item.quantite);
+            }
+            return total;
+        }, 0);
+    }
+    
+    // Validate stock availability
+    validateStock(product, requestedQuantity) {
+        if (product.stock === 0) {
+            window.app?.showToast(`${product.nom} est en rupture de stock`, 'error');
+            return false;
+        }
+        
+        if (requestedQuantity > product.stock) {
+            window.app?.showToast(
+                `Stock insuffisant pour ${product.nom}. Disponible: ${product.stock}`,
+                'error'
+            );
+            return false;
+        }
+        
+        // Check if adding to existing cart item would exceed stock
+        const existingItem = this.cart.find(item => item.id === product._id);
+        if (existingItem) {
+            const totalRequested = existingItem.quantite + requestedQuantity;
+            if (totalRequested > product.stock) {
+                window.app?.showToast(
+                    `Stock insuffisant. Vous avez déjà ${existingItem.quantite} dans le panier. Max: ${product.stock}`,
+                    'error'
+                );
+                return false;
             }
         }
         
-        this.cart.splice(itemIndex, 1);
-        this.saveCart();
-        this.updateCartUI();
-        this.showToast(`${item.nom} retiré du panier`, 'success');
-    }
-};
-
-// Get cart statistics
-PharmacieGaherApp.prototype.getCartStats = function() {
-    const itemCount = this.cart.reduce((count, item) => count + item.quantite, 0);
-    const subtotal = this.cart.reduce((total, item) => total + (item.prix * item.quantite), 0);
-    const shippingCost = subtotal >= 5000 ? 0 : 300;
-    const total = subtotal + shippingCost;
-    
-    return {
-        itemCount,
-        subtotal,
-        shippingCost,
-        total,
-        isEmpty: this.cart.length === 0,
-        hasItems: this.cart.length > 0,
-        qualifiesForFreeShipping: subtotal >= 5000
-    };
-};
-
-// Clear cart with confirmation
-PharmacieGaherApp.prototype.clearCartWithConfirmation = function() {
-    if (this.cart.length === 0) {
-        this.showToast('Votre panier est déjà vide', 'info');
-        return;
+        return true;
     }
     
-    if (confirm('Êtes-vous sûr de vouloir vider votre panier ?')) {
-        this.cart = [];
-        this.saveCart();
-        this.updateCartUI();
-        this.showToast('Panier vidé', 'success');
-        this.closeCartSidebar();
-    }
-};
-
-// Cart validation before checkout
-PharmacieGaherApp.prototype.validateCartForCheckout = function() {
-    if (this.cart.length === 0) {
-        this.showToast('Votre panier est vide', 'warning');
-        return false;
-    }
-    
-    // Check each item for stock availability
-    for (const item of this.cart) {
-        const product = this.allProducts.find(p => p._id === item.id);
+    // Create cart item object
+    createCartItem(product, quantity, options = {}) {
+        const isPromotion = product.enPromotion && product.prixOriginal;
         
-        if (!product) {
-            this.showToast(`Le produit "${item.nom}" n'est plus disponible`, 'error');
-            this.removeFromCart(item.id);
-            return false;
+        return {
+            id: product._id,
+            nom: product.nom,
+            prix: product.prix,
+            prixOriginal: isPromotion ? product.prixOriginal : null,
+            image: this.getProductImageUrl(product),
+            quantite: quantity,
+            stock: product.stock,
+            categorie: product.categorie,
+            marque: product.marque || '',
+            sousTotal: product.prix * quantity,
+            enPromotion: isPromotion,
+            pourcentagePromotion: isPromotion ? product.pourcentagePromotion : 0,
+            dateAjout: new Date().toISOString(),
+            options: options // For future use (size, color, etc.)
+        };
+    }
+    
+    // Get product image URL
+    getProductImageUrl(product) {
+        if (product.image) {
+            if (product.image.startsWith('data:image') || product.image.startsWith('http')) {
+                return product.image;
+            }
+            return `./images/products/${product.image}`;
         }
         
-        if (product.stock === 0) {
-            this.showToast(`"${item.nom}" est en rupture de stock`, 'error');
-            this.removeFromCart(item.id);
-            return false;
-        }
+        // Generate placeholder
+        const categoryColor = this.getCategoryColor(product.categorie);
+        const initials = product.nom.split(' ')
+            .map(word => word[0])
+            .join('')
+            .substring(0, 2)
+            .toUpperCase();
         
-        if (item.quantite > product.stock) {
-            this.showToast(`Stock insuffisant pour "${item.nom}". Quantité ajustée.`, 'warning');
-            item.quantite = product.stock;
-            item.stock = product.stock;
-            this.saveCart();
-            this.updateCartUI();
-        }
+        return `https://via.placeholder.com/100x100/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
     }
     
-    return true;
-};
-
-// Enhanced proceed to checkout
-PharmacieGaherApp.prototype.proceedToCheckoutWithValidation = function() {
-    // Validate cart
-    if (!this.validateCartForCheckout()) {
-        return;
+    // Get category color for placeholder
+    getCategoryColor(category) {
+        const colors = {
+            'Vitalité': '10b981',
+            'Sport': 'f43f5e',
+            'Visage': 'ec4899',
+            'Cheveux': 'f59e0b',
+            'Solaire': 'f97316',
+            'Intime': 'ef4444',
+            'Soins': '22c55e',
+            'Bébé': '06b6d4',
+            'Homme': '3b82f6',
+            'Dentaire': '6366f1'
+        };
+        return colors[category] || '10b981';
     }
     
-    // Close cart sidebar
-    this.closeCartSidebar();
+    // Find product by ID
+    findProductById(productId) {
+        return window.app?.allProducts?.find(p => p._id === productId) || null;
+    }
     
-    // Go to checkout page
-    this.showPage('checkout');
-};
-
-// Mini cart display for header
-PharmacieGaherApp.prototype.renderMiniCart = function() {
-    const stats = this.getCartStats();
+    // Update cart display
+    updateCartDisplay() {
+        this.updateCartCounter();
+        this.updateCartSidebar();
+        this.updateCartSummary();
+    }
     
-    return `
-        <div class="mini-cart-content">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-emerald-800">Panier (${stats.itemCount})</h3>
-                <span class="text-emerald-600 font-semibold">${stats.total} DA</span>
-            </div>
+    // Update cart counter
+    updateCartCounter() {
+        const cartCount = document.getElementById('cartCount');
+        const cartItemsCount = document.getElementById('cartItemsCount');
+        
+        const totalItems = this.cart.reduce((sum, item) => sum + item.quantite, 0);
+        
+        if (cartCount) {
+            cartCount.textContent = totalItems;
             
-            ${stats.isEmpty ? `
-                <div class="text-center py-4">
-                    <i class="fas fa-shopping-cart text-emerald-200 text-2xl mb-2"></i>
-                    <p class="text-emerald-600 text-sm">Panier vide</p>
-                </div>
-            ` : `
-                <div class="space-y-2 mb-4 max-h-32 overflow-y-auto">
-                    ${this.cart.slice(0, 3).map(item => `
-                        <div class="flex items-center space-x-2 text-sm">
-                            <img src="${item.image}" alt="${item.nom}" class="w-8 h-8 object-cover rounded">
-                            <span class="flex-1 truncate">${item.nom}</span>
-                            <span class="text-emerald-600">${item.quantite}×</span>
-                        </div>
-                    `).join('')}
-                    ${this.cart.length > 3 ? `<p class="text-xs text-gray-500 text-center">+${this.cart.length - 3} autres articles</p>` : ''}
-                </div>
-                
-                <button onclick="app.proceedToCheckoutWithValidation()" 
-                        class="w-full bg-emerald-500 text-white py-2 rounded-lg text-sm font-semibold hover:bg-emerald-600 transition-all">
-                    Voir le panier
-                </button>
-            `}
-        </div>
-    `;
-};
-
-// Global cart functions that work with the updated cart system
-window.toggleCartSidebar = function() {
-    if (window.app) {
-        window.app.toggleCartSidebar();
+            // Add animation for changes
+            if (totalItems > 0) {
+                cartCount.classList.add('animate-pulse');
+                setTimeout(() => cartCount.classList.remove('animate-pulse'), 1000);
+            }
+        }
+        
+        if (cartItemsCount) {
+            cartItemsCount.textContent = totalItems === 0 ? '0 articles' : 
+                totalItems === 1 ? '1 article' : `${totalItems} articles`;
+        }
     }
-};
-
-window.addToCartFromCard = function(productId, quantity = 1) {
-    if (window.app) {
-        window.app.addToCartWithValidation(productId, quantity);
+    
+    // Update cart sidebar
+    updateCartSidebar() {
+        const cartItems = document.getElementById('cartItems');
+        const cartSummary = document.getElementById('cartSummary');
+        
+        if (!cartItems) return;
+        
+        if (this.cart.length === 0) {
+            cartItems.innerHTML = this.getEmptyCartHTML();
+            cartSummary?.classList.add('hidden');
+            return;
+        }
+        
+        cartItems.innerHTML = this.cart.map(item => this.generateCartItemHTML(item)).join('');
+        cartSummary?.classList.remove('hidden');
     }
-};
-
-window.updateCartQuantity = function(productId, newQuantity) {
-    if (window.app) {
-        window.app.updateCartQuantityWithValidation(productId, newQuantity);
-    }
-};
-
-window.removeFromCart = function(productId) {
-    if (window.app) {
-        window.app.removeFromCartWithConfirmation(productId, false);
-    }
-};
-
-window.clearCart = function() {
-    if (window.app) {
-        window.app.clearCartWithConfirmation();
-    }
-};
-
-window.proceedToCheckout = function() {
-    if (window.app) {
-        window.app.proceedToCheckoutWithValidation();
-    }
-};
-
-// Enhanced cart item renderer for sidebar
-PharmacieGaherApp.prototype.renderCartItem = function(item) {
-    return `
-        <div class="cart-item">
-            <div class="flex items-start space-x-3">
-                <img src="${item.image}" alt="${item.nom}" 
-                     class="w-16 h-16 object-cover rounded-lg border border-emerald-200 flex-shrink-0">
-                
-                <div class="flex-1 min-w-0">
-                    <h4 class="font-medium text-emerald-800 truncate">${item.nom}</h4>
-                    <p class="text-sm text-emerald-600 mb-2">${item.prix} DA / unité</p>
+    
+    // Generate cart item HTML
+    generateCartItemHTML(item) {
+        const hasPromotion = item.enPromotion && item.prixOriginal;
+        const subtotal = item.prix * item.quantite;
+        
+        return `
+            <div class="bg-white/50 backdrop-blur-sm rounded-2xl p-4 border border-mint-200/50 hover:border-mint-400/60 transition-all shadow-sm hover:shadow-health" data-cart-item="${item.id}">
+                <div class="flex items-start space-x-4">
+                    <!-- Product Image -->
+                    <div class="relative">
+                        <img src="${item.image}" alt="${item.nom}" 
+                             class="w-20 h-20 object-cover rounded-xl shadow-sm"
+                             onerror="this.src='${this.getProductImageUrl({ _id: item.id, nom: item.nom, categorie: item.categorie })}'">
+                        ${hasPromotion ? `
+                            <div class="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold">
+                                -${item.pourcentagePromotion}%
+                            </div>
+                        ` : ''}
+                    </div>
                     
-                    <div class="flex items-center justify-between">
-                        <div class="quantity-selector">
-                            <button onclick="updateCartQuantity('${item.id}', ${Math.max(1, item.quantite - 1)})"
-                                    ${item.quantite <= 1 ? 'disabled class="opacity-50"' : ''}>-</button>
-                            <input type="number" value="${item.quantite}" min="1" max="${item.stock}"
-                                   onchange="updateCartQuantity('${item.id}', parseInt(this.value) || 1)"
-                                   class="text-center">
-                            <button onclick="updateCartQuantity('${item.id}', ${item.quantite + 1})"
-                                    ${item.quantite >= item.stock ? 'disabled class="opacity-50"' : ''}>+</button>
+                    <!-- Product Info -->
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-semibold text-forest-800 text-sm mb-1 line-clamp-2">${item.nom}</h4>
+                        
+                        <!-- Price -->
+                        <div class="flex items-center space-x-2 mb-2">
+                            ${hasPromotion ? `
+                                <span class="text-sm text-gray-400 line-through">${Utils.formatPrice(item.prixOriginal)}</span>
+                                <span class="text-primary font-bold text-lg">${Utils.formatPrice(item.prix)}</span>
+                            ` : `
+                                <span class="text-forest-800 font-bold text-lg">${Utils.formatPrice(item.prix)}</span>
+                            `}
                         </div>
                         
-                        <div class="flex items-center space-x-2">
-                            <span class="font-semibold text-emerald-700">${item.prix * item.quantite} DA</span>
-                            <button onclick="removeFromCart('${item.id}')" 
-                                    class="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-all"
-                                    title="Supprimer">
+                        <!-- Quantity Controls -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center bg-mint-100 rounded-xl overflow-hidden">
+                                <button onclick="cartManager.updateQuantity('${item.id}', ${item.quantite - 1})" 
+                                        class="px-3 py-2 text-primary hover:bg-primary hover:text-white transition-colors disabled:opacity-50"
+                                        ${item.quantite <= 1 ? 'disabled' : ''}>
+                                    <i class="fas fa-minus text-sm"></i>
+                                </button>
+                                <span class="px-4 py-2 text-forest-800 font-semibold min-w-16 text-center">${item.quantite}</span>
+                                <button onclick="cartManager.updateQuantity('${item.id}', ${item.quantite + 1})" 
+                                        class="px-3 py-2 text-primary hover:bg-primary hover:text-white transition-colors disabled:opacity-50"
+                                        ${item.quantite >= item.stock ? 'disabled' : ''}>
+                                    <i class="fas fa-plus text-sm"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Remove Button -->
+                            <button onclick="cartManager.removeFromCart('${item.id}')" 
+                                    class="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-all duration-200"
+                                    title="Retirer du panier">
                                 <i class="fas fa-trash text-sm"></i>
                             </button>
                         </div>
+                        
+                        <!-- Item Subtotal -->
+                        <div class="mt-2 pt-2 border-t border-mint-200/50 text-right">
+                            <span class="text-sm font-semibold text-forest-700">
+                                Sous-total: ${Utils.formatPrice(subtotal)}
+                            </span>
+                            ${item.stock <= 5 ? `
+                                <div class="text-xs text-orange-600 mt-1">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    Plus que ${item.stock} en stock
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
-                    
-                    ${item.quantite >= item.stock ? `
-                        <p class="text-xs text-orange-600 mt-1">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                            Quantité maximale atteinte
-                        </p>
-                    ` : ''}
                 </div>
             </div>
-        </div>
-    `;
-};
+        `;
+    }
+    
+    // Get empty cart HTML
+    getEmptyCartHTML() {
+        return `
+            <div class="text-center py-16">
+                <div class="w-24 h-24 bg-mint-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-shopping-cart text-4xl text-mint-400"></i>
+                </div>
+                <p class="text-xl font-semibold text-forest-700 mb-2">Votre panier est vide</p>
+                <p class="text-mint-600 mb-8">Découvrez nos produits de qualité pour votre bien-être</p>
+                <div class="space-y-3">
+                    <button onclick="window.app.showPage('products'); toggleCart();" 
+                            class="w-full bg-gradient-to-r from-primary to-secondary text-white px-8 py-3 rounded-xl hover:from-secondary hover:to-mint-600 transition-all duration-300 shadow-health font-medium">
+                        <i class="fas fa-leaf mr-2"></i>Explorer nos produits
+                    </button>
+                    <button onclick="window.app.filterByCategory('Vitalité'); toggleCart();" 
+                            class="w-full bg-white text-primary border-2 border-primary px-8 py-3 rounded-xl hover:bg-primary hover:text-white transition-all duration-300 font-medium">
+                        <i class="fas fa-seedling mr-2"></i>Produits Vitalité
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Update cart summary
+    updateCartSummary() {
+        const cartSubtotal = document.getElementById('cartSubtotal');
+        const cartShipping = document.getElementById('cartShipping');
+        const cartTotal = document.getElementById('cartTotal');
+        
+        if (!cartSubtotal || !cartShipping || !cartTotal) return;
+        
+        const totals = this.getCartTotals();
+        
+        cartSubtotal.textContent = Utils.formatPrice(totals.subtotal);
+        cartShipping.textContent = totals.shipping.isFree ? 
+            'Gratuit' : Utils.formatPrice(totals.shipping.cost);
+        cartTotal.textContent = Utils.formatPrice(totals.total);
+        
+        // Update shipping message
+        this.updateShippingMessage(totals);
+    }
+    
+    // Update shipping message
+    updateShippingMessage(totals) {
+        let shippingMessage = document.getElementById('shippingMessage');
+        
+        // Create shipping message if it doesn't exist
+        if (!shippingMessage) {
+            const cartSummary = document.getElementById('cartSummary');
+            if (cartSummary) {
+                shippingMessage = document.createElement('div');
+                shippingMessage.id = 'shippingMessage';
+                shippingMessage.className = 'text-sm text-center py-3 px-4 rounded-xl mb-4';
+                cartSummary.insertBefore(shippingMessage, cartSummary.firstChild);
+            }
+        }
+        
+        if (!shippingMessage) return;
+        
+        if (totals.shipping.isFree) {
+            shippingMessage.innerHTML = `
+                <div class="bg-green-50 text-green-700 border border-green-200">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    <strong>Félicitations !</strong> Vous bénéficiez de la livraison gratuite
+                </div>
+            `;
+        } else if (totals.amountForFreeShipping > 0) {
+            shippingMessage.innerHTML = `
+                <div class="bg-blue-50 text-blue-700 border border-blue-200">
+                    <i class="fas fa-truck mr-2"></i>
+                    Plus que <strong>${Utils.formatPrice(totals.amountForFreeShipping)}</strong> pour la livraison gratuite !
+                </div>
+            `;
+        } else {
+            shippingMessage.innerHTML = `
+                <div class="bg-gray-50 text-gray-700 border border-gray-200">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    Livraison standard: ${Utils.formatPrice(totals.shipping.cost)}
+                </div>
+            `;
+        }
+    }
+    
+    // Show cart notification
+    showCartNotification(message, type = 'success', product = null) {
+        if (!window.app?.showToast) {
+            console.log(`Cart: ${message}`);
+            return;
+        }
+        
+        // For product additions, show enhanced notification
+        if (type === 'success' && product) {
+            const notification = document.createElement('div');
+            notification.className = `
+                fixed top-20 right-6 bg-white border-l-4 border-green-500 rounded-lg shadow-health p-4 z-50 
+                transform translate-x-full transition-transform duration-300 max-w-sm
+            `;
+            
+            notification.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <img src="${this.getProductImageUrl(product)}" alt="${product.nom}" 
+                         class="w-12 h-12 object-cover rounded-lg">
+                    <div class="flex-1">
+                        <p class="font-semibold text-forest-800 text-sm">${message}</p>
+                        <p class="text-xs text-mint-600 mt-1">${Utils.formatPrice(product.prix)}</p>
+                    </div>
+                    <div class="flex flex-col space-y-1">
+                        <button onclick="toggleCart()" 
+                                class="bg-primary text-white text-xs px-3 py-1 rounded-lg hover:bg-secondary transition-colors">
+                            Voir panier
+                        </button>
+                        <button onclick="this.parentElement.parentElement.parentElement.remove()" 
+                                class="text-gray-400 hover:text-gray-600 text-xs">
+                            ×
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => notification.classList.remove('translate-x-full'), 100);
+            
+            // Auto remove
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.classList.add('translate-x-full');
+                    setTimeout(() => notification.remove(), 300);
+                }
+            }, 5000);
+            
+        } else {
+            window.app.showToast(message, type);
+        }
+    }
+    
+    // Dispatch cart events
+    dispatchCartEvent(eventName, detail) {
+        document.dispatchEvent(new CustomEvent(eventName, { detail }));
+    }
+    
+    // Save cart to localStorage
+    saveCart() {
+        try {
+            localStorage.setItem('cart', JSON.stringify(this.cart));
+            
+            // Also save timestamp for cache invalidation
+            localStorage.setItem('cartTimestamp', Date.now().toString());
+            
+        } catch (error) {
+            console.error('❌ Failed to save cart:', error);
+            window.app?.showToast('Erreur de sauvegarde du panier', 'error');
+        }
+    }
+    
+    // Load cart from localStorage
+    loadCart() {
+        try {
+            const cartData = localStorage.getItem('cart');
+            if (cartData) {
+                this.cart = JSON.parse(cartData);
+                
+                // Validate and clean cart items
+                this.cart = this.cart.filter(item => this.validateCartItem(item));
+                
+                this.updateCartDisplay();
+                console.log(`🛒 Cart loaded: ${this.cart.length} items`);
+            }
+        } catch (error) {
+            console.error('❌ Failed to load cart:', error);
+            this.cart = [];
+        }
+    }
+    
+    // Validate cart item structure
+    validateCartItem(item) {
+        const requiredFields = ['id', 'nom', 'prix', 'quantite', 'stock'];
+        return requiredFields.every(field => item.hasOwnProperty(field));
+    }
+    
+    // Apply coupon code
+    async applyCoupon(couponCode) {
+        if (!couponCode?.trim()) {
+            window.app?.showToast('Veuillez saisir un code promo', 'warning');
+            return false;
+        }
+        
+        try {
+            // This would typically make an API call to validate the coupon
+            // For now, we'll simulate some basic coupons
+            const simulatedCoupons = {
+                'BIENVENUE10': { type: 'percentage', value: 10, minAmount: 1000 },
+                'SHIFA20': { type: 'percentage', value: 20, minAmount: 2000 },
+                'LIVRAISON': { type: 'shipping', value: 0 }
+            };
+            
+            const coupon = simulatedCoupons[couponCode.toUpperCase()];
+            if (!coupon) {
+                window.app?.showToast('Code promo invalide', 'error');
+                return false;
+            }
+            
+            const totals = this.getCartTotals();
+            
+            if (coupon.minAmount && totals.subtotal < coupon.minAmount) {
+                window.app?.showToast(
+                    `Montant minimum requis: ${Utils.formatPrice(coupon.minAmount)}`, 
+                    'warning'
+                );
+                return false;
+            }
+            
+            // Apply coupon (this would be handled differently in a real app)
+            window.app?.showToast(`Code promo "${couponCode}" appliqué avec succès !`, 'success');
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Coupon application error:', error);
+            window.app?.showToast('Erreur lors de l\'application du code promo', 'error');
+            return false;
+        }
+    }
+    
+    // Get cart summary for checkout
+    getCheckoutSummary() {
+        const totals = this.getCartTotals();
+        
+        return {
+            items: this.cart.map(item => ({
+                productId: item.id,
+                nom: item.nom,
+                prix: item.prix,
+                quantite: item.quantite,
+                image: item.image,
+                sousTotal: item.prix * item.quantite
+            })),
+            totals,
+            timestamp: new Date().toISOString()
+        };
+    }
+    
+    // Validate cart before checkout
+    validateCartForCheckout() {
+        if (this.cart.length === 0) {
+            window.app?.showToast('Votre panier est vide', 'warning');
+            return false;
+        }
+        
+        const issues = [];
+        
+        // Check each item
+        for (const item of this.cart) {
+            const product = this.findProductById(item.id);
+            
+            if (!product) {
+                issues.push(`${item.nom} n'est plus disponible`);
+                continue;
+            }
+            
+            if (product.stock < item.quantite) {
+                issues.push(`Stock insuffisant pour ${item.nom} (disponible: ${product.stock})`);
+            }
+            
+            if (!product.actif) {
+                issues.push(`${item.nom} n'est plus en vente`);
+            }
+        }
+        
+        if (issues.length > 0) {
+            window.app?.showToast(
+                `Problèmes détectés:\n${issues.join('\n')}`, 
+                'error'
+            );
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Quick add to cart (for product cards)
+    async quickAdd(productId) {
+        return await this.addToCart(productId, 1);
+    }
+    
+    // Bulk operations
+    async addMultipleItems(items) {
+        const results = [];
+        
+        for (const { productId, quantity } of items) {
+            const success = await this.addToCart(productId, quantity);
+            results.push({ productId, success });
+        }
+        
+        return results;
+    }
+    
+    // Get recommended products based on cart
+    getRecommendedProducts() {
+        if (this.cart.length === 0) return [];
+        
+        const cartCategories = [...new Set(this.cart.map(item => item.categorie))];
+        const allProducts = window.app?.allProducts || [];
+        
+        return allProducts
+            .filter(product => 
+                product.actif && 
+                product.stock > 0 &&
+                cartCategories.includes(product.categorie) &&
+                !this.cart.some(item => item.id === product._id)
+            )
+            .sort(() => Math.random() - 0.5) // Shuffle
+            .slice(0, 4);
+    }
+}
 
-console.log('✅ Cart.js loaded successfully with enhanced functionality');
+// Initialize CartManager
+const cartManager = new CartManager();
+
+// Make globally available
+window.cartManager = cartManager;
+
+// Load cart on initialization
+cartManager.loadCart();
+
+// Set up event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Update cart display when products are loaded
+    document.addEventListener('products:loaded', () => {
+        cartManager.updateCartDisplay();
+    });
+    
+    // Handle authentication changes
+    document.addEventListener('auth:login', () => {
+        // Optionally sync cart with user account
+        console.log('🛒 User logged in, cart maintained');
+    });
+    
+    document.addEventListener('auth:logout', () => {
+        // Keep cart for guest users
+        console.log('🛒 User logged out, cart maintained');
+    });
+});
+
+console.log('✅ Enhanced cart.js loaded successfully');
