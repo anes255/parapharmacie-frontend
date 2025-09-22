@@ -1,11 +1,11 @@
-// Complete Fixed Checkout System for Shifa Parapharmacie
+// Fixed Checkout System for Shifa Parapharmacie
 
 class CheckoutSystem {
     constructor() {
         this.currentStep = 1;
         this.orderData = {};
         this.isProcessing = false;
-        this.appliedDiscount = 0;
+        this.maxLocalOrders = 20; // Limit local storage orders
     }
 
     // Initialize checkout process
@@ -14,31 +14,6 @@ class CheckoutSystem {
         this.validateCart();
         this.setupEventListeners();
         this.calculateTotals();
-        this.loadUserData();
-    }
-
-    // Load user data if logged in
-    loadUserData() {
-        if (window.app && window.app.currentUser) {
-            const user = window.app.currentUser;
-            
-            // Pre-fill form with user data
-            const fields = {
-                'checkoutPrenom': user.prenom,
-                'checkoutNom': user.nom,
-                'checkoutEmail': user.email,
-                'checkoutTelephone': user.telephone,
-                'checkoutAdresse': user.adresse,
-                'checkoutWilaya': user.wilaya
-            };
-            
-            Object.entries(fields).forEach(([fieldId, value]) => {
-                const field = document.getElementById(fieldId);
-                if (field && value) {
-                    field.value = value;
-                }
-            });
-        }
     }
 
     // Validate cart before checkout
@@ -90,15 +65,6 @@ class CheckoutSystem {
         const wilayaSelect = document.getElementById('checkoutWilaya');
         if (wilayaSelect) {
             wilayaSelect.addEventListener('change', () => this.calculateShipping());
-        }
-
-        // Form submission
-        const checkoutForm = document.getElementById('checkoutForm');
-        if (checkoutForm) {
-            checkoutForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.processOrder();
-            });
         }
     }
 
@@ -223,8 +189,6 @@ class CheckoutSystem {
                         </div>
                     `;
                     break;
-                default:
-                    paymentInfo.innerHTML = '';
             }
         }
     }
@@ -262,29 +226,18 @@ class CheckoutSystem {
 
     // Update shipping display
     updateShippingDisplay(fraisLivraison) {
-        const shippingElement = document.getElementById('checkoutFraisLivraison');
+        const shippingElement = document.getElementById('shippingCost');
         if (shippingElement) {
+            shippingElement.textContent = `${fraisLivraison} DA`;
+            
             if (fraisLivraison === 0) {
-                shippingElement.innerHTML = `<span class="line-through text-gray-400">${this.getDefaultShippingRate()} DA</span> <span class="text-green-600 font-semibold">GRATUIT</span>`;
+                shippingElement.classList.add('text-green-600', 'font-semibold');
+                shippingElement.classList.remove('text-gray-700');
             } else {
-                shippingElement.textContent = `${fraisLivraison} DA`;
+                shippingElement.classList.remove('text-green-600', 'font-semibold');
+                shippingElement.classList.add('text-gray-700');
             }
         }
-    }
-
-    // Get default shipping rate for display
-    getDefaultShippingRate() {
-        const wilaya = document.getElementById('checkoutWilaya')?.value;
-        const shippingRates = {
-            'Alger': 250,
-            'Blida': 250,
-            'Boumerdès': 250,
-            'Tipaza': 200,
-            'Médéa': 300,
-            'default': 350
-        };
-        
-        return shippingRates[wilaya] || shippingRates.default;
     }
 
     // Calculate and update totals
@@ -293,38 +246,22 @@ class CheckoutSystem {
 
         const sousTotal = window.app.getCartTotal();
         const fraisLivraison = this.getCurrentShippingCost();
-        const discount = this.appliedDiscount;
-        const total = sousTotal + fraisLivraison - discount;
+        const total = sousTotal + fraisLivraison;
 
         // Update display
         const elements = {
             sousTotal: document.getElementById('checkoutSousTotal'),
             fraisLivraison: document.getElementById('checkoutFraisLivraison'),
-            discount: document.getElementById('checkoutDiscount'),
             total: document.getElementById('checkoutTotal')
         };
 
         if (elements.sousTotal) elements.sousTotal.textContent = `${sousTotal} DA`;
-        if (elements.fraisLivraison) {
-            if (fraisLivraison === 0 && sousTotal >= 5000) {
-                elements.fraisLivraison.innerHTML = `<span class="line-through text-gray-400">${this.getDefaultShippingRate()} DA</span> <span class="text-green-600 font-semibold">GRATUIT</span>`;
-            } else {
-                elements.fraisLivraison.textContent = `${fraisLivraison} DA`;
-            }
-        }
-        if (elements.discount && discount > 0) {
-            elements.discount.textContent = `-${discount} DA`;
-            elements.discount.parentNode.style.display = 'flex';
-        } else if (elements.discount) {
-            elements.discount.parentNode.style.display = 'none';
-        }
+        if (elements.fraisLivraison) elements.fraisLivraison.textContent = `${fraisLivraison} DA`;
         if (elements.total) elements.total.textContent = `${total} DA`;
 
         // Show free shipping message
         if (sousTotal >= 5000) {
             this.showFreeShippingMessage();
-        } else {
-            this.showShippingProgress(sousTotal);
         }
     }
 
@@ -364,27 +301,6 @@ class CheckoutSystem {
         }
     }
 
-    // Show shipping progress
-    showShippingProgress(sousTotal) {
-        const needed = 5000 - sousTotal;
-        const container = document.getElementById('shippingMessage');
-        if (container && needed > 0) {
-            const progress = (sousTotal / 5000) * 100;
-            container.innerHTML = `
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div class="flex items-center justify-between text-sm text-blue-800 mb-2">
-                        <span>Livraison gratuite à partir de 5000 DA</span>
-                        <span class="font-medium">${needed} DA restants</span>
-                    </div>
-                    <div class="w-full bg-blue-200 rounded-full h-2">
-                        <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                             style="width: ${Math.min(progress, 100)}%"></div>
-                    </div>
-                </div>
-            `;
-        }
-    }
-
     // Validate entire form
     validateForm() {
         const requiredFields = [
@@ -405,19 +321,36 @@ class CheckoutSystem {
             }
         }
 
-        // Validate payment method
-        const paymentMethod = document.querySelector('input[name="modePaiement"]:checked');
-        if (!paymentMethod) {
-            isValid = false;
-            if (window.app) {
-                window.app.showToast('Veuillez sélectionner un mode de paiement', 'error');
-            }
-        }
-
         return isValid;
     }
 
-    // Process the order - MAIN FUNCTION
+    // Clean old orders from localStorage to prevent quota issues
+    cleanLocalStorage() {
+        try {
+            // Clean admin orders
+            let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            if (adminOrders.length > this.maxLocalOrders) {
+                adminOrders = adminOrders.slice(0, this.maxLocalOrders);
+                localStorage.setItem('adminOrders', JSON.stringify(adminOrders));
+                console.log(`✅ Cleaned admin orders, kept ${adminOrders.length} most recent`);
+            }
+
+            // Clean user orders for current user
+            if (window.app?.currentUser?.id) {
+                const userOrdersKey = `userOrders_${window.app.currentUser.id}`;
+                let userOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
+                if (userOrders.length > this.maxLocalOrders) {
+                    userOrders = userOrders.slice(0, this.maxLocalOrders);
+                    localStorage.setItem(userOrdersKey, JSON.stringify(userOrders));
+                    console.log(`✅ Cleaned user orders, kept ${userOrders.length} most recent`);
+                }
+            }
+        } catch (error) {
+            console.error('Error cleaning localStorage:', error);
+        }
+    }
+
+    // Process the order - MAIN FUNCTION FIXED
     async processOrder() {
         try {
             if (this.isProcessing) {
@@ -427,6 +360,9 @@ class CheckoutSystem {
 
             console.log('🛒 Starting order processing...');
             this.isProcessing = true;
+
+            // Clean localStorage first to free up space
+            this.cleanLocalStorage();
 
             // Validate cart
             if (!this.validateCart()) {
@@ -439,10 +375,7 @@ class CheckoutSystem {
             }
 
             // Disable submit button
-            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]') || 
-                              document.querySelector('button[type="submit"]') ||
-                              document.querySelector('[data-checkout-submit]');
-            
+            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
@@ -454,8 +387,9 @@ class CheckoutSystem {
             console.log('Order data prepared:', orderData);
 
             // Try to submit to API first
-            let orderSaved = false;
+            let apiOrderSaved = false;
             try {
+                console.log('💻 Attempting to save to API...');
                 const response = await apiCall('/orders', {
                     method: 'POST',
                     body: JSON.stringify(orderData)
@@ -463,23 +397,38 @@ class CheckoutSystem {
                 
                 if (response) {
                     console.log('✅ Order saved to API successfully');
-                    orderSaved = true;
+                    apiOrderSaved = true;
                 }
             } catch (apiError) {
                 console.log('⚠️ API save failed, will save locally:', apiError.message);
+                
+                // If we get a 404, the orders endpoint might not exist
+                // Continue with local save
             }
 
-            // Always save locally for admin panel
-            if (window.addOrderToDemo) {
-                const localOrder = window.addOrderToDemo(orderData);
-                if (localOrder) {
-                    console.log('✅ Order saved locally for admin panel');
+            // Always save locally for admin panel and user history
+            try {
+                // Save to admin orders (for admin panel)
+                if (window.addOrderToDemo) {
+                    console.log('💾 Saving to admin orders...');
+                    const localOrder = window.addOrderToDemo(orderData);
+                    if (localOrder) {
+                        console.log('✅ Order saved to admin orders');
+                    }
                 }
-            }
 
-            // Save to user's order history
-            if (window.app && window.app.currentUser) {
-                this.saveToUserOrders(orderData);
+                // Save to user order history
+                if (window.app && window.app.currentUser) {
+                    console.log('👤 Saving to user order history...');
+                    this.saveToUserOrders(orderData);
+                    console.log('✅ Order saved to user history');
+                }
+            } catch (localError) {
+                console.error('❌ Local save failed:', localError);
+                // Don't fail the entire process if local save fails
+                if (window.app) {
+                    window.app.showToast('Commande enregistrée mais erreur de sauvegarde locale', 'warning');
+                }
             }
 
             // Clear cart
@@ -489,7 +438,10 @@ class CheckoutSystem {
 
             // Show success and redirect
             if (window.app) {
-                window.app.showToast('Commande passée avec succès !', 'success');
+                const message = apiOrderSaved 
+                    ? 'Commande passée avec succès !' 
+                    : 'Commande enregistrée localement (API indisponible)';
+                window.app.showToast(message, 'success');
                 window.app.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
             }
 
@@ -503,10 +455,7 @@ class CheckoutSystem {
             }
             
             // Re-enable submit button
-            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]') || 
-                              document.querySelector('button[type="submit"]') ||
-                              document.querySelector('[data-checkout-submit]');
-            
+            const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirmer la commande';
@@ -531,8 +480,7 @@ class CheckoutSystem {
         // Calculate totals
         const sousTotal = window.app ? window.app.getCartTotal() : 0;
         const fraisLivraison = this.getCurrentShippingCost();
-        const discount = this.appliedDiscount;
-        const total = sousTotal + fraisLivraison - discount;
+        const total = sousTotal + fraisLivraison;
 
         // Generate order number
         const orderNumber = this.generateOrderNumber();
@@ -542,7 +490,7 @@ class CheckoutSystem {
             _id: Date.now().toString(),
             numeroCommande: orderNumber,
             client: {
-                userId: window.app?.currentUser?._id || null,
+                userId: window.app?.currentUser?.id || null,
                 prenom,
                 nom,
                 email: email.toLowerCase(),
@@ -559,7 +507,6 @@ class CheckoutSystem {
             })) : [],
             sousTotal,
             fraisLivraison,
-            discount,
             total,
             statut: 'en-attente',
             modePaiement,
@@ -572,18 +519,18 @@ class CheckoutSystem {
 
     // Save order to user's order history
     saveToUserOrders(orderData) {
-        if (!window.app?.currentUser?._id) return;
+        if (!window.app?.currentUser?.id) return;
 
         try {
-            const userOrdersKey = `userOrders_${window.app.currentUser._id}`;
+            const userOrdersKey = `userOrders_${window.app.currentUser.id}`;
             let userOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
             
             // Add new order to the beginning
             userOrders.unshift(orderData);
             
-            // Keep only last 50 orders
-            if (userOrders.length > 50) {
-                userOrders = userOrders.slice(0, 50);
+            // Keep only last maxLocalOrders orders
+            if (userOrders.length > this.maxLocalOrders) {
+                userOrders = userOrders.slice(0, this.maxLocalOrders);
             }
             
             localStorage.setItem(userOrdersKey, JSON.stringify(userOrders));
@@ -591,6 +538,27 @@ class CheckoutSystem {
             
         } catch (error) {
             console.error('Error saving to user orders:', error);
+            
+            // If we get quota exceeded, try to free up space
+            if (error.name === 'QuotaExceededError') {
+                try {
+                    // Remove older orders and try again
+                    const userOrdersKey = `userOrders_${window.app.currentUser.id}`;
+                    let userOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
+                    userOrders = userOrders.slice(0, 10); // Keep only 10 most recent
+                    localStorage.setItem(userOrdersKey, JSON.stringify(userOrders));
+                    
+                    // Try to save the new order again
+                    userOrders.unshift(orderData);
+                    localStorage.setItem(userOrdersKey, JSON.stringify(userOrders));
+                    console.log('✅ Order saved after cleanup');
+                } catch (retryError) {
+                    console.error('Failed to save even after cleanup:', retryError);
+                    throw retryError;
+                }
+            } else {
+                throw error;
+            }
         }
     }
 
@@ -636,43 +604,22 @@ class CheckoutSystem {
     // Apply coupon code
     async applyCoupon(code) {
         try {
+            // This would normally call an API to validate the coupon
             console.log('Applying coupon:', code);
             
             // Placeholder for coupon logic
-            const validCoupons = {
-                'WELCOME10': { type: 'percentage', value: 10, minOrder: 2000 },
-                'SAVE500': { type: 'fixed', value: 500, minOrder: 3000 },
-                'NEWUSER': { type: 'percentage', value: 15, minOrder: 1500 }
-            };
-            
-            const coupon = validCoupons[code.toUpperCase()];
-            if (!coupon) {
+            if (code.toUpperCase() === 'WELCOME10') {
+                const discount = Math.round(window.app.getCartTotal() * 0.1);
+                this.appliedDiscount = discount;
+                this.calculateTotals();
+                
+                if (window.app) {
+                    window.app.showToast(`Coupon appliqué ! Réduction de ${discount} DA`, 'success');
+                }
+                return true;
+            } else {
                 throw new Error('Code coupon invalide');
             }
-            
-            const sousTotal = window.app ? window.app.getCartTotal() : 0;
-            if (sousTotal < coupon.minOrder) {
-                throw new Error(`Commande minimum de ${coupon.minOrder} DA requise`);
-            }
-            
-            let discount = 0;
-            if (coupon.type === 'percentage') {
-                discount = Math.round(sousTotal * coupon.value / 100);
-            } else {
-                discount = coupon.value;
-            }
-            
-            this.appliedDiscount = discount;
-            this.calculateTotals();
-            
-            if (window.app) {
-                window.app.showToast(`Coupon appliqué ! Réduction de ${discount} DA`, 'success');
-            }
-            
-            // Update coupon UI
-            this.updateCouponUI(code, discount);
-            
-            return true;
             
         } catch (error) {
             if (window.app) {
@@ -682,54 +629,14 @@ class CheckoutSystem {
         }
     }
 
-    // Update coupon UI
-    updateCouponUI(code, discount) {
-        const couponContainer = document.getElementById('appliedCoupon');
-        if (couponContainer) {
-            couponContainer.innerHTML = `
-                <div class="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div>
-                        <span class="text-green-800 font-medium">Coupon "${code}" appliqué</span>
-                        <p class="text-green-600 text-sm">Économie: ${discount} DA</p>
-                    </div>
-                    <button onclick="checkoutSystem.removeCoupon()" class="text-red-600 hover:text-red-700">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `;
-        }
-    }
-
     // Remove applied coupon
     removeCoupon() {
         this.appliedDiscount = 0;
         this.calculateTotals();
         
-        const couponContainer = document.getElementById('appliedCoupon');
-        if (couponContainer) {
-            couponContainer.innerHTML = '';
-        }
-        
-        const couponInput = document.getElementById('couponCode');
-        if (couponInput) {
-            couponInput.value = '';
-        }
-        
         if (window.app) {
             window.app.showToast('Coupon retiré', 'info');
         }
-    }
-
-    // Get order summary
-    getOrderSummary() {
-        return {
-            sousTotal: window.app ? window.app.getCartTotal() : 0,
-            fraisLivraison: this.getCurrentShippingCost(),
-            discount: this.appliedDiscount,
-            total: (window.app ? window.app.getCartTotal() : 0) + this.getCurrentShippingCost() - this.appliedDiscount,
-            items: window.app ? window.app.cart : [],
-            itemCount: window.app ? window.app.cart.reduce((sum, item) => sum + item.quantite, 0) : 0
-        };
     }
 }
 
@@ -739,8 +646,9 @@ let checkoutSystem;
 // Initialize checkout when page loads
 function initCheckout() {
     checkoutSystem = new CheckoutSystem();
+    checkoutSystem.init();
     window.checkoutSystem = checkoutSystem;
-    console.log('✅ Checkout system initialized');
+    console.log('✅ Fixed Checkout system initialized with storage management');
 }
 
 // Global functions for checkout
@@ -762,10 +670,6 @@ function applyCheckoutCoupon() {
         const code = couponInput.value.trim();
         if (code) {
             checkoutSystem.applyCoupon(code);
-        } else {
-            if (window.app) {
-                window.app.showToast('Veuillez entrer un code coupon', 'warning');
-            }
         }
     }
 }
@@ -776,20 +680,11 @@ function removeCheckoutCoupon() {
     }
 }
 
-function calculateCheckoutShipping() {
-    if (checkoutSystem) {
-        checkoutSystem.calculateShipping();
-    }
-}
-
-// Auto-initialize when DOM loads
+// Auto-initialize if DOM is already loaded
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        // Small delay to ensure app is initialized first
-        setTimeout(initCheckout, 100);
-    });
+    document.addEventListener('DOMContentLoaded', initCheckout);
 } else {
-    setTimeout(initCheckout, 100);
+    initCheckout();
 }
 
 // Export for global access
@@ -799,6 +694,5 @@ window.validateCheckoutField = validateCheckoutField;
 window.processCheckoutOrder = processCheckoutOrder;
 window.applyCheckoutCoupon = applyCheckoutCoupon;
 window.removeCheckoutCoupon = removeCheckoutCoupon;
-window.calculateCheckoutShipping = calculateCheckoutShipping;
 
-console.log('✅ Complete Checkout.js loaded successfully');
+console.log('✅ Fixed Checkout.js loaded with improved error handling and storage management');
