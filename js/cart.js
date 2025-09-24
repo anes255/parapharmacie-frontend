@@ -1,20 +1,13 @@
-// Fixed Cart System for Shifa Parapharmacie
-
-// Settings object to prevent undefined errors
-const CART_SETTINGS = {
-    FREE_SHIPPING_THRESHOLD: 5000,
-    SHIPPING_COST: 300,
-    MAX_QUANTITY: 10
-};
+// Fixed Cart System for Shifa Parapharmacie - Integrated with App
 
 class CartSystem {
     constructor() {
         this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
         this.isOpen = false;
         this.settings = {
-            fraisLivraison: CART_SETTINGS.SHIPPING_COST,
-            livraisonGratuite: CART_SETTINGS.FREE_SHIPPING_THRESHOLD,
-            maxQuantity: CART_SETTINGS.MAX_QUANTITY
+            fraisLivraison: 300,
+            livraisonGratuite: 5000,
+            maxQuantity: 10
         };
         
         this.init();
@@ -54,6 +47,11 @@ class CartSystem {
             if (e.key === 'cart') {
                 this.cart = JSON.parse(e.newValue || '[]');
                 this.updateUI();
+                
+                // Update main app cart if available
+                if (window.app) {
+                    window.app.cart = [...this.cart];
+                }
             }
         });
     }
@@ -69,9 +67,9 @@ class CartSystem {
             }
 
             if (!product) {
-                // Try to fetch from API
+                // Try to fetch from API using centralized apiCall
                 try {
-                    product = await window.apiCall(`/products/${productId}`);
+                    product = await apiCall(`/products/${productId}`);
                 } catch (error) {
                     throw new Error('Produit non trouvé');
                 }
@@ -133,6 +131,11 @@ class CartSystem {
             this.updateUI();
             this.showAddedNotification(product.nom, quantity);
 
+            // Sync with main app
+            if (window.app) {
+                window.app.cart = [...this.cart];
+            }
+
             console.log('✅ Item added to cart successfully');
             return true;
 
@@ -140,6 +143,8 @@ class CartSystem {
             console.error('❌ Error adding to cart:', error);
             if (window.app) {
                 window.app.showToast(error.message, 'error');
+            } else {
+                alert(error.message); // Fallback
             }
             return false;
         }
@@ -155,8 +160,15 @@ class CartSystem {
             this.saveCart();
             this.updateUI();
             
+            // Sync with main app
             if (window.app) {
+                window.app.cart = [...this.cart];
                 window.app.showToast(`${item.nom} retiré du panier`, 'success');
+                
+                // If on cart page, refresh it
+                if (window.app.currentPage === 'cart') {
+                    window.app.loadCartPage();
+                }
             }
             
             console.log('Item removed from cart:', item.nom);
@@ -200,6 +212,16 @@ class CartSystem {
         this.saveCart();
         this.updateUI();
         
+        // Sync with main app
+        if (window.app) {
+            window.app.cart = [...this.cart];
+            
+            // If on cart page, refresh it
+            if (window.app.currentPage === 'cart') {
+                window.app.loadCartPage();
+            }
+        }
+        
         console.log('Quantity updated:', item.nom, newQuantity);
         return true;
     }
@@ -210,8 +232,15 @@ class CartSystem {
         this.saveCart();
         this.updateUI();
         
+        // Sync with main app
         if (window.app) {
+            window.app.cart = [];
             window.app.showToast('Panier vidé', 'success');
+            
+            // If on cart page, refresh it
+            if (window.app.currentPage === 'cart') {
+                window.app.loadCartPage();
+            }
         }
         
         console.log('Cart cleared');
@@ -291,10 +320,18 @@ class CartSystem {
                 </div>
                 <h3 class="text-lg font-medium text-emerald-800 mb-2">Votre panier est vide</h3>
                 <p class="text-emerald-600 mb-6">Découvrez nos produits et ajoutez-les à votre panier</p>
-                <button onclick="cartSystem.close(); window.app?.showPage('products')" 
-                        class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                    <i class="fas fa-shopping-bag mr-2"></i>Découvrir nos produits
-                </button>
+                <div class="space-y-3">
+                    <button onclick="cartSystem.close(); ${window.app ? "window.app.showPage('products')" : "showPage('products')"}" 
+                            class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                        <i class="fas fa-shopping-bag mr-2"></i>Découvrir nos produits
+                    </button>
+                    <div>
+                        <button onclick="cartSystem.close(); ${window.app ? "window.app.showPage('cart')" : "showPage('cart')"}" 
+                                class="text-emerald-600 hover:text-emerald-800 font-medium text-sm">
+                            <i class="fas fa-shopping-cart mr-2"></i>Voir le panier complet
+                        </button>
+                    </div>
+                </div>
             </div>
         `;
     }
@@ -463,6 +500,9 @@ class CartSystem {
                     <p class="font-medium">${productName}</p>
                     <p class="text-sm opacity-90">Ajouté au panier (${quantity})</p>
                 </div>
+                <button onclick="cartSystem.open()" class="ml-3 text-white hover:text-green-200">
+                    <i class="fas fa-shopping-cart"></i>
+                </button>
             </div>
         `;
         
@@ -527,6 +567,8 @@ class CartSystem {
         if (this.cart.length === 0) {
             if (window.app) {
                 window.app.showToast('Votre panier est vide', 'warning');
+            } else {
+                alert('Votre panier est vide');
             }
             return;
         }
@@ -535,6 +577,9 @@ class CartSystem {
         
         if (window.app) {
             window.app.showPage('checkout');
+        } else {
+            // Fallback if app is not available
+            window.location.href = '#checkout';
         }
     }
 
@@ -553,6 +598,12 @@ class CartSystem {
             this.cart = cartData;
             this.saveCart();
             this.updateUI();
+            
+            // Sync with main app
+            if (window.app) {
+                window.app.cart = [...this.cart];
+            }
+            
             console.log('Cart imported successfully');
         }
     }
@@ -564,6 +615,14 @@ class CartSystem {
             totals: this.getTotals(),
             exportDate: new Date().toISOString()
         };
+    }
+
+    // View cart page
+    viewCartPage() {
+        this.close();
+        if (window.app) {
+            window.app.showPage('cart');
+        }
     }
 }
 
@@ -614,6 +673,12 @@ function proceedToCheckout() {
     }
 }
 
+function viewCartPage() {
+    if (cartSystem) {
+        cartSystem.viewCartPage();
+    }
+}
+
 // Auto-initialize if DOM is already loaded
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCart);
@@ -622,7 +687,6 @@ if (document.readyState === 'loading') {
 }
 
 // Export for global access
-window.CART_SETTINGS = CART_SETTINGS;
 window.initCart = initCart;
 window.cartSystem = cartSystem;
 window.toggleCart = toggleCart;
@@ -631,5 +695,6 @@ window.removeFromCart = removeFromCart;
 window.updateCartQuantity = updateCartQuantity;
 window.clearCart = clearCart;
 window.proceedToCheckout = proceedToCheckout;
+window.viewCartPage = viewCartPage;
 
-console.log('✅ Enhanced Cart.js loaded successfully');
+console.log('✅ Fixed Cart.js loaded with proper app integration');
