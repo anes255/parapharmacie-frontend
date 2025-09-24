@@ -1,5 +1,4 @@
-// Fixed Cart System for Shifa Parapharmacie - Integrated with App
-
+// Fixed Cart System - Properly integrated with app
 class CartSystem {
     constructor() {
         this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
@@ -19,7 +18,6 @@ class CartSystem {
         this.setupEventListeners();
     }
 
-    // Setup cart event listeners
     setupEventListeners() {
         // Cart toggle
         document.addEventListener('click', (e) => {
@@ -47,35 +45,50 @@ class CartSystem {
             if (e.key === 'cart') {
                 this.cart = JSON.parse(e.newValue || '[]');
                 this.updateUI();
-                
-                // Update main app cart if available
-                if (window.app) {
-                    window.app.cart = [...this.cart];
-                }
+                this.syncWithApp();
             }
         });
     }
 
-    // Add item to cart
+    // FIXED: Sync with main app when cart changes
+    syncWithApp() {
+        if (window.app && window.app.cart) {
+            window.app.cart = [...this.cart];
+            console.log('Cart synced with main app:', this.cart.length, 'items');
+        }
+    }
+
+    // FIXED: Add item to cart with proper product resolution
     async addItem(productId, quantity = 1, product = null) {
         try {
             console.log('Adding to cart:', productId, quantity);
 
-            // Find product if not provided
+            // FIXED: Get product from app's cache first
             if (!product && window.app?.allProducts) {
                 product = window.app.allProducts.find(p => p._id === productId);
+                console.log('Product found in app cache:', !!product);
             }
 
+            // If still not found, try to find in localStorage
             if (!product) {
-                // Try to fetch from API using centralized apiCall
+                const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+                product = localProducts.find(p => p._id === productId);
+                console.log('Product found in localStorage:', !!product);
+            }
+
+            // Last resort: try API
+            if (!product) {
                 try {
-                    product = await apiCall(`/products/${productId}`);
+                    const response = await fetch(buildApiUrl(`/products/${productId}`));
+                    if (response.ok) {
+                        product = await response.json();
+                        console.log('Product found via API:', !!product);
+                    }
                 } catch (error) {
-                    throw new Error('Produit non trouvé');
+                    console.log('API call failed:', error.message);
                 }
             }
 
-            // Validate product
             if (!product) {
                 throw new Error('Produit non trouvé');
             }
@@ -129,12 +142,8 @@ class CartSystem {
 
             this.saveCart();
             this.updateUI();
+            this.syncWithApp(); // FIXED: Sync with app
             this.showAddedNotification(product.nom, quantity);
-
-            // Sync with main app
-            if (window.app) {
-                window.app.cart = [...this.cart];
-            }
 
             console.log('✅ Item added to cart successfully');
             return true;
@@ -143,8 +152,6 @@ class CartSystem {
             console.error('❌ Error adding to cart:', error);
             if (window.app) {
                 window.app.showToast(error.message, 'error');
-            } else {
-                alert(error.message); // Fallback
             }
             return false;
         }
@@ -159,16 +166,10 @@ class CartSystem {
             this.cart.splice(itemIndex, 1);
             this.saveCart();
             this.updateUI();
+            this.syncWithApp(); // FIXED: Sync with app
             
-            // Sync with main app
             if (window.app) {
-                window.app.cart = [...this.cart];
                 window.app.showToast(`${item.nom} retiré du panier`, 'success');
-                
-                // If on cart page, refresh it
-                if (window.app.currentPage === 'cart') {
-                    window.app.loadCartPage();
-                }
             }
             
             console.log('Item removed from cart:', item.nom);
@@ -193,7 +194,6 @@ class CartSystem {
 
         const item = this.cart[itemIndex];
 
-        // Validate new quantity
         if (newQuantity > item.stock) {
             if (window.app) {
                 window.app.showToast(`Stock insuffisant. Maximum disponible: ${item.stock}`, 'error');
@@ -211,16 +211,7 @@ class CartSystem {
         item.quantite = newQuantity;
         this.saveCart();
         this.updateUI();
-        
-        // Sync with main app
-        if (window.app) {
-            window.app.cart = [...this.cart];
-            
-            // If on cart page, refresh it
-            if (window.app.currentPage === 'cart') {
-                window.app.loadCartPage();
-            }
-        }
+        this.syncWithApp(); // FIXED: Sync with app
         
         console.log('Quantity updated:', item.nom, newQuantity);
         return true;
@@ -231,16 +222,10 @@ class CartSystem {
         this.cart = [];
         this.saveCart();
         this.updateUI();
+        this.syncWithApp(); // FIXED: Sync with app
         
-        // Sync with main app
         if (window.app) {
-            window.app.cart = [];
             window.app.showToast('Panier vidé', 'success');
-            
-            // If on cart page, refresh it
-            if (window.app.currentPage === 'cart') {
-                window.app.loadCartPage();
-            }
         }
         
         console.log('Cart cleared');
@@ -261,7 +246,7 @@ class CartSystem {
         };
     }
 
-    // Save cart to localStorage
+    // FIXED: Save cart and sync
     saveCart() {
         localStorage.setItem('cart', JSON.stringify(this.cart));
         
@@ -279,14 +264,13 @@ class CartSystem {
         this.updateCartTotals();
     }
 
-    // Update cart count badge
+    // Update cart count badge  
     updateCartCount() {
         const cartCount = document.getElementById('cartCount');
         if (cartCount) {
             const totals = this.getTotals();
             cartCount.textContent = totals.itemCount;
             
-            // Add pulse animation for new items
             if (totals.itemCount > 0) {
                 cartCount.classList.add('animate-pulse');
                 setTimeout(() => cartCount.classList.remove('animate-pulse'), 1000);
@@ -320,18 +304,10 @@ class CartSystem {
                 </div>
                 <h3 class="text-lg font-medium text-emerald-800 mb-2">Votre panier est vide</h3>
                 <p class="text-emerald-600 mb-6">Découvrez nos produits et ajoutez-les à votre panier</p>
-                <div class="space-y-3">
-                    <button onclick="cartSystem.close(); ${window.app ? "window.app.showPage('products')" : "showPage('products')"}" 
-                            class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                        <i class="fas fa-shopping-bag mr-2"></i>Découvrir nos produits
-                    </button>
-                    <div>
-                        <button onclick="cartSystem.close(); ${window.app ? "window.app.showPage('cart')" : "showPage('cart')"}" 
-                                class="text-emerald-600 hover:text-emerald-800 font-medium text-sm">
-                            <i class="fas fa-shopping-cart mr-2"></i>Voir le panier complet
-                        </button>
-                    </div>
-                </div>
+                <button onclick="cartSystem.close(); window.app?.showPage('products')" 
+                        class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                    <i class="fas fa-shopping-bag mr-2"></i>Découvrir nos produits
+                </button>
             </div>
         `;
     }
@@ -410,12 +386,13 @@ class CartSystem {
         if (elements.cartShipping) {
             elements.cartShipping.textContent = `${totals.fraisLivraison} DA`;
             
-            // Style free shipping
             if (totals.fraisLivraison === 0 && totals.sousTotal > 0) {
                 elements.cartShipping.classList.add('text-green-600', 'font-semibold');
+                elements.cartShipping.classList.remove('text-gray-700');
                 elements.cartShipping.innerHTML = `<span class="line-through text-gray-400">${this.settings.fraisLivraison} DA</span> <span class="text-green-600">GRATUIT</span>`;
             } else {
                 elements.cartShipping.classList.remove('text-green-600', 'font-semibold');
+                elements.cartShipping.classList.add('text-gray-700');
             }
         }
         
@@ -423,7 +400,6 @@ class CartSystem {
             elements.cartTotal.textContent = `${totals.total} DA`;
         }
 
-        // Show free shipping progress
         this.updateShippingProgress(totals.sousTotal);
     }
 
@@ -490,7 +466,6 @@ class CartSystem {
 
     // Show notification when item is added
     showAddedNotification(productName, quantity) {
-        // Create notification element
         const notification = document.createElement('div');
         notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transform translate-x-full transition-transform duration-300';
         notification.innerHTML = `
@@ -500,20 +475,15 @@ class CartSystem {
                     <p class="font-medium">${productName}</p>
                     <p class="text-sm opacity-90">Ajouté au panier (${quantity})</p>
                 </div>
-                <button onclick="cartSystem.open()" class="ml-3 text-white hover:text-green-200">
-                    <i class="fas fa-shopping-cart"></i>
-                </button>
             </div>
         `;
         
         document.body.appendChild(notification);
         
-        // Animate in
         setTimeout(() => {
             notification.classList.remove('translate-x-full');
         }, 100);
         
-        // Animate out and remove
         setTimeout(() => {
             notification.classList.add('translate-x-full');
             setTimeout(() => {
@@ -524,7 +494,7 @@ class CartSystem {
         }, 3000);
     }
 
-    // Open cart sidebar
+    // Cart controls
     open() {
         const cartSidebar = document.getElementById('cartSidebar');
         const cartOverlay = document.getElementById('cartOverlay');
@@ -534,13 +504,10 @@ class CartSystem {
             cartOverlay.classList.remove('hidden');
             document.body.classList.add('overflow-hidden');
             this.isOpen = true;
-            
-            // Update cart content
             this.updateUI();
         }
     }
 
-    // Close cart sidebar
     close() {
         const cartSidebar = document.getElementById('cartSidebar');
         const cartOverlay = document.getElementById('cartOverlay');
@@ -553,7 +520,6 @@ class CartSystem {
         }
     }
 
-    // Toggle cart sidebar
     toggle() {
         if (this.isOpen) {
             this.close();
@@ -562,13 +528,10 @@ class CartSystem {
         }
     }
 
-    // Proceed to checkout
     proceedToCheckout() {
         if (this.cart.length === 0) {
             if (window.app) {
                 window.app.showToast('Votre panier est vide', 'warning');
-            } else {
-                alert('Votre panier est vide');
             }
             return;
         }
@@ -577,13 +540,9 @@ class CartSystem {
         
         if (window.app) {
             window.app.showPage('checkout');
-        } else {
-            // Fallback if app is not available
-            window.location.href = '#checkout';
         }
     }
 
-    // Get cart summary for checkout
     getCartSummary() {
         return {
             items: [...this.cart],
@@ -592,37 +551,22 @@ class CartSystem {
         };
     }
 
-    // Import cart (useful for merging with server cart)
     importCart(cartData) {
         if (Array.isArray(cartData)) {
             this.cart = cartData;
             this.saveCart();
             this.updateUI();
-            
-            // Sync with main app
-            if (window.app) {
-                window.app.cart = [...this.cart];
-            }
-            
+            this.syncWithApp();
             console.log('Cart imported successfully');
         }
     }
 
-    // Export cart data
     exportCart() {
         return {
             items: this.cart,
             totals: this.getTotals(),
             exportDate: new Date().toISOString()
         };
-    }
-
-    // View cart page
-    viewCartPage() {
-        this.close();
-        if (window.app) {
-            window.app.showPage('cart');
-        }
     }
 }
 
@@ -636,7 +580,7 @@ function initCart() {
     console.log('✅ Cart system initialized');
 }
 
-// Global cart functions
+// FIXED: Enhanced global cart functions
 function toggleCart() {
     if (cartSystem) {
         cartSystem.toggle();
@@ -646,6 +590,19 @@ function toggleCart() {
 function addToCart(productId, quantity = 1) {
     if (cartSystem) {
         return cartSystem.addItem(productId, quantity);
+    }
+}
+
+// FIXED: Global function for card add to cart
+function addToCartFromCard(productId, quantity = 1) {
+    console.log('Add to cart from card called:', productId);
+    if (cartSystem) {
+        return cartSystem.addItem(productId, quantity);
+    } else if (window.app && typeof window.app.addToCart === 'function') {
+        return window.app.addToCart(productId, quantity);
+    } else {
+        console.error('No cart system available');
+        return false;
     }
 }
 
@@ -673,12 +630,6 @@ function proceedToCheckout() {
     }
 }
 
-function viewCartPage() {
-    if (cartSystem) {
-        cartSystem.viewCartPage();
-    }
-}
-
 // Auto-initialize if DOM is already loaded
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCart);
@@ -691,10 +642,10 @@ window.initCart = initCart;
 window.cartSystem = cartSystem;
 window.toggleCart = toggleCart;
 window.addToCart = addToCart;
+window.addToCartFromCard = addToCartFromCard;
 window.removeFromCart = removeFromCart;
 window.updateCartQuantity = updateCartQuantity;
 window.clearCart = clearCart;
 window.proceedToCheckout = proceedToCheckout;
-window.viewCartPage = viewCartPage;
 
-console.log('✅ Fixed Cart.js loaded with proper app integration');
+console.log('✅ Fixed Cart.js loaded successfully');
