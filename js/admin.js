@@ -1,4 +1,4 @@
-// Complete Admin Panel with Full CRUD Operations - Fixed Version
+// Complete Admin Panel with Fixed API Integration and Order Display
 
 // Global variables
 let adminCurrentSection = 'dashboard';
@@ -17,7 +17,7 @@ class AdminManager {
     async init() {
         console.log('Initializing Admin Manager...');
         await this.loadProducts();
-        this.loadOrders();
+        await this.loadOrders();
     }
 
     // Check if user is admin
@@ -88,32 +88,30 @@ class AdminManager {
         }
     }
 
-    // Load products from storage
+    // Load products from storage and API
     async loadProducts() {
         try {
             // Get products from localStorage first
             let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             
-            // Try to get products from API if authenticated
-            if (this.isUserAdmin()) {
-                try {
-                    const data = await this.apiCallWithAuth('/products');
-                    if (data && data.products && data.products.length > 0) {
-                        // Merge API products with local ones, avoiding duplicates
-                        const localIds = products.map(p => p._id);
-                        const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
-                        products = [...products, ...newApiProducts];
-                        
-                        // Update localStorage with merged data
-                        localStorage.setItem('demoProducts', JSON.stringify(products));
-                    }
-                } catch (error) {
-                    console.log('API unavailable, using local products only:', error.message);
+            // Try to get products from API
+            try {
+                const data = await window.apiCall('/products'); // Use public endpoint first
+                if (data && data.products && data.products.length > 0) {
+                    // Merge API products with local ones, avoiding duplicates
+                    const localIds = products.map(p => p._id);
+                    const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
+                    products = [...products, ...newApiProducts];
+                    
+                    // Update localStorage with merged data
+                    localStorage.setItem('demoProducts', JSON.stringify(products));
                 }
+            } catch (error) {
+                console.log('Public API unavailable for products:', error.message);
             }
             
             this.allProducts = products;
-            console.log(`Loaded ${this.allProducts.length} products`);
+            console.log(`✅ Loaded ${this.allProducts.length} products`);
             
         } catch (error) {
             console.error('Error loading products:', error);
@@ -121,31 +119,88 @@ class AdminManager {
         }
     }
 
-    // Load orders with proper auth
+    // Load orders from all sources
     async loadOrders() {
         try {
-            // Always start with localStorage orders
-            let orders = [...adminOrders];
-            console.log('Local orders loaded:', orders.length);
+            console.log('📦 Loading orders from all sources...');
             
-            // Try to merge with API orders if authenticated
+            // Start with localStorage orders
+            let orders = [...adminOrders];
+            console.log(`📁 Local orders loaded: ${orders.length}`);
+            
+            // Try to get orders from API if authenticated
             if (this.isUserAdmin()) {
                 try {
-                    const data = await this.apiCallWithAuth('/admin/orders');
-                    if (data && data.orders && data.orders.length > 0) {
-                        console.log('API orders loaded:', data.orders.length);
-                        const apiOrders = data.orders.filter(apiOrder => 
-                            !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
-                        );
-                        orders = [...orders, ...apiOrders];
+                    // Try different endpoints
+                    let apiOrders = [];
+                    
+                    // Try admin endpoint first
+                    try {
+                        const adminData = await this.apiCallWithAuth('/admin/orders');
+                        if (adminData && adminData.orders) {
+                            apiOrders = adminData.orders;
+                        }
+                    } catch (adminError) {
+                        console.log('Admin orders endpoint failed, trying general orders:', adminError.message);
+                        
+                        // Try general orders endpoint
+                        try {
+                            const generalData = await this.apiCallWithAuth('/orders');
+                            if (generalData && generalData.orders) {
+                                apiOrders = generalData.orders;
+                            }
+                        } catch (generalError) {
+                            console.log('General orders endpoint also failed:', generalError.message);
+                        }
                     }
+                    
+                    if (apiOrders.length > 0) {
+                        console.log(`🌐 API orders loaded: ${apiOrders.length}`);
+                        
+                        // Merge with local orders, avoiding duplicates
+                        const localOrderNumbers = orders.map(o => o.numeroCommande);
+                        const newApiOrders = apiOrders.filter(o => 
+                            o.numeroCommande && !localOrderNumbers.includes(o.numeroCommande)
+                        );
+                        
+                        orders = [...orders, ...newApiOrders];
+                        console.log(`📋 Merged orders: ${orders.length} total`);
+                    }
+                    
                 } catch (error) {
-                    console.log('API orders unavailable:', error.message);
+                    console.log('🚫 API orders unavailable:', error.message);
                 }
             }
             
+            // Also check user-specific orders from localStorage
+            const user = window.authSystem?.currentUser || window.app?.currentUser;
+            if (user && user.id) {
+                try {
+                    const userOrdersKey = `userOrders_${user.id}`;
+                    const userOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
+                    
+                    if (userOrders.length > 0) {
+                        console.log(`👤 User-specific orders found: ${userOrders.length}`);
+                        
+                        // Merge user orders
+                        const allOrderNumbers = orders.map(o => o.numeroCommande);
+                        const newUserOrders = userOrders.filter(o => 
+                            o.numeroCommande && !allOrderNumbers.includes(o.numeroCommande)
+                        );
+                        
+                        orders = [...orders, ...newUserOrders];
+                        console.log(`👥 Including user orders: ${orders.length} total`);
+                    }
+                } catch (error) {
+                    console.log('Error loading user-specific orders:', error);
+                }
+            }
+            
+            // Sort by date, newest first
+            orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
+            
             this.orders = orders;
-            console.log(`Total orders loaded: ${this.orders.length}`);
+            console.log(`✅ Total orders loaded: ${this.orders.length}`);
             
         } catch (error) {
             console.error('Error loading orders:', error);
@@ -159,6 +214,21 @@ class AdminManager {
             window.app.showToast(message, type);
         } else {
             console.log(`${type.toUpperCase()}: ${message}`);
+            // Create a simple toast if no app toast available
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white z-50 ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 
+                type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
+            }`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 3000);
         }
     }
 
@@ -407,17 +477,25 @@ class AdminManager {
         `;
     }
 
-    // Load orders management with delete functionality
+    // Load orders management with improved loading
     async loadAdminOrders() {
         try {
-            console.log('Loading orders from admin panel...');
+            console.log('📦 Loading orders admin page...');
             
+            // Show loading state first
+            document.getElementById('adminContent').innerHTML = `
+                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                    <div class="text-center py-16">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+                        <p class="text-emerald-600">Chargement des commandes...</p>
+                    </div>
+                </div>
+            `;
+            
+            // Load orders from all sources
             await this.loadOrders();
             
-            // Sort by date, newest first
-            this.orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
-            
-            console.log('Total orders to display:', this.orders.length);
+            console.log(`📊 Displaying ${this.orders.length} orders`);
             
             document.getElementById('adminContent').innerHTML = `
                 <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
@@ -439,8 +517,10 @@ class AdminManager {
                             <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
                             <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées</p>
                             <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
-                                <h4 class="font-semibold text-blue-800 mb-2">Info:</h4>
-                                <p class="text-sm text-blue-700">Les commandes sont automatiquement ajoutées ici lors du checkout</p>
+                                <h4 class="font-semibold text-blue-800 mb-2">Pour tester:</h4>
+                                <p class="text-sm text-blue-700">1. Ajoutez des produits au panier</p>
+                                <p class="text-sm text-blue-700">2. Procédez au checkout</p>
+                                <p class="text-sm text-blue-700">3. Les commandes apparaîtront ici</p>
                             </div>
                         </div>
                     ` : `
@@ -464,16 +544,16 @@ class AdminManager {
                                                 <div class="text-sm text-emerald-600">${order.articles?.length || 0} article(s)</div>
                                             </td>
                                             <td class="py-4 px-6">
-                                                <div class="font-medium text-gray-900">${order.client?.prenom} ${order.client?.nom}</div>
-                                                <div class="text-sm text-gray-600">${order.client?.email}</div>
-                                                <div class="text-xs text-gray-500">${order.client?.wilaya}</div>
+                                                <div class="font-medium text-gray-900">${order.client?.prenom || 'N/A'} ${order.client?.nom || ''}</div>
+                                                <div class="text-sm text-gray-600">${order.client?.email || 'N/A'}</div>
+                                                <div class="text-xs text-gray-500">${order.client?.wilaya || 'N/A'}</div>
                                             </td>
                                             <td class="py-4 px-6">
                                                 <div class="text-sm text-gray-900">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</div>
                                                 <div class="text-xs text-gray-500">${new Date(order.dateCommande).toLocaleTimeString('fr-FR')}</div>
                                             </td>
                                             <td class="py-4 px-6">
-                                                <div class="font-semibold text-emerald-700">${order.total} DA</div>
+                                                <div class="font-semibold text-emerald-700">${order.total || 0} DA</div>
                                                 <div class="text-sm text-gray-600">Livraison: ${order.fraisLivraison || 0} DA</div>
                                             </td>
                                             <td class="py-4 px-6">
@@ -653,13 +733,13 @@ class AdminManager {
         return labels[statut] || statut;
     }
 
-    // Save product (create or update)
+    // FIXED: Save product with correct API endpoint
     async saveProduct(productData, isEditing = false) {
         try {
-            console.log('Saving product:', productData);
+            console.log('💾 Saving product:', productData);
             this.isProcessing = true;
 
-            // Save to localStorage first
+            // Save to localStorage first (always works)
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             
             if (isEditing) {
@@ -671,42 +751,69 @@ class AdminManager {
                     localProducts.push(productData);
                 }
             } else {
-                // Add new product
-                productData._id = Date.now().toString();
+                // Add new product - generate ID if not present
+                if (!productData._id) {
+                    productData._id = Date.now().toString();
+                }
                 localProducts.push(productData);
             }
             
             // Save back to localStorage
             localStorage.setItem('demoProducts', JSON.stringify(localProducts));
-            console.log('Product saved to localStorage');
+            console.log('✅ Product saved to localStorage');
             
-            // Try to save to API if authenticated
-            if (this.isUserAdmin()) {
-                try {
+            // Try to save to API - CORRECTED ENDPOINT
+            let apiSaved = false;
+            try {
+                // Use correct endpoint based on authentication
+                if (this.isUserAdmin()) {
                     const endpoint = isEditing ? `/admin/products/${productData._id}` : '/admin/products';
                     const method = isEditing ? 'PUT' : 'POST';
                     
-                    await this.apiCallWithAuth(endpoint, {
+                    console.log(`🌐 Attempting API save: ${method} ${endpoint}`);
+                    
+                    const response = await this.apiCallWithAuth(endpoint, {
                         method: method,
                         body: JSON.stringify(productData)
                     });
                     
-                    console.log('Product saved to API successfully');
-                } catch (error) {
-                    console.log('API save failed but product saved locally:', error.message);
+                    console.log('✅ Product saved to API successfully:', response);
+                    apiSaved = true;
+                } else {
+                    // Try public endpoint for non-admin users (if available)
+                    try {
+                        const endpoint = isEditing ? `/products/${productData._id}` : '/products';
+                        const method = isEditing ? 'PUT' : 'POST';
+                        
+                        console.log(`🌐 Attempting public API save: ${method} ${endpoint}`);
+                        
+                        const response = await window.apiCall(endpoint, {
+                            method: method,
+                            body: JSON.stringify(productData)
+                        });
+                        
+                        console.log('✅ Product saved to public API successfully:', response);
+                        apiSaved = true;
+                    } catch (publicError) {
+                        console.log('⚠️ Public API save failed:', publicError.message);
+                    }
                 }
+            } catch (apiError) {
+                console.log('⚠️ API save failed but product saved locally:', apiError.message);
             }
             
             // Refresh products cache
             await this.loadProducts();
             
             // Show success message
-            this.showToast(isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 'success');
+            const message = isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès';
+            const fullMessage = apiSaved ? `${message} (API et local)` : `${message} (local uniquement)`;
+            this.showToast(fullMessage, 'success');
             
             return true;
             
         } catch (error) {
-            console.error('Error saving product:', error);
+            console.error('❌ Error saving product:', error);
             this.showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
             return false;
         } finally {
@@ -717,7 +824,7 @@ class AdminManager {
     // Delete order
     async deleteOrder(orderId) {
         try {
-            console.log('Deleting order:', orderId);
+            console.log('🗑️ Deleting order:', orderId);
             
             // Delete from localStorage
             let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
@@ -727,7 +834,7 @@ class AdminManager {
             adminOrders = orders;
             
             const localDeleteSuccess = orders.length < initialCount;
-            console.log('Order deleted locally:', localDeleteSuccess);
+            console.log('✅ Order deleted locally:', localDeleteSuccess);
             
             // Try to delete from API if authenticated
             if (this.isUserAdmin()) {
@@ -735,9 +842,9 @@ class AdminManager {
                     await this.apiCallWithAuth(`/admin/orders/${orderId}`, {
                         method: 'DELETE'
                     });
-                    console.log('Order deleted from API successfully');
+                    console.log('✅ Order deleted from API successfully');
                 } catch (error) {
-                    console.log('API delete failed but order deleted locally:', error.message);
+                    console.log('⚠️ API delete failed but order deleted locally:', error.message);
                 }
             }
             
@@ -750,7 +857,7 @@ class AdminManager {
             }
             
         } catch (error) {
-            console.error('Error deleting order:', error);
+            console.error('❌ Error deleting order:', error);
             this.showToast('Erreur lors de la suppression', 'error');
         }
     }
@@ -767,16 +874,23 @@ async function initAdminManager() {
     console.log('✅ Admin manager initialized');
 }
 
-// Function to add order to demo (called from checkout) - FIXED
+// IMPROVED: Function to add order to demo - FIXED for proper display
 window.addOrderToDemo = function(orderData) {
-    console.log('Adding order to demo:', orderData);
+    console.log('📦 Adding order to admin system:', orderData);
     
     try {
-        // Ensure the order has a valid structure
+        // Ensure the order has a valid structure with all required fields
         const validOrder = {
             _id: orderData._id || Date.now().toString(),
             numeroCommande: orderData.numeroCommande,
-            client: orderData.client,
+            client: {
+                prenom: orderData.client?.prenom || 'Client',
+                nom: orderData.client?.nom || 'Anonyme', 
+                email: orderData.client?.email || 'client@example.com',
+                telephone: orderData.client?.telephone || '0000000000',
+                adresse: orderData.client?.adresse || 'Adresse non spécifiée',
+                wilaya: orderData.client?.wilaya || 'Alger'
+            },
             articles: orderData.articles || [],
             sousTotal: orderData.sousTotal || 0,
             fraisLivraison: orderData.fraisLivraison || 0,
@@ -787,16 +901,17 @@ window.addOrderToDemo = function(orderData) {
             commentaires: orderData.commentaires || ''
         };
         
-        // Add to localStorage
+        // Add to localStorage for admin
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         
         // Check for duplicates based on numeroCommande
         const existingIndex = orders.findIndex(o => o.numeroCommande === validOrder.numeroCommande);
         if (existingIndex > -1) {
-            console.log('Order already exists, updating...');
+            console.log('🔄 Order already exists, updating...');
             orders[existingIndex] = validOrder;
         } else {
-            orders.unshift(validOrder);
+            console.log('➕ Adding new order to admin list');
+            orders.unshift(validOrder); // Add to beginning
         }
         
         localStorage.setItem('adminOrders', JSON.stringify(orders));
@@ -804,16 +919,30 @@ window.addOrderToDemo = function(orderData) {
         // Update global variable
         adminOrders = orders;
         
-        console.log('Order added successfully. Total orders:', orders.length);
-        console.log('Order details:', validOrder);
+        console.log(`✅ Order added successfully. Total admin orders: ${orders.length}`);
+        console.log('📋 Order details:', validOrder);
+        
+        // If admin manager is loaded, refresh the orders
+        if (window.adminManager) {
+            window.adminManager.loadOrders().then(() => {
+                console.log('🔄 Admin orders refreshed after new order');
+                // Refresh the admin orders display if currently viewing
+                if (adminCurrentSection === 'orders') {
+                    window.adminManager.loadAdminOrders();
+                }
+            });
+        }
         
         return validOrder;
         
     } catch (error) {
-        console.error('Error adding order to demo:', error);
+        console.error('❌ Error adding order to admin:', error);
         return null;
     }
 };
+
+// All the modal and CRUD functions remain the same from previous version
+// ... (keeping all the modal functions from the previous complete version)
 
 // COMPLETE PRODUCT MODAL FUNCTIONS
 function openAddProductModal() {
@@ -1109,7 +1238,7 @@ function closeProductModal() {
     currentEditingProduct = null;
 }
 
-// New function to save product directly
+// Save product function
 async function saveProduct() {
     const form = document.getElementById('productForm');
     const isEditing = !!currentEditingProduct;
@@ -1160,7 +1289,7 @@ async function saveProduct() {
             actif: actif,
             enVedette: enVedette,
             enPromotion: enPromotion,
-            dateAjout: new Date().toISOString()
+            dateAjout: currentEditingProduct?.dateAjout || new Date().toISOString()
         };
         
         // Add optional fields
@@ -1208,6 +1337,9 @@ async function saveProduct() {
         spinner.classList.add('hidden');
     }
 }
+
+// All other functions remain the same...
+// Product operations, order management, modals, etc.
 
 // Product operations
 async function toggleFeatured(productId, newStatus) {
@@ -1282,8 +1414,6 @@ async function deleteProduct(productId) {
             
             if (adminCurrentSection === 'products') {
                 adminManager.loadAdminProducts();
-            } else if (adminCurrentSection === 'featured') {
-                adminManager.loadAdminFeatured();
             }
             
         } catch (error) {
@@ -1298,8 +1428,8 @@ async function viewOrderDetails(orderId) {
     try {
         console.log('Viewing order details for:', orderId);
         
-        // Find order in localStorage first
-        let order = adminOrders.find(o => o._id === orderId || o.numeroCommande === orderId);
+        // Find order in orders array first
+        let order = adminManager.orders.find(o => o._id === orderId || o.numeroCommande === orderId);
         
         if (order) {
             // Create detailed order modal
@@ -1557,4 +1687,4 @@ window.closeOrderDetailModal = closeOrderDetailModal;
 window.deleteOrder = deleteOrder;
 window.previewImage = previewImage;
 
-console.log('✅ Complete Admin System loaded with full CRUD operations');
+console.log('✅ Fixed Admin System loaded with API integration and order display');
