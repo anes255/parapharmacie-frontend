@@ -1,4 +1,4 @@
-// Fixed Checkout System for Shifa Parapharmacie - Integrated with Admin Orders
+// Final Fixed Checkout System - Correct API Format
 
 class CheckoutSystem {
     constructor() {
@@ -40,14 +40,13 @@ class CheckoutSystem {
             return;
         }
 
+        // FIXED: Map cart items to correct API format
         this.orderData.articles = cart.map(item => ({
-            id: item.id,
+            productId: item.id,  // API expects 'productId', not 'id'
             nom: item.nom,
             prix: item.prix,
             quantite: item.quantite,
-            image: item.image,
-            categorie: item.categorie,
-            marque: item.marque
+            image: item.image || ''
         }));
 
         this.calculateTotals();
@@ -491,32 +490,32 @@ class CheckoutSystem {
             // Generate order number
             const orderNumber = 'CMD' + Date.now().toString().slice(-6);
             
-            // Prepare final order data
+            // FIXED: Prepare final order data with correct format
             const finalOrderData = {
-                _id: Date.now().toString(),
                 numeroCommande: orderNumber,
                 client: this.orderData.client,
-                articles: this.orderData.articles,
+                articles: this.orderData.articles,  // Already in correct format with productId
                 sousTotal: this.orderData.sousTotal,
                 fraisLivraison: this.orderData.fraisLivraison,
                 total: this.orderData.total,
-                statut: 'en-attente',
                 modePaiement: 'Paiement à la livraison',
-                dateCommande: new Date().toISOString(),
                 commentaires: this.orderData.commentaires
             };
 
             this.orderData.numeroCommande = orderNumber;
 
+            console.log('💳 Sending order to API:', finalOrderData);
+
             // Save order to localStorage (for admin panel)
             this.saveOrderToLocalStorage(finalOrderData);
 
-            // Try to save to API
+            // Try to save to API with retry logic
             try {
-                await this.saveOrderToAPI(finalOrderData);
+                await this.saveOrderToAPIWithRetry(finalOrderData);
                 console.log('✅ Order saved to API successfully');
             } catch (error) {
                 console.log('⚠️ API save failed, order saved locally:', error.message);
+                // Continue with local save - don't fail the entire process
             }
 
             // Clear cart
@@ -543,14 +542,22 @@ class CheckoutSystem {
 
     saveOrderToLocalStorage(orderData) {
         try {
+            // Add to admin orders with additional fields needed locally
+            const localOrderData = {
+                ...orderData,
+                _id: Date.now().toString(),
+                statut: 'en-attente',
+                dateCommande: new Date().toISOString()
+            };
+
             // Add to admin orders
             if (typeof window.addOrderToDemo === 'function') {
-                window.addOrderToDemo(orderData);
+                window.addOrderToDemo(localOrderData);
                 console.log('✅ Order added to admin demo system');
             } else {
                 // Fallback: save directly to localStorage
                 let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-                adminOrders.unshift(orderData);
+                adminOrders.unshift(localOrderData);
                 localStorage.setItem('adminOrders', JSON.stringify(adminOrders));
                 console.log('✅ Order saved to localStorage directly');
             }
@@ -560,20 +567,38 @@ class CheckoutSystem {
         }
     }
 
-    async saveOrderToAPI(orderData) {
-        try {
-            const response = await apiCall('/orders', {
-                method: 'POST',
-                body: JSON.stringify(orderData)
-            });
-            
-            console.log('API order response:', response);
-            return response;
-        } catch (error) {
-            console.error('API order save failed:', error);
-            // Don't throw error, let order save locally
-            throw error;
+    async saveOrderToAPIWithRetry(orderData, maxRetries = 3) {
+        let lastError = null;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`🔄 API Save Attempt ${attempt}/${maxRetries}`);
+                
+                const response = await apiCall('/orders', {
+                    method: 'POST',
+                    body: JSON.stringify(orderData)
+                });
+                
+                console.log('✅ API order response:', response);
+                return response;
+                
+            } catch (error) {
+                lastError = error;
+                console.error(`❌ API Save Attempt ${attempt} failed:`, error.message);
+                
+                // Don't retry on client errors (400-499)
+                if (error.message.includes('400') || error.message.includes('401') || error.message.includes('403')) {
+                    throw error;
+                }
+                
+                // Wait before retrying
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                }
+            }
         }
+        
+        throw lastError;
     }
 
     clearCart() {
@@ -617,4 +642,4 @@ PharmacieGaherApp.prototype.loadCheckoutPage = async function() {
 window.initCheckout = initCheckout;
 window.checkoutSystem = checkoutSystem;
 
-console.log('✅ Fixed Checkout.js loaded with proper order integration');
+console.log('✅ Final Fixed Checkout.js loaded with correct API format');
