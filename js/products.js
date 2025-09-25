@@ -1,847 +1,671 @@
-// Complete Products Management System - FIXED VERSION
+// Fixed PharmacieGaherApp Products functionality with createProductCard function
+class PharmacieGaherApp {
+    constructor() {
+        this.apiUrl = window.API_CONFIG?.baseURL || 'https://parapharmacie-gaher.onrender.com';
+        this.currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+        this.authToken = localStorage.getItem('authToken');
+        this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        this.allProducts = JSON.parse(localStorage.getItem('products') || '[]');
+        this.currentProductsFilter = null;
+        this.currentSearchQuery = '';
+        
+        console.log('Products JS initialized');
+    }
 
-// FIXED: Enhanced products page loading with proper API integration
-PharmacieGaherApp.prototype.loadProductsPage = async function(params = {}) {
-    try {
-        console.log('Loading products page with params:', params);
-        
-        // Get products from cache first
-        let allProducts = [...this.allProducts];
-        
-        // Try to get fresh products from API
+    // Load products page with proper error handling
+    async loadProductsPage(params = {}) {
         try {
-            const response = await fetch(buildApiUrl('/products'), {
-                headers: this.getAuthHeaders()
-            });
+            console.log('📦 Loading products page with params:', params);
             
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.products && data.products.length > 0) {
-                    // Update cache with API products
-                    allProducts = data.products;
-                    this.allProducts = [...allProducts];
-                    localStorage.setItem('demoProducts', JSON.stringify(allProducts));
-                    console.log('✅ Products updated from API');
+            const { 
+                category = '', 
+                search = '', 
+                featured = false, 
+                promotion = false,
+                page = 1,
+                limit = 20
+            } = params;
+
+            // Update internal state
+            this.currentProductsFilter = params;
+            this.currentSearchQuery = search;
+
+            let filteredProducts = [];
+            
+            // Try to load from API first
+            try {
+                const queryParams = new URLSearchParams({
+                    page: page.toString(),
+                    limit: limit.toString(),
+                    ...(category && { categorie: category }),
+                    ...(search && { search }),
+                    ...(featured && { enVedette: 'true' }),
+                    ...(promotion && { enPromotion: 'true' })
+                });
+
+                const response = await fetch(`${this.apiUrl}/api/products?${queryParams}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    filteredProducts = data.products || data;
+                    
+                    // Update local cache
+                    if (!search && !category && !featured && !promotion) {
+                        this.allProducts = filteredProducts;
+                        localStorage.setItem('products', JSON.stringify(filteredProducts));
+                    }
+                    
+                    console.log('✅ Products loaded from API:', filteredProducts.length);
+                } else {
+                    throw new Error('API not available');
                 }
+                
+            } catch (apiError) {
+                console.log('⚠️ API unavailable, using cached products');
+                
+                // Filter local products
+                filteredProducts = this.allProducts.filter(product => {
+                    if (!product.actif && product.actif !== undefined) return false;
+                    if (category && product.categorie !== category) return false;
+                    if (search && !product.nom.toLowerCase().includes(search.toLowerCase()) && 
+                        !product.description.toLowerCase().includes(search.toLowerCase())) return false;
+                    if (featured && !product.enVedette) return false;
+                    if (promotion && !product.enPromotion) return false;
+                    return true;
+                });
             }
-        } catch (error) {
-            console.log('⚠️ API unavailable, using cached products');
-        }
-        
-        // Apply filters
-        let filteredProducts = allProducts.filter(product => product.actif !== false);
-        
-        // Filter by category if specified
-        if (params.categorie) {
-            filteredProducts = filteredProducts.filter(p => p.categorie === params.categorie);
-        }
-        
-        // Filter by search if specified
-        if (params.search) {
-            const searchTerm = params.search.toLowerCase();
-            filteredProducts = filteredProducts.filter(p => 
-                p.nom.toLowerCase().includes(searchTerm) ||
-                p.description?.toLowerCase().includes(searchTerm) ||
-                p.marque?.toLowerCase().includes(searchTerm) ||
-                p.categorie.toLowerCase().includes(searchTerm)
-            );
-        }
-        
-        // Sort products
-        filteredProducts.sort((a, b) => {
-            // Featured products first
-            if (a.enVedette && !b.enVedette) return -1;
-            if (!a.enVedette && b.enVedette) return 1;
+
+            // Build page title
+            let pageTitle = 'Nos Produits';
+            let pageSubtitle = 'Découvrez notre large gamme de produits parapharmaceutiques';
             
-            // Then by date (newest first)
-            return new Date(b.dateAjout || 0) - new Date(a.dateAjout || 0);
-        });
-        
-        const mainContent = document.getElementById('mainContent');
-        
-        // Build page title
-        let pageTitle = 'Nos Produits';
-        let pageSubtitle = `${filteredProducts.length} produit(s) disponible(s)`;
-        
-        if (params.categorie) {
-            pageTitle = `Catégorie: ${params.categorie}`;
-        } else if (params.search) {
-            pageTitle = `Recherche: "${params.search}"`;
-        }
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <!-- Page Header -->
-                <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">${pageTitle}</h1>
-                    <p class="text-xl text-emerald-600">${pageSubtitle}</p>
-                    ${params.categorie || params.search ? `
-                        <div class="mt-4">
-                            <button onclick="app.showPage('products')" class="text-emerald-600 hover:text-emerald-800 font-medium">
-                                <i class="fas fa-arrow-left mr-2"></i>Voir tous les produits
+            if (category) {
+                pageTitle = `Catégorie: ${category}`;
+                pageSubtitle = `Produits dans la catégorie ${category}`;
+            } else if (search) {
+                pageTitle = `Recherche: "${search}"`;
+                pageSubtitle = `${filteredProducts.length} produit(s) trouvé(s)`;
+            } else if (featured) {
+                pageTitle = 'Produits en Vedette';
+                pageSubtitle = 'Nos produits les plus populaires';
+            } else if (promotion) {
+                pageTitle = 'Produits en Promotion';
+                pageSubtitle = 'Profitez de nos offres spéciales';
+            }
+
+            // Get categories for filter
+            const categories = [...new Set(this.allProducts.map(p => p.categorie).filter(Boolean))].sort();
+
+            document.getElementById('main-content').innerHTML = `
+                <div class="container mx-auto px-4 py-8">
+                    <!-- Header Section -->
+                    <div class="text-center mb-12">
+                        <h1 class="text-4xl font-bold text-gray-800 mb-4">${pageTitle}</h1>
+                        <p class="text-xl text-gray-600 max-w-3xl mx-auto">${pageSubtitle}</p>
+                    </div>
+
+                    <!-- Filters and Search -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+                        <div class="flex flex-col lg:flex-row gap-4 items-center">
+                            <!-- Search Bar -->
+                            <div class="flex-1 w-full lg:w-auto">
+                                <div class="relative">
+                                    <input type="text" id="product-search" placeholder="Rechercher un produit..." 
+                                           value="${search}"
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                                    <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Category Filter -->
+                            <div class="w-full lg:w-auto">
+                                <select id="category-filter" class="w-full lg:w-48 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                    <option value="">Toutes les catégories</option>
+                                    ${categories.map(cat => `
+                                        <option value="${cat}" ${cat === category ? 'selected' : ''}>${cat}</option>
+                                    `).join('')}
+                                </select>
+                            </div>
+
+                            <!-- Filter Buttons -->
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="app.loadProductsPage({featured: true})" 
+                                        class="px-4 py-2 rounded-lg transition-colors ${featured ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                                    ⭐ Vedette
+                                </button>
+                                <button onclick="app.loadProductsPage({promotion: true})" 
+                                        class="px-4 py-2 rounded-lg transition-colors ${promotion ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                                    🏷️ Promotion
+                                </button>
+                                <button onclick="app.loadProductsPage()" 
+                                        class="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors">
+                                    🔄 Tout afficher
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Products Grid -->
+                    <div id="products-container">
+                        ${filteredProducts.length === 0 ? `
+                            <div class="text-center py-16">
+                                <svg class="w-24 h-24 text-gray-300 mx-auto mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                </svg>
+                                <h3 class="text-2xl font-bold text-gray-800 mb-2">Aucun produit trouvé</h3>
+                                <p class="text-gray-600 mb-6">Aucun produit ne correspond à vos critères de recherche.</p>
+                                <button onclick="app.loadProductsPage()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg transition-colors">
+                                    Voir tous les produits
+                                </button>
+                            </div>
+                        ` : `
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                ${filteredProducts.map(product => this.createProductCard(product)).join('')}
+                            </div>
+                        `}
+                    </div>
+
+                    <!-- Load More Button (if needed) -->
+                    ${filteredProducts.length >= limit ? `
+                        <div class="text-center mt-12">
+                            <button onclick="app.loadMoreProducts()" id="load-more-btn" 
+                                    class="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-lg transition-colors">
+                                Charger plus de produits
                             </button>
                         </div>
                     ` : ''}
                 </div>
-                
-                <!-- Categories Filter -->
-                ${!params.categorie ? `
-                    <div class="mb-8">
-                        <h3 class="text-lg font-semibold text-emerald-700 mb-4">Filtrer par catégorie:</h3>
-                        <div class="flex flex-wrap gap-2">
-                            <button onclick="app.showPage('products')" class="px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full hover:bg-emerald-200 transition-all font-medium">
-                                Toutes les catégories
-                            </button>
-                            ${this.getAvailableCategories().map(cat => `
-                                <button onclick="app.filterByCategory('${cat}')" class="px-4 py-2 bg-white border border-emerald-200 text-emerald-700 rounded-full hover:bg-emerald-50 transition-all">
-                                    ${cat}
-                                </button>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-                
-                <!-- Search Bar -->
-                <div class="mb-8">
-                    <div class="max-w-md mx-auto">
-                        <div class="relative">
-                            <input type="text" id="productsSearchInput" placeholder="Rechercher un produit..." 
-                                   value="${params.search || ''}"
-                                   class="w-full px-4 py-3 pl-12 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 transition-all"
-                                   onkeypress="handleProductsSearch(event)">
-                            <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-emerald-400"></i>
-                            <button onclick="searchProducts()" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-all">
-                                Rechercher
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Products Grid -->
-                <div class="products-container">
-                    ${filteredProducts.length === 0 ? `
-                        <div class="text-center py-16">
-                            <i class="fas fa-search text-6xl text-emerald-200 mb-6"></i>
-                            <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit trouvé</h3>
-                            <p class="text-emerald-600 mb-8">
-                                ${params.search ? `Aucun produit ne correspond à votre recherche "${params.search}"` : 
-                                  params.categorie ? `Aucun produit dans la catégorie "${params.categorie}"` : 
-                                  'Aucun produit disponible pour le moment'}
-                            </p>
-                            <button onclick="app.showPage('products')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                                <i class="fas fa-arrow-left mr-2"></i>Retour aux produits
-                            </button>
-                        </div>
-                    ` : `
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            ${filteredProducts.map(product => this.createProductCard(product)).join('')}
-                        </div>
-                    `}
-                </div>
-                
-                <!-- Load More Button (if many products) -->
-                ${filteredProducts.length > 12 ? `
-                    <div class="text-center mt-12">
-                        <button onclick="loadMoreProducts()" class="bg-emerald-100 text-emerald-700 font-bold py-3 px-8 rounded-xl hover:bg-emerald-200 transition-all">
-                            <i class="fas fa-plus mr-2"></i>Charger plus de produits
-                        </button>
-                    </div>
-                ` : ''}
-                
-                <!-- Back to Top -->
-                ${filteredProducts.length > 8 ? `
-                    <div class="fixed bottom-8 right-8 z-40">
-                        <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" 
-                                class="bg-emerald-500 text-white p-4 rounded-full shadow-lg hover:bg-emerald-600 transition-all hover:scale-105">
-                            <i class="fas fa-arrow-up"></i>
-                        </button>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-        
-        // Set up search functionality
-        this.setupProductsSearch();
-        
-    } catch (error) {
-        console.error('Error loading products page:', error);
-        document.getElementById('mainContent').innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="text-center py-16">
-                    <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-6"></i>
-                    <h3 class="text-2xl font-bold text-red-800 mb-4">Erreur de chargement</h3>
-                    <p class="text-red-600 mb-8">Impossible de charger les produits</p>
-                    <button onclick="app.showPage('products')" class="bg-red-500 text-white font-bold py-3 px-8 rounded-xl hover:bg-red-600 transition-all">
-                        <i class="fas fa-refresh mr-2"></i>Réessayer
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-};
+            `;
 
-// Enhanced product page loading
-PharmacieGaherApp.prototype.loadProductPage = async function(productId) {
-    try {
-        console.log('Loading product page for ID:', productId);
-        
-        // Find product in cache first
-        let product = this.allProducts.find(p => p._id === productId);
-        
-        // If not in cache, try API
-        if (!product) {
-            try {
-                const response = await fetch(buildApiUrl(`/products/${productId}`), {
-                    headers: this.getAuthHeaders()
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    product = data.product || data;
-                }
-            } catch (error) {
-                console.log('API unavailable for single product');
-            }
-        }
-        
-        if (!product) {
-            throw new Error('Produit non trouvé');
-        }
-        
-        const isOutOfStock = product.stock === 0;
-        const hasPromotion = product.enPromotion && product.prixOriginal;
-        
-        // Generate related products (same category)
-        const relatedProducts = this.allProducts
-            .filter(p => p.categorie === product.categorie && p._id !== product._id && p.actif !== false)
-            .slice(0, 4);
-        
-        document.getElementById('mainContent').innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <!-- Breadcrumb -->
-                <nav class="flex items-center space-x-2 text-sm text-emerald-600 mb-8">
-                    <a href="#" onclick="app.showPage('home')" class="hover:text-emerald-800">Accueil</a>
-                    <i class="fas fa-chevron-right text-xs"></i>
-                    <a href="#" onclick="app.showPage('products')" class="hover:text-emerald-800">Produits</a>
-                    <i class="fas fa-chevron-right text-xs"></i>
-                    <a href="#" onclick="app.filterByCategory('${product.categorie}')" class="hover:text-emerald-800">${product.categorie}</a>
-                    <i class="fas fa-chevron-right text-xs"></i>
-                    <span class="text-emerald-800 font-medium">${product.nom}</span>
-                </nav>
-                
-                <!-- Product Details -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
-                    <!-- Product Image -->
-                    <div class="relative">
-                        ${hasPromotion ? `<div class="badge-promotion absolute top-4 left-4 z-20">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
-                        ${isOutOfStock ? `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10 rounded-2xl">
-                            <span class="text-white font-bold text-xl">Rupture de stock</span>
-                        </div>` : ''}
-                        
-                        <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl overflow-hidden">
-                            <img src="${product.image || this.generatePlaceholderImage(product)}" 
-                                 alt="${product.nom}" 
-                                 class="w-full h-full object-cover"
-                                 onerror="this.src='${this.generatePlaceholderImage(product)}'">
+            // Add event listeners
+            this.initProductsEventListeners();
+            
+            console.log('✅ Products page loaded successfully');
+
+        } catch (error) {
+            console.error('❌ Error loading products page:', error);
+            document.getElementById('main-content').innerHTML = `
+                <div class="container mx-auto px-4 py-8">
+                    <div class="text-center">
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-8">
+                            <svg class="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <h2 class="text-2xl font-bold text-red-600 mb-2">Erreur de chargement</h2>
+                            <p class="text-red-700 mb-4">Impossible de charger les produits: ${error.message}</p>
+                            <button onclick="location.reload()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-colors">
+                                Réessayer
+                            </button>
                         </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Create product card HTML - CRITICAL FUNCTION
+    createProductCard(product) {
+        if (!product) return '';
+        
+        const imageUrl = (product.images && product.images[0]) || 'https://via.placeholder.com/300x300?text=Produit';
+        const hasPromotion = product.enPromotion && product.prixOriginal && product.prixOriginal > product.prix;
+        const discountPercent = hasPromotion ? Math.round(((product.prixOriginal - product.prix) / product.prixOriginal) * 100) : 0;
+        
+        return `
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group overflow-hidden">
+                <!-- Product Image -->
+                <div class="relative overflow-hidden">
+                    <img src="${imageUrl}" alt="${product.nom}" 
+                         class="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+                         onerror="this.src='https://via.placeholder.com/300x300?text=Image+non+disponible'">
+                    
+                    <!-- Badges -->
+                    <div class="absolute top-3 left-3 flex flex-col space-y-1">
+                        ${product.enVedette ? `
+                            <span class="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                ⭐ Vedette
+                            </span>
+                        ` : ''}
+                        ${hasPromotion ? `
+                            <span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                -${discountPercent}%
+                            </span>
+                        ` : ''}
+                        ${product.stock <= 5 && product.stock > 0 ? `
+                            <span class="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                Stock limité
+                            </span>
+                        ` : ''}
+                        ${product.stock === 0 ? `
+                            <span class="bg-gray-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                Rupture
+                            </span>
+                        ` : ''}
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <button onclick="app.viewProductDetails('${product._id}')" 
+                                class="bg-white bg-opacity-90 hover:bg-opacity-100 p-2 rounded-full shadow-md transition-all">
+                            <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Product Info -->
+                <div class="p-4">
+                    <div class="mb-2">
+                        <span class="text-sm text-emerald-600 font-medium">${product.categorie || 'Santé'}</span>
+                        ${product.marque ? `<span class="text-sm text-gray-500"> • ${product.marque}</span>` : ''}
                     </div>
                     
-                    <!-- Product Info -->
-                    <div class="space-y-6">
-                        <div>
-                            <h1 class="text-3xl font-bold text-emerald-800 mb-2">${product.nom}</h1>
-                            ${product.marque ? `<p class="text-emerald-600 text-lg">${product.marque}</p>` : ''}
-                            <span class="inline-block bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-medium mt-2">${product.categorie}</span>
-                        </div>
-                        
-                        <div class="space-y-2">
+                    <h3 class="font-semibold text-gray-800 mb-2 line-clamp-2 min-h-[2.5rem]" title="${product.nom}">
+                        ${product.nom}
+                    </h3>
+                    
+                    <p class="text-sm text-gray-600 mb-3 line-clamp-2 min-h-[2.5rem]">
+                        ${product.description || 'Description non disponible'}
+                    </p>
+
+                    <!-- Price -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xl font-bold text-emerald-600">
+                                ${parseFloat(product.prix).toFixed(2)}€
+                            </span>
                             ${hasPromotion ? `
-                                <div class="flex items-center space-x-3">
-                                    <span class="text-2xl text-gray-400 line-through">${product.prixOriginal} DA</span>
-                                    <span class="text-3xl font-bold text-red-600">${product.prix} DA</span>
-                                    <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-sm font-bold">PROMO</span>
-                                </div>
-                                <p class="text-sm text-red-600">Vous économisez ${product.prixOriginal - product.prix} DA</p>
-                            ` : `
-                                <span class="text-3xl font-bold text-emerald-700">${product.prix} DA</span>
-                            `}
-                            <p class="text-emerald-600">
-                                Stock: <span class="font-semibold ${product.stock <= 5 ? 'text-orange-600' : 'text-emerald-600'}">${product.stock} unité(s)</span>
-                            </p>
+                                <span class="text-sm text-gray-500 line-through">
+                                    ${parseFloat(product.prixOriginal).toFixed(2)}€
+                                </span>
+                            ` : ''}
                         </div>
-                        
-                        <div>
-                            <h3 class="text-lg font-semibold text-emerald-800 mb-2">Description</h3>
-                            <p class="text-gray-700 leading-relaxed">${product.description}</p>
-                        </div>
-                        
-                        ${product.ingredients ? `
-                            <div>
-                                <h3 class="text-lg font-semibold text-emerald-800 mb-2">Ingrédients</h3>
-                                <p class="text-gray-700">${product.ingredients}</p>
-                            </div>
+                        ${product.stock !== undefined ? `
+                            <span class="text-xs text-gray-500">
+                                Stock: ${product.stock || 0}
+                            </span>
                         ` : ''}
-                        
-                        ${product.modeEmploi ? `
-                            <div>
-                                <h3 class="text-lg font-semibold text-emerald-800 mb-2">Mode d'emploi</h3>
-                                <p class="text-gray-700">${product.modeEmploi}</p>
-                            </div>
-                        ` : ''}
-                        
-                        ${product.precautions ? `
-                            <div>
-                                <h3 class="text-lg font-semibold text-emerald-800 mb-2">Précautions</h3>
-                                <p class="text-gray-700">${product.precautions}</p>
-                            </div>
-                        ` : ''}
-                        
-                        <!-- Add to Cart Section -->
-                        ${!isOutOfStock ? `
-                            <div class="bg-emerald-50 rounded-xl p-6 border border-emerald-200">
-                                <div class="flex items-center space-x-4 mb-4">
-                                    <label class="text-emerald-700 font-medium">Quantité:</label>
-                                    <div class="flex items-center border border-emerald-300 rounded-lg">
-                                        <button onclick="changeProductQuantity(-1)" class="px-3 py-2 text-emerald-600 hover:bg-emerald-100 rounded-l-lg">
-                                            <i class="fas fa-minus"></i>
-                                        </button>
-                                        <input type="number" id="productQuantity" value="1" min="1" max="${product.stock}" 
-                                               class="w-16 py-2 text-center border-0 focus:ring-0">
-                                        <button onclick="changeProductQuantity(1)" class="px-3 py-2 text-emerald-600 hover:bg-emerald-100 rounded-r-lg">
-                                            <i class="fas fa-plus"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <button onclick="addProductToCart('${product._id}')" 
-                                        class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 text-lg">
-                                    <i class="fas fa-cart-plus mr-2"></i>Ajouter au panier
+                    </div>
+
+                    <!-- Add to Cart Button -->
+                    <div class="flex items-center space-x-2">
+                        ${product.stock > 0 || product.stock === undefined ? `
+                            <div class="flex-1 flex items-center border border-gray-300 rounded-lg">
+                                <button onclick="app.decreaseQuantity('${product._id}')" 
+                                        class="px-3 py-2 text-gray-500 hover:text-gray-700 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                                    </svg>
+                                </button>
+                                <input type="number" id="qty-${product._id}" value="1" min="1" max="${product.stock || 99}" 
+                                       class="flex-1 text-center py-2 border-0 focus:outline-none focus:ring-0" 
+                                       style="max-width: 60px;">
+                                <button onclick="app.increaseQuantity('${product._id}')" 
+                                        class="px-3 py-2 text-gray-500 hover:text-gray-700 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
                                 </button>
                             </div>
+                            <button onclick="app.addToCart('${product._id}')" 
+                                    class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m2.6 8L6 5H3m4 8a2 2 0 100 4 2 2 0 000-4zm10 0a2 2 0 100 4 2 2 0 000-4z"></path>
+                                </svg>
+                                <span class="hidden sm:inline">Ajouter</span>
+                            </button>
                         ` : `
-                            <div class="bg-red-50 rounded-xl p-6 border border-red-200">
-                                <p class="text-red-700 font-medium text-center">
-                                    <i class="fas fa-exclamation-circle mr-2"></i>
-                                    Ce produit n'est actuellement pas disponible
-                                </p>
-                            </div>
+                            <button disabled class="w-full bg-gray-300 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed">
+                                Rupture de stock
+                            </button>
                         `}
                     </div>
                 </div>
-                
-                <!-- Related Products -->
-                ${relatedProducts.length > 0 ? `
-                    <div class="border-t border-emerald-200 pt-16">
-                        <h2 class="text-2xl font-bold text-emerald-800 mb-8 text-center">Produits similaires</h2>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                            ${relatedProducts.map(relProduct => this.createProductCard(relProduct)).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-        
-        // Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-    } catch (error) {
-        console.error('Error loading product page:', error);
-        document.getElementById('mainContent').innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="text-center py-16">
-                    <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-6"></i>
-                    <h3 class="text-2xl font-bold text-red-800 mb-4">Produit non trouvé</h3>
-                    <p class="text-red-600 mb-8">Le produit que vous cherchez n'existe pas ou n'est plus disponible</p>
-                    <button onclick="app.showPage('products')" class="bg-emerald-500 text-white font-bold py-3 px-8 rounded-xl hover:bg-emerald-600 transition-all">
-                        <i class="fas fa-arrow-left mr-2"></i>Retour aux produits
-                    </button>
-                </div>
             </div>
         `;
     }
-};
 
-// Enhanced checkout page loading
-PharmacieGaherApp.prototype.loadCheckoutPage = async function() {
-    try {
-        console.log('Loading checkout page...');
-        
-        // Validate cart
-        if (!this.cart || this.cart.length === 0) {
-            this.showToast('Votre panier est vide', 'warning');
-            this.showPage('products');
+    // Initialize products event listeners
+    initProductsEventListeners() {
+        // Search functionality
+        const searchInput = document.getElementById('product-search');
+        if (searchInput) {
+            let searchTimeout;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    const query = e.target.value.trim();
+                    this.loadProductsPage({ ...this.currentProductsFilter, search: query });
+                }, 500);
+            });
+        }
+
+        // Category filter
+        const categoryFilter = document.getElementById('category-filter');
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', (e) => {
+                const category = e.target.value;
+                this.loadProductsPage({ 
+                    ...this.currentProductsFilter, 
+                    category: category || undefined,
+                    search: this.currentSearchQuery 
+                });
+            });
+        }
+    }
+
+    // Increase quantity in product card
+    increaseQuantity(productId) {
+        const input = document.getElementById(`qty-${productId}`);
+        if (input) {
+            const currentValue = parseInt(input.value) || 1;
+            const maxValue = parseInt(input.max) || 99;
+            if (currentValue < maxValue) {
+                input.value = currentValue + 1;
+            }
+        }
+    }
+
+    // Decrease quantity in product card
+    decreaseQuantity(productId) {
+        const input = document.getElementById(`qty-${productId}`);
+        if (input) {
+            const currentValue = parseInt(input.value) || 1;
+            if (currentValue > 1) {
+                input.value = currentValue - 1;
+            }
+        }
+    }
+
+    // Add product to cart
+    addToCart(productId) {
+        try {
+            console.log('🛒 Adding product to cart:', productId);
+            
+            const product = this.allProducts.find(p => p._id === productId);
+            if (!product) {
+                console.error('Product not found:', productId);
+                alert('Produit non trouvé');
+                return;
+            }
+
+            const quantityInput = document.getElementById(`qty-${productId}`);
+            const quantity = quantityInput ? parseInt(quantityInput.value) || 1 : 1;
+
+            // Check stock
+            if (product.stock !== undefined && quantity > product.stock) {
+                alert(`Stock insuffisant. Stock disponible: ${product.stock}`);
+                return;
+            }
+
+            // Check if product already in cart
+            const existingItemIndex = this.cart.findIndex(item => item._id === productId);
+            
+            if (existingItemIndex !== -1) {
+                // Update quantity
+                const newQuantity = this.cart[existingItemIndex].quantite + quantity;
+                
+                if (product.stock !== undefined && newQuantity > product.stock) {
+                    alert(`Stock insuffisant. Quantité maximum: ${product.stock}`);
+                    return;
+                }
+                
+                this.cart[existingItemIndex].quantite = newQuantity;
+            } else {
+                // Add new item
+                this.cart.push({
+                    _id: product._id,
+                    nom: product.nom,
+                    prix: product.prix,
+                    images: product.images,
+                    categorie: product.categorie,
+                    quantite: quantity,
+                    stock: product.stock
+                });
+            }
+
+            // Save to localStorage
+            localStorage.setItem('cart', JSON.stringify(this.cart));
+            
+            // Update UI
+            this.updateCartUI();
+            
+            // Show success message
+            this.showMessage(`${product.nom} ajouté au panier (${quantity})`, 'success');
+            
+            // Reset quantity input
+            if (quantityInput) {
+                quantityInput.value = 1;
+            }
+
+            console.log('✅ Product added to cart successfully');
+
+        } catch (error) {
+            console.error('❌ Error adding to cart:', error);
+            alert('Erreur lors de l\'ajout au panier');
+        }
+    }
+
+    // View product details
+    viewProductDetails(productId) {
+        const product = this.allProducts.find(p => p._id === productId);
+        if (!product) {
+            alert('Produit non trouvé');
             return;
         }
-        
-        // Calculate totals
-        const sousTotal = this.getCartTotal();
-        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
-        const total = sousTotal + fraisLivraison;
-        
-        // Get user info if logged in
-        const userInfo = this.currentUser || {};
-        
-        document.getElementById('mainContent').innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <div class="text-center mb-8">
-                    <h1 class="text-3xl font-bold text-emerald-800 mb-2">Finaliser votre commande</h1>
-                    <p class="text-emerald-600">Vérifiez vos informations et validez votre commande</p>
-                </div>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <!-- Order Form -->
-                    <div class="bg-white rounded-2xl shadow-xl border border-emerald-200/50 p-6">
-                        <h2 class="text-xl font-bold text-emerald-800 mb-6">Informations de livraison</h2>
-                        
-                        <form id="checkoutForm" class="space-y-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="checkoutPrenom" class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
-                                    <input type="text" id="checkoutPrenom" name="prenom" required 
-                                           value="${userInfo.prenom || ''}"
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                           placeholder="Votre prénom">
-                                </div>
-                                <div>
-                                    <label for="checkoutNom" class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
-                                    <input type="text" id="checkoutNom" name="nom" required 
-                                           value="${userInfo.nom || ''}"
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                           placeholder="Votre nom">
-                                </div>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="checkoutEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                                    <input type="email" id="checkoutEmail" name="email" required 
-                                           value="${userInfo.email || ''}"
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                           placeholder="votre@email.com">
-                                </div>
-                                <div>
-                                    <label for="checkoutTelephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
-                                    <input type="tel" id="checkoutTelephone" name="telephone" required 
-                                           value="${userInfo.telephone || ''}"
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                           placeholder="+213 555 123 456">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label for="checkoutAdresse" class="block text-sm font-medium text-gray-700 mb-2">Adresse complète *</label>
-                                <textarea id="checkoutAdresse" name="adresse" required rows="3"
-                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
-                                          placeholder="Votre adresse complète">${userInfo.adresse || ''}</textarea>
-                            </div>
-                            
-                            <div>
-                                <label for="checkoutWilaya" class="block text-sm font-medium text-gray-700 mb-2">Wilaya *</label>
-                                <select id="checkoutWilaya" name="wilaya" required 
-                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
-                                    <option value="">Sélectionnez votre wilaya</option>
-                                    <option value="Alger" ${userInfo.wilaya === 'Alger' ? 'selected' : ''}>Alger</option>
-                                    <option value="Blida" ${userInfo.wilaya === 'Blida' ? 'selected' : ''}>Blida</option>
-                                    <option value="Boumerdès" ${userInfo.wilaya === 'Boumerdès' ? 'selected' : ''}>Boumerdès</option>
-                                    <option value="Tipaza" ${userInfo.wilaya === 'Tipaza' ? 'selected' : ''}>Tipaza</option>
-                                    <option value="Médéa" ${userInfo.wilaya === 'Médéa' ? 'selected' : ''}>Médéa</option>
-                                    <option value="Aïn Defla" ${userInfo.wilaya === 'Aïn Defla' ? 'selected' : ''}>Aïn Defla</option>
-                                    <option value="Chlef" ${userInfo.wilaya === 'Chlef' ? 'selected' : ''}>Chlef</option>
-                                    <option value="Djelfa" ${userInfo.wilaya === 'Djelfa' ? 'selected' : ''}>Djelfa</option>
-                                    <option value="Laghouat" ${userInfo.wilaya === 'Laghouat' ? 'selected' : ''}>Laghouat</option>
-                                    <option value="M'sila" ${userInfo.wilaya === 'M\'sila' ? 'selected' : ''}>M'sila</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label for="checkoutCommentaires" class="block text-sm font-medium text-gray-700 mb-2">Commentaires (optionnel)</label>
-                                <textarea id="checkoutCommentaires" name="commentaires" rows="2"
-                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
-                                          placeholder="Instructions spéciales pour la livraison..."></textarea>
-                            </div>
-                            
-                            <!-- Payment Method -->
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-4">Mode de paiement *</label>
-                                <div class="space-y-3">
-                                    <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:bg-emerald-50 transition-all">
-                                        <input type="radio" name="modePaiement" value="Paiement à la livraison" checked 
-                                               class="text-emerald-600 focus:ring-emerald-500">
-                                        <div class="ml-3">
-                                            <div class="font-medium text-gray-900">Paiement à la livraison</div>
-                                            <div class="text-sm text-gray-500">Payez en espèces lors de la réception</div>
-                                        </div>
-                                        <i class="fas fa-money-bill-wave text-emerald-600 ml-auto text-xl"></i>
-                                    </label>
-                                    
-                                    <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition-all opacity-50">
-                                        <input type="radio" name="modePaiement" value="Carte bancaire" disabled
-                                               class="text-blue-600 focus:ring-blue-500">
-                                        <div class="ml-3">
-                                            <div class="font-medium text-gray-900">Carte bancaire</div>
-                                            <div class="text-sm text-gray-500">Bientôt disponible</div>
-                                        </div>
-                                        <i class="fas fa-credit-card text-blue-600 ml-auto text-xl"></i>
-                                    </label>
-                                </div>
-                                <div id="paymentMethodInfo" class="mt-4"></div>
-                            </div>
-                        </form>
+
+        const imageUrl = (product.images && product.images[0]) || 'https://via.placeholder.com/400x400?text=Produit';
+        const hasPromotion = product.enPromotion && product.prixOriginal && product.prixOriginal > product.prix;
+        const discountPercent = hasPromotion ? Math.round(((product.prixOriginal - product.prix) / product.prixOriginal) * 100) : 0;
+
+        const modalHTML = `
+            <div id="product-details-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                    <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                        <h2 class="text-2xl font-bold text-gray-800">Détails du produit</h2>
+                        <button onclick="document.getElementById('product-details-modal').remove()" 
+                                class="text-gray-400 hover:text-gray-600 transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
                     </div>
                     
-                    <!-- Order Summary -->
-                    <div class="bg-white rounded-2xl shadow-xl border border-emerald-200/50 p-6 h-fit">
-                        <h2 class="text-xl font-bold text-emerald-800 mb-6">Résumé de la commande</h2>
-                        
-                        <!-- Cart Items -->
-                        <div class="space-y-4 mb-6">
-                            ${this.cart.map(item => `
-                                <div class="flex items-center space-x-3 p-3 bg-emerald-50/50 rounded-lg">
-                                    <img src="${item.image}" alt="${item.nom}" 
-                                         class="w-12 h-12 object-cover rounded-lg border border-emerald-200">
-                                    <div class="flex-1">
-                                        <h4 class="font-medium text-emerald-800 text-sm">${item.nom}</h4>
-                                        <p class="text-emerald-600 text-xs">${item.quantite} × ${item.prix} DA</p>
-                                    </div>
-                                    <span class="font-bold text-emerald-700">${item.quantite * item.prix} DA</span>
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <!-- Product Image -->
+                            <div class="relative">
+                                <img src="${imageUrl}" alt="${product.nom}" 
+                                     class="w-full h-96 object-cover rounded-xl"
+                                     onerror="this.src='https://via.placeholder.com/400x400?text=Image+non+disponible'">
+                                
+                                <!-- Badges -->
+                                <div class="absolute top-4 left-4 flex flex-col space-y-2">
+                                    ${product.enVedette ? `
+                                        <span class="bg-yellow-500 text-white text-sm px-3 py-1 rounded-full font-medium">
+                                            ⭐ Vedette
+                                        </span>
+                                    ` : ''}
+                                    ${hasPromotion ? `
+                                        <span class="bg-red-500 text-white text-sm px-3 py-1 rounded-full font-medium">
+                                            -${discountPercent}% de remise
+                                        </span>
+                                    ` : ''}
                                 </div>
-                            `).join('')}
-                        </div>
-                        
-                        <!-- Shipping Progress -->
-                        <div id="shippingMessage" class="mb-4">
-                            ${sousTotal >= 5000 ? `
-                                <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-                                    <p class="text-green-700 text-sm font-medium">
-                                        <i class="fas fa-truck mr-2"></i>
-                                        Félicitations ! Livraison gratuite.
-                                    </p>
+                            </div>
+
+                            <!-- Product Info -->
+                            <div>
+                                <div class="mb-4">
+                                    <span class="text-sm text-emerald-600 font-medium bg-emerald-100 px-2 py-1 rounded">
+                                        ${product.categorie || 'Santé'}
+                                    </span>
+                                    ${product.marque ? `<span class="text-sm text-gray-500 ml-2">par ${product.marque}</span>` : ''}
                                 </div>
-                            ` : `
-                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                    <div class="flex items-center justify-between text-sm text-blue-800 mb-2">
-                                        <span>Livraison gratuite à partir de 5000 DA</span>
-                                        <span class="font-medium">${5000 - sousTotal} DA restants</span>
+                                
+                                <h1 class="text-3xl font-bold text-gray-800 mb-4">${product.nom}</h1>
+                                
+                                <p class="text-gray-600 mb-6 leading-relaxed">
+                                    ${product.description || 'Description non disponible'}
+                                </p>
+
+                                <!-- Price -->
+                                <div class="mb-6">
+                                    <div class="flex items-center space-x-3 mb-2">
+                                        <span class="text-3xl font-bold text-emerald-600">
+                                            ${parseFloat(product.prix).toFixed(2)}€
+                                        </span>
+                                        ${hasPromotion ? `
+                                            <span class="text-xl text-gray-500 line-through">
+                                                ${parseFloat(product.prixOriginal).toFixed(2)}€
+                                            </span>
+                                            <span class="text-sm text-green-600 bg-green-100 px-2 py-1 rounded">
+                                                Économisez ${(product.prixOriginal - product.prix).toFixed(2)}€
+                                            </span>
+                                        ` : ''}
                                     </div>
-                                    <div class="w-full bg-blue-200 rounded-full h-2">
-                                        <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                                             style="width: ${Math.min((sousTotal / 5000) * 100, 100)}%"></div>
-                                    </div>
+                                    ${product.stock !== undefined ? `
+                                        <p class="text-sm ${product.stock > 5 ? 'text-green-600' : product.stock > 0 ? 'text-orange-600' : 'text-red-600'}">
+                                            ${product.stock > 5 ? '✅ En stock' : 
+                                              product.stock > 0 ? `⚠️ Stock limité (${product.stock} restant)` : 
+                                              '❌ Rupture de stock'}
+                                        </p>
+                                    ` : ''}
                                 </div>
-                            `}
+
+                                <!-- Add to Cart Section -->
+                                ${product.stock > 0 || product.stock === undefined ? `
+                                    <div class="space-y-4">
+                                        <div class="flex items-center space-x-4">
+                                            <label class="text-sm font-medium text-gray-700">Quantité:</label>
+                                            <div class="flex items-center border border-gray-300 rounded-lg">
+                                                <button onclick="app.decreaseQuantity('detail-${product._id}')" 
+                                                        class="px-4 py-2 text-gray-500 hover:text-gray-700 transition-colors">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                                                    </svg>
+                                                </button>
+                                                <input type="number" id="qty-detail-${product._id}" value="1" min="1" max="${product.stock || 99}" 
+                                                       class="text-center py-2 border-0 focus:outline-none focus:ring-0" 
+                                                       style="width: 80px;">
+                                                <button onclick="app.increaseQuantity('detail-${product._id}')" 
+                                                        class="px-4 py-2 text-gray-500 hover:text-gray-700 transition-colors">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <button onclick="app.addToCartFromDetails('${product._id}')" 
+                                                class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center space-x-2">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m2.6 8L6 5H3m4 8a2 2 0 100 4 2 2 0 000-4zm10 0a2 2 0 100 4 2 2 0 000-4z"></path>
+                                            </svg>
+                                            <span>Ajouter au panier</span>
+                                        </button>
+                                    </div>
+                                ` : `
+                                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                                        <p class="text-red-600 font-medium">❌ Produit en rupture de stock</p>
+                                        <p class="text-red-500 text-sm mt-1">Ce produit sera bientôt disponible</p>
+                                    </div>
+                                `}
+                            </div>
                         </div>
-                        
-                        <!-- Order Totals -->
-                        <div class="border-t border-emerald-200 pt-4 space-y-3">
-                            <div class="flex justify-between text-emerald-700">
-                                <span>Sous-total:</span>
-                                <span id="checkoutSousTotal">${sousTotal} DA</span>
-                            </div>
-                            <div class="flex justify-between text-emerald-700">
-                                <span>Frais de livraison:</span>
-                                <span id="checkoutFraisLivraison" class="${fraisLivraison === 0 ? 'text-green-600 font-semibold' : ''}">${fraisLivraison === 0 ? 'GRATUIT' : fraisLivraison + ' DA'}</span>
-                            </div>
-                            <div class="flex justify-between text-lg font-bold text-emerald-800 border-t border-emerald-200 pt-3">
-                                <span>Total:</span>
-                                <span id="checkoutTotal">${total} DA</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Submit Button -->
-                        <button onclick="processCheckoutOrder()" 
-                                class="w-full mt-6 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 text-lg">
-                            <i class="fas fa-check mr-2"></i>Confirmer la commande
-                        </button>
-                        
-                        <p class="text-xs text-gray-500 text-center mt-4">
-                            En validant votre commande, vous acceptez nos conditions générales de vente.
-                        </p>
                     </div>
                 </div>
             </div>
         `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    }
+
+    // Add to cart from details modal
+    addToCartFromDetails(productId) {
+        const quantityInput = document.getElementById(`qty-detail-${productId}`);
+        const quantity = quantityInput ? parseInt(quantityInput.value) || 1 : 1;
         
-        // Initialize checkout system
-        if (window.initCheckout) {
-            window.initCheckout();
+        // Update the quantity input in the main product card if it exists
+        const mainQuantityInput = document.getElementById(`qty-${productId}`);
+        if (mainQuantityInput) {
+            mainQuantityInput.value = quantity;
         }
         
-    } catch (error) {
-        console.error('Error loading checkout page:', error);
-        this.showToast('Erreur lors du chargement de la commande', 'error');
-        this.showPage('products');
-    }
-};
-
-// Order confirmation page
-PharmacieGaherApp.prototype.loadOrderConfirmationPage = async function(orderNumber) {
-    try {
-        console.log('Loading order confirmation for:', orderNumber);
+        this.addToCart(productId);
         
-        document.getElementById('mainContent').innerHTML = `
-            <div class="container mx-auto px-4 py-16 text-center">
-                <div class="max-w-2xl mx-auto">
-                    <!-- Success Animation -->
-                    <div class="w-32 h-32 mx-auto mb-8 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-2xl">
-                        <i class="fas fa-check text-white text-6xl animate-pulse"></i>
-                    </div>
-                    
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
-                    <p class="text-xl text-emerald-600 mb-8">Votre commande a été enregistrée avec succès</p>
-                    
-                    <div class="bg-gradient-to-br from-emerald-50 to-green-100 border border-emerald-200 rounded-2xl p-8 mb-8">
-                        <h2 class="text-2xl font-bold text-emerald-800 mb-4">
-                            Commande #${orderNumber}
-                        </h2>
-                        <p class="text-emerald-700 mb-6">
-                            Un email de confirmation vous sera envoyé sous peu avec tous les détails de votre commande.
-                        </p>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                            <div class="bg-white/60 rounded-xl p-4">
-                                <h3 class="font-semibold text-emerald-800 mb-2">
-                                    <i class="fas fa-truck mr-2"></i>Livraison
-                                </h3>
-                                <p class="text-emerald-700 text-sm">
-                                    Votre commande sera livrée sous 24-48h ouvrables
-                                </p>
-                            </div>
-                            
-                            <div class="bg-white/60 rounded-xl p-4">
-                                <h3 class="font-semibold text-emerald-800 mb-2">
-                                    <i class="fas fa-phone mr-2"></i>Suivi
-                                </h3>
-                                <p class="text-emerald-700 text-sm">
-                                    Nous vous contacterons pour confirmer l'adresse
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <button onclick="app.showPage('products')" 
-                                class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 text-lg mr-4">
-                            <i class="fas fa-shopping-bag mr-2"></i>Continuer vos achats
-                        </button>
-                        
-                        <button onclick="app.showPage('home')" 
-                                class="bg-emerald-100 text-emerald-700 font-bold py-4 px-8 rounded-xl hover:bg-emerald-200 transition-all text-lg">
-                            <i class="fas fa-home mr-2"></i>Retour à l'accueil
-                        </button>
-                    </div>
-                    
-                    <div class="mt-12 p-6 bg-blue-50 border border-blue-200 rounded-2xl">
-                        <h3 class="font-semibold text-blue-800 mb-3">
-                            <i class="fas fa-info-circle mr-2"></i>Informations importantes
-                        </h3>
-                        <ul class="text-blue-700 text-sm space-y-2 text-left">
-                            <li>• Le paiement s'effectue à la livraison en espèces</li>
-                            <li>• Vérifiez vos articles avant de payer le livreur</li>
-                            <li>• Conservez votre numéro de commande pour le suivi</li>
-                            <li>• Pour toute question, contactez-nous au +213 123 456 789</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        `;
+        // Close modal after adding to cart
+        setTimeout(() => {
+            const modal = document.getElementById('product-details-modal');
+            if (modal) modal.remove();
+        }, 1000);
+    }
+
+    // Update cart UI
+    updateCartUI() {
+        const cartButton = document.querySelector('.cart-button');
+        const cartCount = document.getElementById('cart-count');
         
-    } catch (error) {
-        console.error('Error loading order confirmation:', error);
-        this.showToast('Erreur lors du chargement de la confirmation', 'error');
-        this.showPage('home');
+        if (cartButton && cartCount) {
+            const totalItems = this.cart.reduce((total, item) => total + parseInt(item.quantite), 0);
+            cartCount.textContent = totalItems;
+            cartCount.style.display = totalItems > 0 ? 'inline-block' : 'none';
+        }
+
+        console.log('🛒 Cart UI updated, items:', this.cart.length);
     }
-};
 
-// Helper methods
-PharmacieGaherApp.prototype.getAvailableCategories = function() {
-    const categories = new Set(this.allProducts.map(p => p.categorie));
-    return Array.from(categories).sort();
-};
-
-PharmacieGaherApp.prototype.setupProductsSearch = function() {
-    const searchInput = document.getElementById('productsSearchInput');
-    if (searchInput) {
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.performSearch(e.target.value);
-            }
-        });
+    // Show success/error messages
+    showMessage(message, type = 'info') {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 transition-all ${
+            type === 'success' ? 'bg-green-500 text-white' :
+            type === 'error' ? 'bg-red-500 text-white' :
+            'bg-blue-500 text-white'
+        }`;
+        messageDiv.textContent = message;
+        
+        document.body.appendChild(messageDiv);
+        
+        setTimeout(() => {
+            messageDiv.style.opacity = '0';
+            setTimeout(() => messageDiv.remove(), 300);
+        }, 3000);
     }
-};
 
-PharmacieGaherApp.prototype.generatePlaceholderImage = function(product) {
-    const getCategoryColor = (category) => {
-        const colors = {
-            'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
-            'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-            'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
-            'Dentaire': '6366f1', 'Maman': 'd946ef', 'Minceur': '8b5cf6'
-        };
-        return colors[category] || '10b981';
-    };
-    
-    const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
-    const categoryColor = getCategoryColor(product.categorie);
-    return `https://via.placeholder.com/300x300/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
-};
-
-// FIXED: Process order function (integrates with checkout.js)
-PharmacieGaherApp.prototype.processOrder = function() {
-    console.log('processOrder called in app.js - delegating to checkout system');
-    if (window.processCheckoutOrder) {
-        return window.processCheckoutOrder();
-    } else {
-        console.error('Checkout system not available');
-        this.showToast('Système de commande non initialisé', 'error');
-    }
-};
-
-// Global functions for product management
-function handleProductsSearch(event) {
-    if (event.key === 'Enter') {
-        searchProducts();
-    }
-}
-
-function searchProducts() {
-    const searchInput = document.getElementById('productsSearchInput');
-    if (searchInput && window.app) {
-        const query = searchInput.value.trim();
-        if (query) {
-            window.app.performSearch(query);
-        } else {
-            window.app.showPage('products');
+    // Load more products (pagination)
+    loadMoreProducts() {
+        // This would typically load the next page
+        // For now, just hide the button
+        const loadMoreBtn = document.getElementById('load-more-btn');
+        if (loadMoreBtn) {
+            loadMoreBtn.style.display = 'none';
         }
     }
 }
 
-function changeProductQuantity(change) {
-    const quantityInput = document.getElementById('productQuantity');
-    if (quantityInput) {
-        const currentValue = parseInt(quantityInput.value) || 1;
-        const maxValue = parseInt(quantityInput.max) || 10;
-        const newValue = Math.max(1, Math.min(maxValue, currentValue + change));
-        quantityInput.value = newValue;
-    }
-}
-
-function addProductToCart(productId) {
-    const quantityInput = document.getElementById('productQuantity');
-    const quantity = quantityInput ? parseInt(quantityInput.value) || 1 : 1;
-    
-    if (window.addToCart) {
-        window.addToCart(productId, quantity);
-    } else if (window.cartSystem) {
-        window.cartSystem.addItem(productId, quantity);
-    } else if (window.app) {
-        window.app.addToCart(productId, quantity);
-    } else {
-        console.error('No cart system available');
-    }
-}
-
-function loadMoreProducts() {
-    // Implementation for loading more products (pagination)
-    console.log('Load more products requested');
-    // This would typically load the next page of products
-}
-
-// Category filtering
-function filterProductsByCategory(category) {
-    if (window.app) {
-        window.app.filterByCategory(category);
-    }
-}
-
-// Search functionality
-function performProductSearch(query) {
-    if (window.app) {
-        window.app.performSearch(query);
-    }
-}
-
-// Product sorting
-function sortProducts(sortBy) {
-    console.log('Sorting products by:', sortBy);
-    // Implementation for product sorting
-}
-
-// Product filtering
-function filterProductsByPrice(minPrice, maxPrice) {
-    console.log('Filtering products by price:', minPrice, maxPrice);
-    // Implementation for price filtering
-}
-
-function filterProductsByStock(inStockOnly) {
-    console.log('Filtering by stock availability:', inStockOnly);
-    // Implementation for stock filtering
-}
-
-// Enhanced product card interactions
-function viewProductDetails(productId) {
-    if (window.app) {
-        window.app.showPage('product', { id: productId });
-    }
-}
-
-function quickAddToCart(productId, event) {
-    // Prevent event bubbling to avoid navigating to product page
-    if (event) {
-        event.stopPropagation();
+// CSS for line-clamp utility (add to your CSS file)
+const style = document.createElement('style');
+style.textContent = `
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
     }
     
-    if (window.addToCart) {
-        window.addToCart(productId, 1);
-    } else if (window.app) {
-        window.app.addToCart(productId, 1);
+    .min-h-[2.5rem] {
+        min-height: 2.5rem;
     }
+`;
+document.head.appendChild(style);
+
+// Ensure the class is available globally
+if (typeof window !== 'undefined') {
+    window.PharmacieGaherApp = PharmacieGaherApp;
 }
 
-// Wishlist functionality (placeholder for future implementation)
-function addToWishlist(productId) {
-    console.log('Adding to wishlist:', productId);
-    // Implementation for wishlist functionality
-}
-
-function removeFromWishlist(productId) {
-    console.log('Removing from wishlist:', productId);
-    // Implementation for wishlist functionality
-}
-
-// Product comparison (placeholder for future implementation)
-function addToComparison(productId) {
-    console.log('Adding to comparison:', productId);
-    // Implementation for product comparison
-}
-
-// Product reviews (placeholder for future implementation)
-function showProductReviews(productId) {
-    console.log('Showing reviews for product:', productId);
-    // Implementation for product reviews
-}
-
-function submitProductReview(productId, rating, comment) {
-    console.log('Submitting review for product:', productId, rating, comment);
-    // Implementation for review submission
-}
-
-// Export functions for global access
-window.handleProductsSearch = handleProductsSearch;
-window.searchProducts = searchProducts;
-window.changeProductQuantity = changeProductQuantity;
-window.addProductToCart = addProductToCart;
-window.loadMoreProducts = loadMoreProducts;
-window.filterProductsByCategory = filterProductsByCategory;
-window.performProductSearch = performProductSearch;
-window.sortProducts = sortProducts;
-window.filterProductsByPrice = filterProductsByPrice;
-window.filterProductsByStock = filterProductsByStock;
-window.viewProductDetails = viewProductDetails;
-window.quickAddToCart = quickAddToCart;
-window.addToWishlist = addToWishlist;
-window.removeFromWishlist = removeFromWishlist;
-window.addToComparison = addToComparison;
-window.showProductReviews = showProductReviews;
-window.submitProductReview = submitProductReview;
-
-console.log('✅ Complete Products.js loaded with full functionality');
+console.log('✅ Products JS loaded with createProductCard function');
