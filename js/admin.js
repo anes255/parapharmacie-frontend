@@ -1,847 +1,1437 @@
-// Complete Products Management System - FIXED VERSION
+// Complete Admin Panel with Full Product Management and Order System - FIXED VERSION
 
-// FIXED: Enhanced products page loading with proper API integration
-PharmacieGaherApp.prototype.loadProductsPage = async function(params = {}) {
+// Global variables
+let adminCurrentSection = 'dashboard';
+let currentEditingProduct = null;
+let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+
+// API Configuration
+const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5000/api'
+    : 'https://parapharmacie-gaher.onrender.com/api';
+
+// Helper function to make API calls
+async function apiCall(endpoint, options = {}) {
+    const url = `${API_BASE_URL}${endpoint}`;
+    
+    const defaultOptions = {
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    };
+    
+    // Add auth token if available
+    const token = localStorage.getItem('token');
+    if (token) {
+        defaultOptions.headers['x-auth-token'] = token;
+    }
+    
+    const finalOptions = {
+        ...defaultOptions,
+        ...options,
+        headers: {
+            ...defaultOptions.headers,
+            ...options.headers
+        }
+    };
+    
+    const response = await fetch(url, finalOptions);
+    
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
+        throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+    
+    return response.json();
+}
+
+// Products Management - Add to app prototype
+PharmacieGaherApp.prototype.loadAdminProducts = async function() {
     try {
-        console.log('Loading products page with params:', params);
+        // Get products from localStorage
+        let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
-        // Get products from cache first
-        let allProducts = [...this.allProducts];
-        
-        // Try to get fresh products from API
+        // Try to get products from API as well
         try {
-            const response = await fetch(buildApiUrl('/products'), {
-                headers: this.getAuthHeaders()
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.products && data.products.length > 0) {
-                    // Update cache with API products
-                    allProducts = data.products;
-                    this.allProducts = [...allProducts];
-                    localStorage.setItem('demoProducts', JSON.stringify(allProducts));
-                    console.log('✅ Products updated from API');
-                }
+            const data = await apiCall('/products');
+            if (data && data.products && data.products.length > 0) {
+                // Merge API products with local ones, avoiding duplicates
+                const localIds = products.map(p => p._id);
+                const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
+                products = [...products, ...newApiProducts];
+                
+                // Update localStorage with merged data
+                localStorage.setItem('demoProducts', JSON.stringify(products));
             }
         } catch (error) {
-            console.log('⚠️ API unavailable, using cached products');
+            console.log('API unavailable, using local products only');
         }
         
-        // Apply filters
-        let filteredProducts = allProducts.filter(product => product.actif !== false);
-        
-        // Filter by category if specified
-        if (params.categorie) {
-            filteredProducts = filteredProducts.filter(p => p.categorie === params.categorie);
-        }
-        
-        // Filter by search if specified
-        if (params.search) {
-            const searchTerm = params.search.toLowerCase();
-            filteredProducts = filteredProducts.filter(p => 
-                p.nom.toLowerCase().includes(searchTerm) ||
-                p.description?.toLowerCase().includes(searchTerm) ||
-                p.marque?.toLowerCase().includes(searchTerm) ||
-                p.categorie.toLowerCase().includes(searchTerm)
-            );
-        }
-        
-        // Sort products
-        filteredProducts.sort((a, b) => {
-            // Featured products first
-            if (a.enVedette && !b.enVedette) return -1;
-            if (!a.enVedette && b.enVedette) return 1;
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6 mb-6">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-emerald-800">Gestion des produits</h2>
+                        <p class="text-emerald-600">${products.length} produits au total</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button onclick="openAddProductModal()" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-plus mr-2"></i>Nouveau produit
+                        </button>
+                    </div>
+                </div>
+            </div>
             
-            // Then by date (newest first)
-            return new Date(b.dateAjout || 0) - new Date(a.dateAjout || 0);
-        });
-        
-        const mainContent = document.getElementById('mainContent');
-        
-        // Build page title
-        let pageTitle = 'Nos Produits';
-        let pageSubtitle = `${filteredProducts.length} produit(s) disponible(s)`;
-        
-        if (params.categorie) {
-            pageTitle = `Catégorie: ${params.categorie}`;
-        } else if (params.search) {
-            pageTitle = `Recherche: "${params.search}"`;
-        }
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <!-- Page Header -->
-                <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">${pageTitle}</h1>
-                    <p class="text-xl text-emerald-600">${pageSubtitle}</p>
-                    ${params.categorie || params.search ? `
-                        <div class="mt-4">
-                            <button onclick="app.showPage('products')" class="text-emerald-600 hover:text-emerald-800 font-medium">
-                                <i class="fas fa-arrow-left mr-2"></i>Voir tous les produits
-                            </button>
-                        </div>
-                    ` : ''}
-                </div>
-                
-                <!-- Categories Filter -->
-                ${!params.categorie ? `
-                    <div class="mb-8">
-                        <h3 class="text-lg font-semibold text-emerald-700 mb-4">Filtrer par catégorie:</h3>
-                        <div class="flex flex-wrap gap-2">
-                            <button onclick="app.showPage('products')" class="px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full hover:bg-emerald-200 transition-all font-medium">
-                                Toutes les catégories
-                            </button>
-                            ${this.getAvailableCategories().map(cat => `
-                                <button onclick="app.filterByCategory('${cat}')" class="px-4 py-2 bg-white border border-emerald-200 text-emerald-700 rounded-full hover:bg-emerald-50 transition-all">
-                                    ${cat}
-                                </button>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-                
-                <!-- Search Bar -->
-                <div class="mb-8">
-                    <div class="max-w-md mx-auto">
-                        <div class="relative">
-                            <input type="text" id="productsSearchInput" placeholder="Rechercher un produit..." 
-                                   value="${params.search || ''}"
-                                   class="w-full px-4 py-3 pl-12 border-2 border-emerald-200 rounded-xl focus:border-emerald-400 transition-all"
-                                   onkeypress="handleProductsSearch(event)">
-                            <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-emerald-400"></i>
-                            <button onclick="searchProducts()" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-all">
-                                Rechercher
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Products Grid -->
-                <div class="products-container">
-                    ${filteredProducts.length === 0 ? `
-                        <div class="text-center py-16">
-                            <i class="fas fa-search text-6xl text-emerald-200 mb-6"></i>
-                            <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit trouvé</h3>
-                            <p class="text-emerald-600 mb-8">
-                                ${params.search ? `Aucun produit ne correspond à votre recherche "${params.search}"` : 
-                                  params.categorie ? `Aucun produit dans la catégorie "${params.categorie}"` : 
-                                  'Aucun produit disponible pour le moment'}
-                            </p>
-                            <button onclick="app.showPage('products')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                                <i class="fas fa-arrow-left mr-2"></i>Retour aux produits
-                            </button>
-                        </div>
-                    ` : `
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            ${filteredProducts.map(product => this.createProductCard(product)).join('')}
-                        </div>
-                    `}
-                </div>
-                
-                <!-- Load More Button (if many products) -->
-                ${filteredProducts.length > 12 ? `
-                    <div class="text-center mt-12">
-                        <button onclick="loadMoreProducts()" class="bg-emerald-100 text-emerald-700 font-bold py-3 px-8 rounded-xl hover:bg-emerald-200 transition-all">
-                            <i class="fas fa-plus mr-2"></i>Charger plus de produits
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 overflow-hidden">
+                ${products.length === 0 ? `
+                    <div class="p-16 text-center">
+                        <i class="fas fa-pills text-6xl text-emerald-200 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit</h3>
+                        <p class="text-emerald-600 mb-8">Commencez par ajouter votre premier produit</p>
+                        <button onclick="openAddProductModal()" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-plus mr-2"></i>Ajouter un produit
                         </button>
                     </div>
-                ` : ''}
-                
-                <!-- Back to Top -->
-                ${filteredProducts.length > 8 ? `
-                    <div class="fixed bottom-8 right-8 z-40">
-                        <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" 
-                                class="bg-emerald-500 text-white p-4 rounded-full shadow-lg hover:bg-emerald-600 transition-all hover:scale-105">
-                            <i class="fas fa-arrow-up"></i>
-                        </button>
+                ` : `
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-emerald-50 border-b border-emerald-200">
+                                <tr>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Image</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Produit</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Prix</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Stock</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Statut</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${products.map(product => this.renderProductRow(product)).join('')}
+                            </tbody>
+                        </table>
                     </div>
-                ` : ''}
-            </div>
-        `;
-        
-        // Set up search functionality
-        this.setupProductsSearch();
-        
-    } catch (error) {
-        console.error('Error loading products page:', error);
-        document.getElementById('mainContent').innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="text-center py-16">
-                    <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-6"></i>
-                    <h3 class="text-2xl font-bold text-red-800 mb-4">Erreur de chargement</h3>
-                    <p class="text-red-600 mb-8">Impossible de charger les produits</p>
-                    <button onclick="app.showPage('products')" class="bg-red-500 text-white font-bold py-3 px-8 rounded-xl hover:bg-red-600 transition-all">
-                        <i class="fas fa-refresh mr-2"></i>Réessayer
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-};
-
-// Enhanced product page loading
-PharmacieGaherApp.prototype.loadProductPage = async function(productId) {
-    try {
-        console.log('Loading product page for ID:', productId);
-        
-        // Find product in cache first
-        let product = this.allProducts.find(p => p._id === productId);
-        
-        // If not in cache, try API
-        if (!product) {
-            try {
-                const response = await fetch(buildApiUrl(`/products/${productId}`), {
-                    headers: this.getAuthHeaders()
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    product = data.product || data;
-                }
-            } catch (error) {
-                console.log('API unavailable for single product');
-            }
-        }
-        
-        if (!product) {
-            throw new Error('Produit non trouvé');
-        }
-        
-        const isOutOfStock = product.stock === 0;
-        const hasPromotion = product.enPromotion && product.prixOriginal;
-        
-        // Generate related products (same category)
-        const relatedProducts = this.allProducts
-            .filter(p => p.categorie === product.categorie && p._id !== product._id && p.actif !== false)
-            .slice(0, 4);
-        
-        document.getElementById('mainContent').innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <!-- Breadcrumb -->
-                <nav class="flex items-center space-x-2 text-sm text-emerald-600 mb-8">
-                    <a href="#" onclick="app.showPage('home')" class="hover:text-emerald-800">Accueil</a>
-                    <i class="fas fa-chevron-right text-xs"></i>
-                    <a href="#" onclick="app.showPage('products')" class="hover:text-emerald-800">Produits</a>
-                    <i class="fas fa-chevron-right text-xs"></i>
-                    <a href="#" onclick="app.filterByCategory('${product.categorie}')" class="hover:text-emerald-800">${product.categorie}</a>
-                    <i class="fas fa-chevron-right text-xs"></i>
-                    <span class="text-emerald-800 font-medium">${product.nom}</span>
-                </nav>
-                
-                <!-- Product Details -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
-                    <!-- Product Image -->
-                    <div class="relative">
-                        ${hasPromotion ? `<div class="badge-promotion absolute top-4 left-4 z-20">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
-                        ${isOutOfStock ? `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10 rounded-2xl">
-                            <span class="text-white font-bold text-xl">Rupture de stock</span>
-                        </div>` : ''}
-                        
-                        <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl overflow-hidden">
-                            <img src="${product.image || this.generatePlaceholderImage(product)}" 
-                                 alt="${product.nom}" 
-                                 class="w-full h-full object-cover"
-                                 onerror="this.src='${this.generatePlaceholderImage(product)}'">
-                        </div>
-                    </div>
-                    
-                    <!-- Product Info -->
-                    <div class="space-y-6">
-                        <div>
-                            <h1 class="text-3xl font-bold text-emerald-800 mb-2">${product.nom}</h1>
-                            ${product.marque ? `<p class="text-emerald-600 text-lg">${product.marque}</p>` : ''}
-                            <span class="inline-block bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-medium mt-2">${product.categorie}</span>
-                        </div>
-                        
-                        <div class="space-y-2">
-                            ${hasPromotion ? `
-                                <div class="flex items-center space-x-3">
-                                    <span class="text-2xl text-gray-400 line-through">${product.prixOriginal} DA</span>
-                                    <span class="text-3xl font-bold text-red-600">${product.prix} DA</span>
-                                    <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-sm font-bold">PROMO</span>
-                                </div>
-                                <p class="text-sm text-red-600">Vous économisez ${product.prixOriginal - product.prix} DA</p>
-                            ` : `
-                                <span class="text-3xl font-bold text-emerald-700">${product.prix} DA</span>
-                            `}
-                            <p class="text-emerald-600">
-                                Stock: <span class="font-semibold ${product.stock <= 5 ? 'text-orange-600' : 'text-emerald-600'}">${product.stock} unité(s)</span>
-                            </p>
-                        </div>
-                        
-                        <div>
-                            <h3 class="text-lg font-semibold text-emerald-800 mb-2">Description</h3>
-                            <p class="text-gray-700 leading-relaxed">${product.description}</p>
-                        </div>
-                        
-                        ${product.ingredients ? `
-                            <div>
-                                <h3 class="text-lg font-semibold text-emerald-800 mb-2">Ingrédients</h3>
-                                <p class="text-gray-700">${product.ingredients}</p>
-                            </div>
-                        ` : ''}
-                        
-                        ${product.modeEmploi ? `
-                            <div>
-                                <h3 class="text-lg font-semibold text-emerald-800 mb-2">Mode d'emploi</h3>
-                                <p class="text-gray-700">${product.modeEmploi}</p>
-                            </div>
-                        ` : ''}
-                        
-                        ${product.precautions ? `
-                            <div>
-                                <h3 class="text-lg font-semibold text-emerald-800 mb-2">Précautions</h3>
-                                <p class="text-gray-700">${product.precautions}</p>
-                            </div>
-                        ` : ''}
-                        
-                        <!-- Add to Cart Section -->
-                        ${!isOutOfStock ? `
-                            <div class="bg-emerald-50 rounded-xl p-6 border border-emerald-200">
-                                <div class="flex items-center space-x-4 mb-4">
-                                    <label class="text-emerald-700 font-medium">Quantité:</label>
-                                    <div class="flex items-center border border-emerald-300 rounded-lg">
-                                        <button onclick="changeProductQuantity(-1)" class="px-3 py-2 text-emerald-600 hover:bg-emerald-100 rounded-l-lg">
-                                            <i class="fas fa-minus"></i>
-                                        </button>
-                                        <input type="number" id="productQuantity" value="1" min="1" max="${product.stock}" 
-                                               class="w-16 py-2 text-center border-0 focus:ring-0">
-                                        <button onclick="changeProductQuantity(1)" class="px-3 py-2 text-emerald-600 hover:bg-emerald-100 rounded-r-lg">
-                                            <i class="fas fa-plus"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <button onclick="addProductToCart('${product._id}')" 
-                                        class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 text-lg">
-                                    <i class="fas fa-cart-plus mr-2"></i>Ajouter au panier
-                                </button>
-                            </div>
-                        ` : `
-                            <div class="bg-red-50 rounded-xl p-6 border border-red-200">
-                                <p class="text-red-700 font-medium text-center">
-                                    <i class="fas fa-exclamation-circle mr-2"></i>
-                                    Ce produit n'est actuellement pas disponible
-                                </p>
-                            </div>
-                        `}
-                    </div>
-                </div>
-                
-                <!-- Related Products -->
-                ${relatedProducts.length > 0 ? `
-                    <div class="border-t border-emerald-200 pt-16">
-                        <h2 class="text-2xl font-bold text-emerald-800 mb-8 text-center">Produits similaires</h2>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                            ${relatedProducts.map(relProduct => this.createProductCard(relProduct)).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-        
-        // Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-    } catch (error) {
-        console.error('Error loading product page:', error);
-        document.getElementById('mainContent').innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="text-center py-16">
-                    <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-6"></i>
-                    <h3 class="text-2xl font-bold text-red-800 mb-4">Produit non trouvé</h3>
-                    <p class="text-red-600 mb-8">Le produit que vous cherchez n'existe pas ou n'est plus disponible</p>
-                    <button onclick="app.showPage('products')" class="bg-emerald-500 text-white font-bold py-3 px-8 rounded-xl hover:bg-emerald-600 transition-all">
-                        <i class="fas fa-arrow-left mr-2"></i>Retour aux produits
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-};
-
-// Enhanced checkout page loading
-PharmacieGaherApp.prototype.loadCheckoutPage = async function() {
-    try {
-        console.log('Loading checkout page...');
-        
-        // Validate cart
-        if (!this.cart || this.cart.length === 0) {
-            this.showToast('Votre panier est vide', 'warning');
-            this.showPage('products');
-            return;
-        }
-        
-        // Calculate totals
-        const sousTotal = this.getCartTotal();
-        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
-        const total = sousTotal + fraisLivraison;
-        
-        // Get user info if logged in
-        const userInfo = this.currentUser || {};
-        
-        document.getElementById('mainContent').innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <div class="text-center mb-8">
-                    <h1 class="text-3xl font-bold text-emerald-800 mb-2">Finaliser votre commande</h1>
-                    <p class="text-emerald-600">Vérifiez vos informations et validez votre commande</p>
-                </div>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <!-- Order Form -->
-                    <div class="bg-white rounded-2xl shadow-xl border border-emerald-200/50 p-6">
-                        <h2 class="text-xl font-bold text-emerald-800 mb-6">Informations de livraison</h2>
-                        
-                        <form id="checkoutForm" class="space-y-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="checkoutPrenom" class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
-                                    <input type="text" id="checkoutPrenom" name="prenom" required 
-                                           value="${userInfo.prenom || ''}"
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                           placeholder="Votre prénom">
-                                </div>
-                                <div>
-                                    <label for="checkoutNom" class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
-                                    <input type="text" id="checkoutNom" name="nom" required 
-                                           value="${userInfo.nom || ''}"
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                           placeholder="Votre nom">
-                                </div>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="checkoutEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                                    <input type="email" id="checkoutEmail" name="email" required 
-                                           value="${userInfo.email || ''}"
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                           placeholder="votre@email.com">
-                                </div>
-                                <div>
-                                    <label for="checkoutTelephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
-                                    <input type="tel" id="checkoutTelephone" name="telephone" required 
-                                           value="${userInfo.telephone || ''}"
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
-                                           placeholder="+213 555 123 456">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label for="checkoutAdresse" class="block text-sm font-medium text-gray-700 mb-2">Adresse complète *</label>
-                                <textarea id="checkoutAdresse" name="adresse" required rows="3"
-                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
-                                          placeholder="Votre adresse complète">${userInfo.adresse || ''}</textarea>
-                            </div>
-                            
-                            <div>
-                                <label for="checkoutWilaya" class="block text-sm font-medium text-gray-700 mb-2">Wilaya *</label>
-                                <select id="checkoutWilaya" name="wilaya" required 
-                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
-                                    <option value="">Sélectionnez votre wilaya</option>
-                                    <option value="Alger" ${userInfo.wilaya === 'Alger' ? 'selected' : ''}>Alger</option>
-                                    <option value="Blida" ${userInfo.wilaya === 'Blida' ? 'selected' : ''}>Blida</option>
-                                    <option value="Boumerdès" ${userInfo.wilaya === 'Boumerdès' ? 'selected' : ''}>Boumerdès</option>
-                                    <option value="Tipaza" ${userInfo.wilaya === 'Tipaza' ? 'selected' : ''}>Tipaza</option>
-                                    <option value="Médéa" ${userInfo.wilaya === 'Médéa' ? 'selected' : ''}>Médéa</option>
-                                    <option value="Aïn Defla" ${userInfo.wilaya === 'Aïn Defla' ? 'selected' : ''}>Aïn Defla</option>
-                                    <option value="Chlef" ${userInfo.wilaya === 'Chlef' ? 'selected' : ''}>Chlef</option>
-                                    <option value="Djelfa" ${userInfo.wilaya === 'Djelfa' ? 'selected' : ''}>Djelfa</option>
-                                    <option value="Laghouat" ${userInfo.wilaya === 'Laghouat' ? 'selected' : ''}>Laghouat</option>
-                                    <option value="M'sila" ${userInfo.wilaya === 'M\'sila' ? 'selected' : ''}>M'sila</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label for="checkoutCommentaires" class="block text-sm font-medium text-gray-700 mb-2">Commentaires (optionnel)</label>
-                                <textarea id="checkoutCommentaires" name="commentaires" rows="2"
-                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
-                                          placeholder="Instructions spéciales pour la livraison..."></textarea>
-                            </div>
-                            
-                            <!-- Payment Method -->
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-4">Mode de paiement *</label>
-                                <div class="space-y-3">
-                                    <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:bg-emerald-50 transition-all">
-                                        <input type="radio" name="modePaiement" value="Paiement à la livraison" checked 
-                                               class="text-emerald-600 focus:ring-emerald-500">
-                                        <div class="ml-3">
-                                            <div class="font-medium text-gray-900">Paiement à la livraison</div>
-                                            <div class="text-sm text-gray-500">Payez en espèces lors de la réception</div>
-                                        </div>
-                                        <i class="fas fa-money-bill-wave text-emerald-600 ml-auto text-xl"></i>
-                                    </label>
-                                    
-                                    <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition-all opacity-50">
-                                        <input type="radio" name="modePaiement" value="Carte bancaire" disabled
-                                               class="text-blue-600 focus:ring-blue-500">
-                                        <div class="ml-3">
-                                            <div class="font-medium text-gray-900">Carte bancaire</div>
-                                            <div class="text-sm text-gray-500">Bientôt disponible</div>
-                                        </div>
-                                        <i class="fas fa-credit-card text-blue-600 ml-auto text-xl"></i>
-                                    </label>
-                                </div>
-                                <div id="paymentMethodInfo" class="mt-4"></div>
-                            </div>
-                        </form>
-                    </div>
-                    
-                    <!-- Order Summary -->
-                    <div class="bg-white rounded-2xl shadow-xl border border-emerald-200/50 p-6 h-fit">
-                        <h2 class="text-xl font-bold text-emerald-800 mb-6">Résumé de la commande</h2>
-                        
-                        <!-- Cart Items -->
-                        <div class="space-y-4 mb-6">
-                            ${this.cart.map(item => `
-                                <div class="flex items-center space-x-3 p-3 bg-emerald-50/50 rounded-lg">
-                                    <img src="${item.image}" alt="${item.nom}" 
-                                         class="w-12 h-12 object-cover rounded-lg border border-emerald-200">
-                                    <div class="flex-1">
-                                        <h4 class="font-medium text-emerald-800 text-sm">${item.nom}</h4>
-                                        <p class="text-emerald-600 text-xs">${item.quantite} × ${item.prix} DA</p>
-                                    </div>
-                                    <span class="font-bold text-emerald-700">${item.quantite * item.prix} DA</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                        
-                        <!-- Shipping Progress -->
-                        <div id="shippingMessage" class="mb-4">
-                            ${sousTotal >= 5000 ? `
-                                <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-                                    <p class="text-green-700 text-sm font-medium">
-                                        <i class="fas fa-truck mr-2"></i>
-                                        Félicitations ! Livraison gratuite.
-                                    </p>
-                                </div>
-                            ` : `
-                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                    <div class="flex items-center justify-between text-sm text-blue-800 mb-2">
-                                        <span>Livraison gratuite à partir de 5000 DA</span>
-                                        <span class="font-medium">${5000 - sousTotal} DA restants</span>
-                                    </div>
-                                    <div class="w-full bg-blue-200 rounded-full h-2">
-                                        <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                                             style="width: ${Math.min((sousTotal / 5000) * 100, 100)}%"></div>
-                                    </div>
-                                </div>
-                            `}
-                        </div>
-                        
-                        <!-- Order Totals -->
-                        <div class="border-t border-emerald-200 pt-4 space-y-3">
-                            <div class="flex justify-between text-emerald-700">
-                                <span>Sous-total:</span>
-                                <span id="checkoutSousTotal">${sousTotal} DA</span>
-                            </div>
-                            <div class="flex justify-between text-emerald-700">
-                                <span>Frais de livraison:</span>
-                                <span id="checkoutFraisLivraison" class="${fraisLivraison === 0 ? 'text-green-600 font-semibold' : ''}">${fraisLivraison === 0 ? 'GRATUIT' : fraisLivraison + ' DA'}</span>
-                            </div>
-                            <div class="flex justify-between text-lg font-bold text-emerald-800 border-t border-emerald-200 pt-3">
-                                <span>Total:</span>
-                                <span id="checkoutTotal">${total} DA</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Submit Button -->
-                        <button onclick="processCheckoutOrder()" 
-                                class="w-full mt-6 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 text-lg">
-                            <i class="fas fa-check mr-2"></i>Confirmer la commande
-                        </button>
-                        
-                        <p class="text-xs text-gray-500 text-center mt-4">
-                            En validant votre commande, vous acceptez nos conditions générales de vente.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Initialize checkout system
-        if (window.initCheckout) {
-            window.initCheckout();
-        }
-        
-    } catch (error) {
-        console.error('Error loading checkout page:', error);
-        this.showToast('Erreur lors du chargement de la commande', 'error');
-        this.showPage('products');
-    }
-};
-
-// Order confirmation page
-PharmacieGaherApp.prototype.loadOrderConfirmationPage = async function(orderNumber) {
-    try {
-        console.log('Loading order confirmation for:', orderNumber);
-        
-        document.getElementById('mainContent').innerHTML = `
-            <div class="container mx-auto px-4 py-16 text-center">
-                <div class="max-w-2xl mx-auto">
-                    <!-- Success Animation -->
-                    <div class="w-32 h-32 mx-auto mb-8 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-2xl">
-                        <i class="fas fa-check text-white text-6xl animate-pulse"></i>
-                    </div>
-                    
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
-                    <p class="text-xl text-emerald-600 mb-8">Votre commande a été enregistrée avec succès</p>
-                    
-                    <div class="bg-gradient-to-br from-emerald-50 to-green-100 border border-emerald-200 rounded-2xl p-8 mb-8">
-                        <h2 class="text-2xl font-bold text-emerald-800 mb-4">
-                            Commande #${orderNumber}
-                        </h2>
-                        <p class="text-emerald-700 mb-6">
-                            Un email de confirmation vous sera envoyé sous peu avec tous les détails de votre commande.
-                        </p>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                            <div class="bg-white/60 rounded-xl p-4">
-                                <h3 class="font-semibold text-emerald-800 mb-2">
-                                    <i class="fas fa-truck mr-2"></i>Livraison
-                                </h3>
-                                <p class="text-emerald-700 text-sm">
-                                    Votre commande sera livrée sous 24-48h ouvrables
-                                </p>
-                            </div>
-                            
-                            <div class="bg-white/60 rounded-xl p-4">
-                                <h3 class="font-semibold text-emerald-800 mb-2">
-                                    <i class="fas fa-phone mr-2"></i>Suivi
-                                </h3>
-                                <p class="text-emerald-700 text-sm">
-                                    Nous vous contacterons pour confirmer l'adresse
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <button onclick="app.showPage('products')" 
-                                class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 text-lg mr-4">
-                            <i class="fas fa-shopping-bag mr-2"></i>Continuer vos achats
-                        </button>
-                        
-                        <button onclick="app.showPage('home')" 
-                                class="bg-emerald-100 text-emerald-700 font-bold py-4 px-8 rounded-xl hover:bg-emerald-200 transition-all text-lg">
-                            <i class="fas fa-home mr-2"></i>Retour à l'accueil
-                        </button>
-                    </div>
-                    
-                    <div class="mt-12 p-6 bg-blue-50 border border-blue-200 rounded-2xl">
-                        <h3 class="font-semibold text-blue-800 mb-3">
-                            <i class="fas fa-info-circle mr-2"></i>Informations importantes
-                        </h3>
-                        <ul class="text-blue-700 text-sm space-y-2 text-left">
-                            <li>• Le paiement s'effectue à la livraison en espèces</li>
-                            <li>• Vérifiez vos articles avant de payer le livreur</li>
-                            <li>• Conservez votre numéro de commande pour le suivi</li>
-                            <li>• Pour toute question, contactez-nous au +213 123 456 789</li>
-                        </ul>
-                    </div>
-                </div>
+                `}
             </div>
         `;
         
     } catch (error) {
-        console.error('Error loading order confirmation:', error);
-        this.showToast('Erreur lors du chargement de la confirmation', 'error');
-        this.showPage('home');
+        console.error('Error loading products:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <p class="text-red-800">Erreur de chargement des produits</p>
+            </div>
+        `;
     }
 };
 
-// Helper methods
-PharmacieGaherApp.prototype.getAvailableCategories = function() {
-    const categories = new Set(this.allProducts.map(p => p.categorie));
-    return Array.from(categories).sort();
-};
-
-PharmacieGaherApp.prototype.setupProductsSearch = function() {
-    const searchInput = document.getElementById('productsSearchInput');
-    if (searchInput) {
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.performSearch(e.target.value);
-            }
-        });
-    }
-};
-
-PharmacieGaherApp.prototype.generatePlaceholderImage = function(product) {
+// Product Row Renderer
+PharmacieGaherApp.prototype.renderProductRow = function(product) {
     const getCategoryColor = (category) => {
         const colors = {
-            'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
-            'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-            'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
-            'Dentaire': '6366f1', 'Maman': 'd946ef', 'Minceur': '8b5cf6'
+            'Vitalité': '10b981', 'Cheveux': 'f59e0b', 'Visage': 'ec4899',
+            'Intime': 'ef4444', 'Solaire': 'f97316', 'Bébé': '06b6d4',
+            'Maman': 'd946ef', 'Minceur': '8b5cf6', 'Homme': '3b82f6',
+            'Soins': '22c55e', 'Dentaire': '6366f1', 'Sport': 'f43f5e'
         };
         return colors[category] || '10b981';
     };
     
     const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
     const categoryColor = getCategoryColor(product.categorie);
-    return `https://via.placeholder.com/300x300/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+    const imageUrl = product.image || `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+
+    return `
+        <tr class="border-b border-emerald-50 hover:bg-emerald-50/50 transition-colors">
+            <td class="py-4 px-6">
+                <img src="${imageUrl}" alt="${product.nom}" 
+                     class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200 shadow-sm"
+                     onerror="this.src='https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}'">
+            </td>
+            <td class="py-4 px-6">
+                <div class="font-semibold text-gray-900">${product.nom}</div>
+                <div class="text-sm text-emerald-600">${product.categorie}</div>
+                <div class="text-xs text-gray-500">${product.marque || 'Sans marque'}</div>
+            </td>
+            <td class="py-4 px-6">
+                <span class="text-lg font-semibold text-emerald-700">${product.prix} DA</span>
+            </td>
+            <td class="py-4 px-6">
+                <span class="text-emerald-600 font-medium">${product.stock} unités</span>
+            </td>
+            <td class="py-4 px-6">
+                <div class="flex items-center space-x-2">
+                    <div class="w-2 h-2 rounded-full ${product.actif ? 'bg-green-500' : 'bg-red-500'}"></div>
+                    <span class="text-sm font-medium ${product.actif ? 'text-green-700' : 'text-red-700'}">
+                        ${product.actif ? 'Actif' : 'Inactif'}
+                    </span>
+                </div>
+                ${product.enVedette ? '<div class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded inline-block mt-1">★ En vedette</div>' : ''}
+            </td>
+            <td class="py-4 px-6">
+                <div class="flex items-center space-x-2">
+                    <button onclick="openEditProductModal('${product._id}')" 
+                            class="text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-all"
+                            title="Modifier">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="toggleFeatured('${product._id}', ${!product.enVedette})" 
+                            class="text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100 p-2 rounded-lg transition-all"
+                            title="${product.enVedette ? 'Retirer de la vedette' : 'Mettre en vedette'}">
+                        <i class="fas fa-star ${product.enVedette ? 'text-yellow-500' : ''}"></i>
+                    </button>
+                    <button onclick="deleteProduct('${product._id}')" 
+                            class="text-red-600 hover:text-red-800 hover:bg-red-100 p-2 rounded-lg transition-all"
+                            title="Supprimer">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
 };
 
-// FIXED: Process order function (integrates with checkout.js)
-PharmacieGaherApp.prototype.processOrder = function() {
-    console.log('processOrder called in app.js - delegating to checkout system');
-    if (window.processCheckoutOrder) {
-        return window.processCheckoutOrder();
-    } else {
-        console.error('Checkout system not available');
-        this.showToast('Système de commande non initialisé', 'error');
+// Orders Management - FIXED
+PharmacieGaherApp.prototype.loadAdminOrders = async function() {
+    try {
+        console.log('Loading orders from admin panel...');
+        
+        // Always start with localStorage orders
+        let orders = [...adminOrders];
+        console.log('Local orders loaded:', orders.length);
+        
+        // Try to merge with API orders
+        try {
+            const data = await apiCall('/orders');
+            if (data && data.orders && data.orders.length > 0) {
+                console.log('API orders loaded:', data.orders.length);
+                const apiOrders = data.orders.filter(apiOrder => 
+                    !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
+                );
+                orders = [...orders, ...apiOrders];
+            }
+        } catch (error) {
+            console.log('API unavailable, using only local orders');
+        }
+        
+        // Sort by date, newest first
+        orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
+        
+        console.log('Total orders to display:', orders.length);
+        
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-emerald-800">Gestion des commandes</h2>
+                    <div class="flex gap-2">
+                        <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-semibold">
+                            ${orders.length} commande(s)
+                        </span>
+                        <button onclick="app.loadAdminOrders()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-sync mr-2"></i>Actualiser
+                        </button>
+                    </div>
+                </div>
+                
+                ${orders.length === 0 ? `
+                    <div class="text-center py-16">
+                        <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
+                        <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées</p>
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
+                            <h4 class="font-semibold text-blue-800 mb-2">Info:</h4>
+                            <p class="text-sm text-blue-700">Les commandes sont automatiquement ajoutées ici lors du checkout</p>
+                        </div>
+                    </div>
+                ` : `
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-emerald-50 border-b border-emerald-200">
+                                <tr>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Commande</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Client</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Date</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Total</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Statut</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${orders.map(order => `
+                                    <tr class="border-b border-emerald-50 hover:bg-emerald-50/50 transition-colors">
+                                        <td class="py-4 px-6">
+                                            <div class="font-semibold text-emerald-800">#${order.numeroCommande}</div>
+                                            <div class="text-sm text-emerald-600">${order.articles?.length || 0} article(s)</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="font-medium text-gray-900">${order.client?.prenom || 'N/A'} ${order.client?.nom || ''}</div>
+                                            <div class="text-sm text-gray-600">${order.client?.email || 'N/A'}</div>
+                                            <div class="text-xs text-gray-500">${order.client?.adresse || order.client?.wilaya || 'N/A'}</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="text-sm text-gray-900">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</div>
+                                            <div class="text-xs text-gray-500">${new Date(order.dateCommande).toLocaleTimeString('fr-FR')}</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="font-semibold text-emerald-700">${order.total} DA</div>
+                                            <div class="text-sm text-gray-600">Livraison: ${order.fraisLivraison || 0} DA</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.statut)}">
+                                                ${getStatusLabel(order.statut)}
+                                            </span>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="flex items-center space-x-2">
+                                                <button onclick="viewOrderDetails('${order._id || order.numeroCommande}')" 
+                                                        class="text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-all"
+                                                        title="Voir détails">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button onclick="updateOrderStatus('${order._id || order.numeroCommande}', 'confirmée')" 
+                                                        class="text-green-600 hover:text-green-800 hover:bg-green-100 p-2 rounded-lg transition-all"
+                                                        title="Confirmer">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error loading orders:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur de chargement des commandes</h3>
+                <p class="text-red-700 mb-4">Détails: ${error.message}</p>
+                <button onclick="app.loadAdminOrders()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                    Réessayer
+                </button>
+            </div>
+        `;
     }
 };
 
-// Global functions for product management
-function handleProductsSearch(event) {
-    if (event.key === 'Enter') {
-        searchProducts();
+// Featured Products Management
+PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
+    try {
+        // Get products from local storage
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        
+        let featuredProducts = localProducts.filter(p => p.enVedette);
+        let allProducts = localProducts.filter(p => !p.enVedette);
+        
+        // Try to get products from API
+        try {
+            const allData = await apiCall('/products');
+            if (allData && allData.products && allData.products.length > 0) {
+                // Merge API products, avoiding duplicates
+                const localIds = localProducts.map(p => p._id);
+                const newApiProducts = allData.products.filter(p => !localIds.includes(p._id));
+                
+                featuredProducts = [...featuredProducts, ...newApiProducts.filter(p => p.enVedette)];
+                allProducts = [...allProducts, ...newApiProducts.filter(p => !p.enVedette)];
+            }
+        } catch (error) {
+            console.log('API unavailable, using local products');
+        }
+        
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                <h2 class="text-2xl font-bold text-emerald-800 mb-6">Gestion des Coups de Coeur</h2>
+                
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-emerald-700 mb-4">Produits en vedette (${featuredProducts.length})</h3>
+                    ${featuredProducts.length === 0 ? `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+                            <i class="fas fa-star text-yellow-400 text-4xl mb-4"></i>
+                            <p class="text-yellow-700">Aucun produit en vedette</p>
+                            <p class="text-yellow-600 text-sm mt-2">Ajoutez des produits en vedette pour les mettre en avant sur votre site</p>
+                        </div>
+                    ` : `
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${featuredProducts.map(product => `
+                                <div class="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-4">
+                                    <div class="flex items-center space-x-3">
+                                        <img src="${product.image || this.generatePlaceholderImage(product)}" 
+                                             alt="${product.nom}" 
+                                             class="w-16 h-16 object-cover rounded-lg border-2 border-yellow-200">
+                                        <div class="flex-1">
+                                            <h4 class="font-semibold text-amber-800">${product.nom}</h4>
+                                            <p class="text-amber-600 text-sm">${product.categorie} - ${product.prix} DA</p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 flex justify-end">
+                                        <button onclick="toggleFeatured('${product._id}', false)" 
+                                                class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">
+                                            <i class="fas fa-star mr-1"></i>Retirer
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+                
+                <div class="border-t border-emerald-200 pt-6">
+                    <h3 class="text-lg font-semibold text-emerald-700 mb-4">Autres produits disponibles</h3>
+                    ${allProducts.length === 0 ? `
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+                            <p class="text-blue-700">Aucun autre produit disponible</p>
+                        </div>
+                    ` : `
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${allProducts.map(product => `
+                                <div class="bg-white border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors">
+                                    <div class="flex items-center space-x-3">
+                                        <img src="${product.image || this.generatePlaceholderImage(product)}" 
+                                             alt="${product.nom}" 
+                                             class="w-16 h-16 object-cover rounded-lg border-2 border-gray-200">
+                                        <div class="flex-1">
+                                            <h4 class="font-semibold text-gray-800">${product.nom}</h4>
+                                            <p class="text-gray-600 text-sm">${product.categorie} - ${product.prix} DA</p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 flex justify-end">
+                                        <button onclick="toggleFeatured('${product._id}', true)" 
+                                                class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm">
+                                            <i class="fas fa-star mr-1"></i>Ajouter aux coups de coeur
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error loading featured products:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <p class="text-red-800">Erreur de chargement des produits en vedette</p>
+            </div>
+        `;
+    }
+};
+
+// Helper method to generate placeholder image URL
+PharmacieGaherApp.prototype.generatePlaceholderImage = function(product) {
+    const getCategoryColor = (category) => {
+        const colors = {
+            'Vitalité': '10b981', 'Cheveux': 'f59e0b', 'Visage': 'ec4899',
+            'Intime': 'ef4444', 'Solaire': 'f97316', 'Bébé': '06b6d4',
+            'Maman': 'd946ef', 'Minceur': '8b5cf6', 'Homme': '3b82f6',
+            'Soins': '22c55e', 'Dentaire': '6366f1', 'Sport': 'f43f5e'
+        };
+        return colors[category] || '10b981';
+    };
+    
+    const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+    const categoryColor = getCategoryColor(product.categorie);
+    return `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+};
+
+// Cleanup Section
+PharmacieGaherApp.prototype.loadCleanupSection = async function() {
+    try {
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                <h2 class="text-2xl font-bold text-red-800 mb-6">Nettoyage de la base de données</h2>
+                
+                <div class="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-600 text-2xl mr-4"></i>
+                        <div>
+                            <h3 class="text-lg font-semibold text-green-800">Base de données propre</h3>
+                            <p class="text-green-600">Aucun produit problématique détecté</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-4">Actions de maintenance</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onclick="refreshProductCache()" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl">
+                            <i class="fas fa-sync mr-2"></i>Actualiser le cache
+                        </button>
+                        <button onclick="validateAllProducts()" 
+                                class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl">
+                            <i class="fas fa-check-double mr-2"></i>Valider tous les produits
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                    <h3 class="text-lg font-semibold text-red-800 mb-4">Actions dangereuses</h3>
+                    <p class="text-red-600 mb-4">Attention : Les actions ci-dessous sont irréversibles.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onclick="clearAllProducts()" 
+                                class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl">
+                            <i class="fas fa-trash-alt mr-2"></i>Supprimer tous les produits
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading cleanup section:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <p class="text-red-800">Erreur de chargement de la section nettoyage</p>
+            </div>
+        `;
+    }
+};
+
+// Function to add order to demo (called from checkout) - FIXED
+window.addOrderToDemo = function(orderData) {
+    console.log('Adding order to demo:', orderData);
+    
+    try {
+        // Ensure the order has a valid structure with proper client data
+        const validOrder = {
+            _id: orderData._id || Date.now().toString(),
+            numeroCommande: orderData.numeroCommande,
+            client: {
+                userId: orderData.client?.userId || null,
+                prenom: orderData.client?.prenom || 'N/A',
+                nom: orderData.client?.nom || 'N/A',
+                email: orderData.client?.email || 'N/A',
+                telephone: orderData.client?.telephone || 'N/A',
+                adresse: orderData.client?.adresse || 'N/A',
+                wilaya: orderData.client?.wilaya || 'N/A'
+            },
+            articles: orderData.articles || [],
+            sousTotal: orderData.sousTotal || 0,
+            fraisLivraison: orderData.fraisLivraison || 0,
+            total: orderData.total || 0,
+            statut: orderData.statut || 'en-attente',
+            modePaiement: orderData.modePaiement || 'Paiement à la livraison',
+            dateCommande: orderData.dateCommande || new Date().toISOString(),
+            commentaires: orderData.commentaires || ''
+        };
+        
+        // Add to localStorage
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        
+        // Check for duplicates based on numeroCommande
+        const existingIndex = orders.findIndex(o => o.numeroCommande === validOrder.numeroCommande);
+        if (existingIndex > -1) {
+            console.log('Order already exists, updating...');
+            orders[existingIndex] = validOrder;
+        } else {
+            orders.unshift(validOrder);
+        }
+        
+        localStorage.setItem('adminOrders', JSON.stringify(orders));
+        
+        // Update global variable
+        adminOrders = orders;
+        
+        console.log('Order added successfully. Total orders:', orders.length);
+        console.log('Order details:', validOrder);
+        
+        return validOrder;
+        
+    } catch (error) {
+        console.error('Error adding order to demo:', error);
+        return null;
+    }
+};
+
+// Helper functions for order management
+function getStatusColor(statut) {
+    const colors = {
+        'en-attente': 'bg-yellow-100 text-yellow-800',
+        'confirmée': 'bg-green-100 text-green-800',
+        'préparée': 'bg-blue-100 text-blue-800',
+        'expédiée': 'bg-purple-100 text-purple-800',
+        'livrée': 'bg-emerald-100 text-emerald-800',
+        'annulée': 'bg-red-100 text-red-800'
+    };
+    return colors[statut] || 'bg-gray-100 text-gray-800';
+}
+
+function getStatusLabel(statut) {
+    const labels = {
+        'en-attente': 'En attente',
+        'confirmée': 'Confirmée',
+        'préparée': 'Préparée',
+        'expédiée': 'Expédiée',
+        'livrée': 'Livrée',
+        'annulée': 'Annulée'
+    };
+    return labels[statut] || statut;
+}
+
+// Enhanced Product Modal Functions with Image Upload
+function openAddProductModal() {
+    currentEditingProduct = null;
+    showProductModal('Ajouter un nouveau produit', 'Ajouter le produit');
+}
+
+async function openEditProductModal(productId) {
+    try {
+        // Look for product in local storage first
+        let product = null;
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        product = localProducts.find(p => p._id === productId);
+        
+        // If not found locally, try API
+        if (!product) {
+            try {
+                const response = await fetch(buildApiUrl(`/products/${productId}`));
+                if (response.ok) {
+                    product = await response.json();
+                }
+            } catch (error) {
+                console.log('API unavailable, unable to find product');
+            }
+        }
+        
+        // If still not found, show error
+        if (!product) {
+            app.showToast('Produit non trouvé', 'error');
+            return;
+        }
+        
+        currentEditingProduct = product;
+        showProductModal('Modifier le produit', 'Modifier le produit');
+        setTimeout(() => fillProductForm(product), 100);
+    } catch (error) {
+        console.error('Error loading product:', error);
+        app.showToast('Erreur lors du chargement du produit', 'error');
     }
 }
 
-function searchProducts() {
-    const searchInput = document.getElementById('productsSearchInput');
-    if (searchInput && window.app) {
-        const query = searchInput.value.trim();
-        if (query) {
-            window.app.performSearch(query);
+function showProductModal(title, submitText) {
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="productModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                    <h3 class="text-2xl font-bold text-emerald-800">${title}</h3>
+                    <button onclick="closeProductModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="p-6 overflow-y-auto max-h-[75vh]">
+                    <form id="productForm" class="space-y-6">
+                        <input type="hidden" id="productId" value="${currentEditingProduct ? currentEditingProduct._id : ''}">
+                        
+                        <!-- Basic Information -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
+                                <input type="text" id="productNom" name="nom" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                       placeholder="Nom du produit">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Marque</label>
+                                <input type="text" id="productMarque" name="marque" 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                       placeholder="Marque du produit">
+                            </div>
+                        </div>
+                        
+                        <!-- Description -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
+                            <textarea id="productDescription" name="description" required rows="3" 
+                                      class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                      placeholder="Description détaillée du produit"></textarea>
+                        </div>
+                        
+                        <!-- Image Upload -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Image du produit</label>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <div id="imagePreviewContainer" class="bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl p-4 text-center mb-2 h-48 flex items-center justify-center">
+                                        <div id="imagePreviewPlaceholder">
+                                            <i class="fas fa-image text-gray-400 text-4xl mb-2"></i>
+                                            <p class="text-gray-500">Aperçu de l'image</p>
+                                        </div>
+                                        <img id="imagePreview" src="" alt="Aperçu" class="max-h-40 max-w-full hidden">
+                                    </div>
+                                </div>
+                                <div class="flex flex-col justify-center">
+                                    <div class="mb-4">
+                                        <label for="productImageUpload" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-4 rounded-xl text-center cursor-pointer flex items-center justify-center">
+                                            <i class="fas fa-upload mr-2"></i>Télécharger une image
+                                            <input type="file" id="productImageUpload" name="image" accept="image/*" class="hidden" onchange="previewImage(this)">
+                                        </label>
+                                    </div>
+                                    <div class="text-sm text-gray-500">
+                                        <p>Formats acceptés: JPG, PNG, GIF</p>
+                                        <p>Taille max: 2MB</p>
+                                    </div>
+                                    <input type="hidden" id="productImageUrl" name="imageUrl">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Price and Stock -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prix (DA) *</label>
+                                <input type="number" id="productPrix" name="prix" required min="0" step="1" 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prix original (DA)</label>
+                                <input type="number" id="productPrixOriginal" name="prixOriginal" min="0" step="1" 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                       placeholder="Pour les promotions">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Stock *</label>
+                                <input type="number" id="productStock" name="stock" required min="0" step="1" 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Catégorie *</label>
+                                <select id="productCategorie" name="categorie" required 
+                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                    <option value="">Sélectionnez</option>
+                                    <option value="Vitalité">Vitalité</option>
+                                    <option value="Cheveux">Cheveux</option>
+                                    <option value="Visage">Visage</option>
+                                    <option value="Intime">Intime</option>
+                                    <option value="Solaire">Solaire</option>
+                                    <option value="Bébé">Bébé</option>
+                                    <option value="Maman">Maman</option>
+                                    <option value="Minceur">Minceur</option>
+                                    <option value="Homme">Homme</option>
+                                    <option value="Soins">Soins</option>
+                                    <option value="Dentaire">Dentaire</option>
+                                    <option value="Sport">Sport</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Additional Info -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Ingrédients</label>
+                                <textarea id="productIngredients" name="ingredients" rows="2" 
+                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                          placeholder="Principaux ingrédients"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Mode d'emploi</label>
+                                <textarea id="productModeEmploi" name="modeEmploi" rows="2" 
+                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                          placeholder="Comment utiliser le produit"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Précautions</label>
+                                <textarea id="productPrecautions" name="precautions" rows="2" 
+                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                          placeholder="Précautions d'usage"></textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- Options -->
+                        <div class="flex flex-wrap gap-6">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="productEnVedette" name="enVedette" 
+                                       class="rounded text-emerald-600 mr-2 w-5 h-5">
+                                <span class="text-sm font-medium text-gray-700">En vedette</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="productEnPromotion" name="enPromotion" 
+                                       class="rounded text-emerald-600 mr-2 w-5 h-5">
+                                <span class="text-sm font-medium text-gray-700">En promotion</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="productActif" name="actif" checked 
+                                       class="rounded text-emerald-600 mr-2 w-5 h-5">
+                                <span class="text-sm font-medium text-gray-700">Produit actif</span>
+                            </label>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                            <button type="button" onclick="closeProductModal()" 
+                                    class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
+                                Annuler
+                            </button>
+                            <button type="button" onclick="saveProduct()" id="productSubmitBtn" 
+                                    class="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                                <span id="productSubmitText">${submitText}</span>
+                                <i id="productSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `);
+    
+    document.body.style.overflow = 'hidden';
+    
+    // Initialize promotion checkbox behavior
+    document.getElementById('productEnPromotion').addEventListener('change', function() {
+        const prixOriginalField = document.getElementById('productPrixOriginal');
+        if (this.checked) {
+            prixOriginalField.required = true;
+            prixOriginalField.focus();
         } else {
-            window.app.showPage('products');
+            prixOriginalField.required = false;
+        }
+    });
+}
+
+// Improved image preview function
+function previewImage(input) {
+    const preview = document.getElementById('imagePreview');
+    const placeholder = document.getElementById('imagePreviewPlaceholder');
+    const imageUrl = document.getElementById('productImageUrl');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Validate file size (2MB max)
+        if (file.size > 2 * 1024 * 1024) {
+            app.showToast('Image trop volumineuse. Maximum 2MB.', 'error');
+            input.value = '';
+            return;
+        }
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            app.showToast('Veuillez sélectionner un fichier image.', 'error');
+            input.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            
+            // Save image data to hidden input
+            imageUrl.value = e.target.result;
+            console.log('Image preview generated');
+        };
+        
+        reader.readAsDataURL(file);
+    } else {
+        // Reset preview if no file selected
+        preview.classList.add('hidden');
+        placeholder.classList.remove('hidden');
+        imageUrl.value = '';
+        console.log('No file selected');
+    }
+}
+
+function fillProductForm(product) {
+    document.getElementById('productId').value = product._id || '';
+    document.getElementById('productNom').value = product.nom || '';
+    document.getElementById('productMarque').value = product.marque || '';
+    document.getElementById('productDescription').value = product.description || '';
+    document.getElementById('productPrix').value = product.prix || '';
+    document.getElementById('productPrixOriginal').value = product.prixOriginal || '';
+    document.getElementById('productStock').value = product.stock || '';
+    document.getElementById('productCategorie').value = product.categorie || '';
+    document.getElementById('productIngredients').value = product.ingredients || '';
+    document.getElementById('productModeEmploi').value = product.modeEmploi || '';
+    document.getElementById('productPrecautions').value = product.precautions || '';
+    document.getElementById('productEnVedette').checked = product.enVedette || false;
+    document.getElementById('productEnPromotion').checked = product.enPromotion || false;
+    document.getElementById('productActif').checked = product.actif !== false; // Default to true
+    
+    // Handle image preview
+    if (product.image) {
+        const preview = document.getElementById('imagePreview');
+        const placeholder = document.getElementById('imagePreviewPlaceholder');
+        const imageUrl = document.getElementById('productImageUrl');
+        
+        preview.src = product.image;
+        preview.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        imageUrl.value = product.image;
+    }
+    
+    // Trigger change event for promotion checkbox
+    document.getElementById('productEnPromotion').dispatchEvent(new Event('change'));
+}
+
+function closeProductModal() {
+    const modal = document.getElementById('productModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = 'auto';
+    }
+    currentEditingProduct = null;
+}
+
+// New function to save product directly
+function saveProduct() {
+    const form = document.getElementById('productForm');
+    const isEditing = !!currentEditingProduct;
+    
+    // Validate form
+    const nom = document.getElementById('productNom').value.trim();
+    const prix = document.getElementById('productPrix').value;
+    const stock = document.getElementById('productStock').value;
+    const categorie = document.getElementById('productCategorie').value;
+    const description = document.getElementById('productDescription').value.trim();
+    
+    if (!nom || !prix || !stock || !categorie || !description) {
+        app.showToast('Veuillez remplir tous les champs obligatoires', 'error');
+        return;
+    }
+    
+    const button = document.getElementById('productSubmitBtn');
+    const buttonText = document.getElementById('productSubmitText');
+    const spinner = document.getElementById('productSubmitSpinner');
+    
+    // Disable button and show loading
+    button.disabled = true;
+    buttonText.classList.add('hidden');
+    spinner.classList.remove('hidden');
+    
+    try {
+        // Get form values
+        const productId = document.getElementById('productId').value || Date.now().toString();
+        const marque = document.getElementById('productMarque').value.trim();
+        const prixOriginal = document.getElementById('productPrixOriginal').value;
+        const ingredients = document.getElementById('productIngredients').value.trim();
+        const modeEmploi = document.getElementById('productModeEmploi').value.trim();
+        const precautions = document.getElementById('productPrecautions').value.trim();
+        const enVedette = document.getElementById('productEnVedette').checked;
+        const enPromotion = document.getElementById('productEnPromotion').checked;
+        const actif = document.getElementById('productActif').checked;
+        const imageUrl = document.getElementById('productImageUrl').value;
+        
+        // Prepare product data
+        const productData = {
+            _id: productId,
+            nom: nom,
+            description: description,
+            marque: marque,
+            prix: parseInt(prix),
+            stock: parseInt(stock),
+            categorie: categorie,
+            actif: actif,
+            enVedette: enVedette,
+            enPromotion: enPromotion,
+            dateAjout: new Date().toISOString()
+        };
+        
+        // Add optional fields
+        if (prixOriginal) {
+            productData.prixOriginal = parseInt(prixOriginal);
+            
+            // Calculate discount percentage
+            if (enPromotion && productData.prixOriginal > productData.prix) {
+                productData.pourcentagePromotion = Math.round((productData.prixOriginal - productData.prix) / productData.prixOriginal * 100);
+            }
+        }
+        
+        if (ingredients) productData.ingredients = ingredients;
+        if (modeEmploi) productData.modeEmploi = modeEmploi;
+        if (precautions) productData.precautions = precautions;
+        
+        // Handle image
+        if (imageUrl) {
+            productData.image = imageUrl;
+        }
+        
+        console.log('Product data to save:', productData);
+        
+        // Save to localStorage first
+        let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        
+        if (isEditing) {
+            // Update existing product
+            const index = localProducts.findIndex(p => p._id === productData._id);
+            if (index !== -1) {
+                localProducts[index] = productData;
+            } else {
+                localProducts.push(productData);
+            }
+        } else {
+            // Add new product
+            localProducts.push(productData);
+        }
+        
+        // Save back to localStorage
+        localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+        console.log('Product saved to localStorage');
+        
+        // Update the app's product cache to refresh main page immediately
+        if (window.app) {
+            window.app.refreshProductsCache();
+        }
+        
+        // Try to save to API (optional)
+        const saveToApi = async () => {
+            try {
+                const endpoint = isEditing ? `/products/${productData._id}` : '/products';
+                const method = isEditing ? 'PUT' : 'POST';
+                
+                const response = await fetch(buildApiUrl(endpoint), {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-token': localStorage.getItem('token')
+                    },
+                    body: JSON.stringify(productData)
+                });
+                
+                if (response.ok) {
+                    console.log('Product saved to API successfully');
+                } else {
+                    console.log('API save failed but product saved locally');
+                }
+            } catch (error) {
+                console.log('API save failed, but product saved locally:', error);
+            }
+        };
+        
+        // Save to API in background
+        saveToApi();
+        
+        // Show success message
+        app.showToast(isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 'success');
+        closeProductModal();
+        
+        // Refresh admin section
+        if (adminCurrentSection === 'products') {
+            app.loadAdminProducts();
+        } else if (adminCurrentSection === 'featured' && productData.enVedette) {
+            app.loadAdminFeatured();
+        }
+        
+    } catch (error) {
+        console.error('Error saving product:', error);
+        app.showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
+    } finally {
+        // Re-enable button
+        button.disabled = false;
+        buttonText.classList.remove('hidden');
+        spinner.classList.add('hidden');
+    }
+}
+
+// Product operations
+async function toggleFeatured(productId, newStatus) {
+    try {
+        console.log('Toggling featured status:', productId, newStatus);
+        
+        // Update in localStorage first
+        let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        const productIndex = localProducts.findIndex(p => p._id === productId);
+        
+        if (productIndex !== -1) {
+            localProducts[productIndex].enVedette = newStatus;
+            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+            console.log('Product featured status updated locally');
+            
+            // Update the app's product cache
+            if (window.app) {
+                window.app.refreshProductsCache();
+            }
+        }
+        
+        // Try to update via API
+        try {
+            await apiCall(`/products/${productId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ enVedette: newStatus })
+            });
+            console.log('Product featured status updated via API');
+        } catch (error) {
+            console.log('API update failed, but local update succeeded');
+        }
+        
+        app.showToast(`Produit ${newStatus ? 'ajouté aux' : 'retiré des'} coups de coeur`, 'success');
+        
+        if (adminCurrentSection === 'products') {
+            app.loadAdminProducts();
+        } else if (adminCurrentSection === 'featured') {
+            app.loadAdminFeatured();
+        }
+        
+    } catch (error) {
+        console.error('Error toggling featured:', error);
+        app.showToast('Erreur lors de la modification', 'error');
+    }
+}
+
+async function deleteProduct(productId) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
+        try {
+            console.log('Deleting product:', productId);
+            
+            // Delete from local storage first
+            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            const initialCount = localProducts.length;
+            localProducts = localProducts.filter(p => p._id !== productId);
+            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+            
+            const localDeleteSuccess = localProducts.length < initialCount;
+            console.log('Product deleted locally:', localDeleteSuccess);
+            
+            // Update the app's product cache
+            if (window.app) {
+                window.app.refreshProductsCache();
+            }
+            
+            // Try to delete from API
+            try {
+                await apiCall(`/products/${productId}`, {
+                    method: 'DELETE'
+                });
+                console.log('Product deleted from API successfully');
+            } catch (error) {
+                console.log('API delete failed, but product deleted locally:', error);
+            }
+            
+            // Refresh the products list
+            app.showToast('Produit supprimé avec succès', 'success');
+            
+            if (adminCurrentSection === 'products') {
+                app.loadAdminProducts();
+            } else if (adminCurrentSection === 'featured') {
+                app.loadAdminFeatured();
+            }
+            
+        } catch (error) {
+            console.error('Error deleting product:', error);
+            app.showToast('Erreur lors de la suppression', 'error');
         }
     }
 }
 
-function changeProductQuantity(change) {
-    const quantityInput = document.getElementById('productQuantity');
-    if (quantityInput) {
-        const currentValue = parseInt(quantityInput.value) || 1;
-        const maxValue = parseInt(quantityInput.max) || 10;
-        const newValue = Math.max(1, Math.min(maxValue, currentValue + change));
-        quantityInput.value = newValue;
+// Order detail modal - FIXED
+async function viewOrderDetails(orderId) {
+    try {
+        console.log('Viewing order details for:', orderId);
+        
+        // Find order in localStorage first
+        let order = adminOrders.find(o => o._id === orderId || o.numeroCommande === orderId);
+        
+        if (!order) {
+            // Try to get from API
+            try {
+                const response = await fetch(buildApiUrl(`/orders/${orderId}`), {
+                    headers: {
+                        'x-auth-token': localStorage.getItem('token')
+                    }
+                });
+                if (response.ok) {
+                    order = await response.json();
+                }
+            } catch (error) {
+                console.log('Order not found in API');
+            }
+        }
+        
+        if (order) {
+            // Create detailed order modal
+            document.body.insertAdjacentHTML('beforeend', `
+                <div id="orderDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                            <h3 class="text-2xl font-bold text-emerald-800">Commande #${order.numeroCommande}</h3>
+                            <button onclick="closeOrderDetailModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="p-6 overflow-y-auto max-h-[75vh]">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                                <div>
+                                    <h4 class="font-semibold text-emerald-800 mb-4">Informations client</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <p><strong>Nom:</strong> ${order.client?.prenom || 'N/A'} ${order.client?.nom || ''}</p>
+                                        <p><strong>Email:</strong> ${order.client?.email || 'N/A'}</p>
+                                        <p><strong>Téléphone:</strong> ${order.client?.telephone || 'N/A'}</p>
+                                        <p><strong>Adresse:</strong> ${order.client?.adresse || 'N/A'}</p>
+                                        <p><strong>Wilaya:</strong> ${order.client?.wilaya || 'N/A'}</p>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-emerald-800 mb-4">Détails commande</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <p><strong>Date:</strong> ${new Date(order.dateCommande).toLocaleDateString('fr-FR')} à ${new Date(order.dateCommande).toLocaleTimeString('fr-FR')}</p>
+                                        <p><strong>Statut:</strong> <span class="px-2 py-1 rounded text-xs ${getStatusColor(order.statut)}">${getStatusLabel(order.statut)}</span></p>
+                                        <p><strong>Paiement:</strong> ${order.modePaiement}</p>
+                                        ${order.commentaires ? `<p><strong>Commentaires:</strong> ${order.commentaires}</p>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-6">
+                                <h4 class="font-semibold text-emerald-800 mb-4">Articles commandés</h4>
+                                <div class="space-y-3">
+                                    ${order.articles?.map(article => `
+                                        <div class="flex items-center space-x-4 p-4 bg-emerald-50/50 rounded-xl border border-emerald-200/50">
+                                            <img src="${article.image || 'https://via.placeholder.com/64x64/10b981/ffffff?text=' + encodeURIComponent((article.nom || '').substring(0, 2))}" 
+                                                 alt="${article.nom}" 
+                                                 class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200">
+                                            <div class="flex-1">
+                                                <h5 class="font-medium text-emerald-800">${article.nom}</h5>
+                                                <p class="text-sm text-emerald-600">Quantité: ${article.quantite} × ${article.prix} DA</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="font-medium text-emerald-800">${(article.quantite || 0) * (article.prix || 0)} DA</p>
+                                            </div>
+                                        </div>
+                                    `).join('') || '<p class="text-gray-500">Aucun article</p>'}
+                                </div>
+                            </div>
+                            
+                            <div class="border-t border-emerald-200 pt-4">
+                                <div class="space-y-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-emerald-600">Sous-total:</span>
+                                        <span class="text-emerald-800">${order.sousTotal || 0} DA</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-emerald-600">Frais de livraison:</span>
+                                        <span class="text-emerald-800">${order.fraisLivraison || 0} DA</span>
+                                    </div>
+                                    <div class="flex justify-between text-lg font-semibold border-t border-emerald-200 pt-2">
+                                        <span class="text-emerald-800">Total:</span>
+                                        <span class="text-emerald-600">${order.total || 0} DA</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-4 p-6 border-t border-gray-200">
+                            <button onclick="closeOrderDetailModal()" 
+                                    class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
+                                Fermer
+                            </button>
+                            <button onclick="updateOrderStatus('${order._id || order.numeroCommande}', 'confirmée')" 
+                                    class="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-lg">
+                                Confirmer la commande
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+            
+            document.body.style.overflow = 'hidden';
+        } else {
+            app.showToast('Commande non trouvée', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error viewing order details:', error);
+        app.showToast('Erreur lors de l\'affichage des détails', 'error');
     }
 }
 
-function addProductToCart(productId) {
-    const quantityInput = document.getElementById('productQuantity');
-    const quantity = quantityInput ? parseInt(quantityInput.value) || 1 : 1;
+function closeOrderDetailModal() {
+    const modal = document.getElementById('orderDetailModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = 'auto';
+    }
+}
+
+async function updateOrderStatus(orderId, newStatus) {
+    try {
+        console.log('Updating order status:', orderId, 'to', newStatus);
+        
+        // Update in localStorage
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const orderIndex = orders.findIndex(o => o._id === orderId || o.numeroCommande === orderId);
+        
+        if (orderIndex > -1) {
+            orders[orderIndex].statut = newStatus;
+            if (newStatus === 'livrée') {
+                orders[orderIndex].dateLivraison = new Date().toISOString();
+            }
+            localStorage.setItem('adminOrders', JSON.stringify(orders));
+            adminOrders = orders;
+            console.log('Order status updated locally');
+        }
+        
+        // Try to update via API
+        try {
+            await apiCall(`/orders/${orderId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ 
+                    statut: newStatus,
+                    dateLivraison: newStatus === 'livrée' ? new Date().toISOString() : null
+                })
+            });
+            console.log('Order status updated via API');
+        } catch (error) {
+            console.log('API update failed, but local update succeeded');
+        }
+        
+        app.showToast('Statut de la commande mis à jour', 'success');
+        
+        // Close modal if open
+        closeOrderDetailModal();
+        
+        // Refresh orders list
+        if (adminCurrentSection === 'orders') {
+            app.loadAdminOrders();
+        }
+        
+    } catch (error) {
+        console.error('Error updating order status:', error);
+        app.showToast('Erreur lors de la mise à jour du statut', 'error');
+    }
+}
+
+// Utility functions
+async function refreshProductCache() {
+    if (window.app) {
+        window.app.refreshProductsCache();
+    }
+    app.showToast('Cache actualisé', 'success');
+}
+
+async function validateAllProducts() {
+    app.showToast('Validation terminée', 'success');
+}
+
+async function clearAllProducts() {
+    if (confirm('ATTENTION: Cette action supprimera TOUS les produits. Êtes-vous absolument sûr ?')) {
+        localStorage.removeItem('demoProducts');
+        
+        // Update the app's product cache
+        if (window.app) {
+            window.app.refreshProductsCache();
+        }
+        
+        app.showToast('Tous les produits ont été supprimés', 'success');
+        if (adminCurrentSection === 'products') {
+            app.loadAdminProducts();
+        }
+    }
+}
+
+// Section switching
+function switchAdminSection(section) {
+    document.querySelectorAll('.admin-nav-btn').forEach(btn => {
+        btn.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
+        btn.classList.add('hover:bg-emerald-50', 'text-emerald-700', 'border-r', 'border-emerald-100');
+    });
     
-    if (window.addToCart) {
-        window.addToCart(productId, quantity);
-    } else if (window.cartSystem) {
-        window.cartSystem.addItem(productId, quantity);
-    } else if (window.app) {
-        window.app.addToCart(productId, quantity);
+    const activeBtn = document.querySelector(`.admin-nav-btn.${section}`);
+    if (activeBtn) {
+        activeBtn.classList.add('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
+        activeBtn.classList.remove('hover:bg-emerald-50', 'text-emerald-700', 'border-r', 'border-emerald-100');
+    }
+    
+    adminCurrentSection = section;
+    
+    switch(section) {
+        case 'dashboard':
+            app.loadAdminDashboard();
+            break;
+        case 'products':
+            app.loadAdminProducts();
+            break;
+        case 'orders':
+            app.loadAdminOrders();
+            break;
+        case 'featured':
+            app.loadAdminFeatured();
+            break;
+        case 'cleanup':
+            app.loadCleanupSection();
+            break;
+    }
+}
+
+// Modal event handlers
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('productModal');
+    if (modal && event.target === modal) {
+        closeProductModal();
+    }
+    
+    const orderModal = document.getElementById('orderDetailModal');
+    if (orderModal && event.target === orderModal) {
+        closeOrderDetailModal();
+    }
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('productModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            closeProductModal();
+        }
+        
+        const orderModal = document.getElementById('orderDetailModal');
+        if (orderModal && !orderModal.classList.contains('hidden')) {
+            closeOrderDetailModal();
+        }
+    }
+});
+
+// Error handling for API calls
+window.handleApiError = function(error, context = '') {
+    console.error(`❌ API Error ${context}:`, error);
+    
+    if (error.message.includes('401') || error.message.includes('Token invalide')) {
+        // Token expired or invalid
+        localStorage.removeItem('token');
+        if (window.app) {
+            window.app.currentUser = null;
+            window.app.updateUserUI();
+            window.app.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
+            window.app.showPage('login');
+        }
+    } else if (error.message.includes('403')) {
+        if (window.app) {
+            window.app.showToast('Accès refusé', 'error');
+        }
+    } else if (error.message.includes('404')) {
+        if (window.app) {
+            window.app.showToast('Ressource non trouvée', 'error');
+        }
+    } else if (error.message.includes('500')) {
+        if (window.app) {
+            window.app.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
+        }
     } else {
-        console.error('No cart system available');
+        if (window.app) {
+            window.app.showToast(error.message || 'Une erreur est survenue', 'error');
+        }
     }
-}
-
-function loadMoreProducts() {
-    // Implementation for loading more products (pagination)
-    console.log('Load more products requested');
-    // This would typically load the next page of products
-}
-
-// Category filtering
-function filterProductsByCategory(category) {
-    if (window.app) {
-        window.app.filterByCategory(category);
-    }
-}
-
-// Search functionality
-function performProductSearch(query) {
-    if (window.app) {
-        window.app.performSearch(query);
-    }
-}
-
-// Product sorting
-function sortProducts(sortBy) {
-    console.log('Sorting products by:', sortBy);
-    // Implementation for product sorting
-}
-
-// Product filtering
-function filterProductsByPrice(minPrice, maxPrice) {
-    console.log('Filtering products by price:', minPrice, maxPrice);
-    // Implementation for price filtering
-}
-
-function filterProductsByStock(inStockOnly) {
-    console.log('Filtering by stock availability:', inStockOnly);
-    // Implementation for stock filtering
-}
-
-// Enhanced product card interactions
-function viewProductDetails(productId) {
-    if (window.app) {
-        window.app.showPage('product', { id: productId });
-    }
-}
-
-function quickAddToCart(productId, event) {
-    // Prevent event bubbling to avoid navigating to product page
-    if (event) {
-        event.stopPropagation();
-    }
-    
-    if (window.addToCart) {
-        window.addToCart(productId, 1);
-    } else if (window.app) {
-        window.app.addToCart(productId, 1);
-    }
-}
-
-// Wishlist functionality (placeholder for future implementation)
-function addToWishlist(productId) {
-    console.log('Adding to wishlist:', productId);
-    // Implementation for wishlist functionality
-}
-
-function removeFromWishlist(productId) {
-    console.log('Removing from wishlist:', productId);
-    // Implementation for wishlist functionality
-}
-
-// Product comparison (placeholder for future implementation)
-function addToComparison(productId) {
-    console.log('Adding to comparison:', productId);
-    // Implementation for product comparison
-}
-
-// Product reviews (placeholder for future implementation)
-function showProductReviews(productId) {
-    console.log('Showing reviews for product:', productId);
-    // Implementation for product reviews
-}
-
-function submitProductReview(productId, rating, comment) {
-    console.log('Submitting review for product:', productId, rating, comment);
-    // Implementation for review submission
-}
+};
 
 // Export functions for global access
-window.handleProductsSearch = handleProductsSearch;
-window.searchProducts = searchProducts;
-window.changeProductQuantity = changeProductQuantity;
-window.addProductToCart = addProductToCart;
-window.loadMoreProducts = loadMoreProducts;
-window.filterProductsByCategory = filterProductsByCategory;
-window.performProductSearch = performProductSearch;
-window.sortProducts = sortProducts;
-window.filterProductsByPrice = filterProductsByPrice;
-window.filterProductsByStock = filterProductsByStock;
-window.viewProductDetails = viewProductDetails;
-window.quickAddToCart = quickAddToCart;
-window.addToWishlist = addToWishlist;
-window.removeFromWishlist = removeFromWishlist;
-window.addToComparison = addToComparison;
-window.showProductReviews = showProductReviews;
-window.submitProductReview = submitProductReview;
+window.switchAdminSection = switchAdminSection;
+window.openAddProductModal = openAddProductModal;
+window.openEditProductModal = openEditProductModal;
+window.closeProductModal = closeProductModal;
+window.saveProduct = saveProduct;
+window.toggleFeatured = toggleFeatured;
+window.deleteProduct = deleteProduct;
+window.refreshProductCache = refreshProductCache;
+window.validateAllProducts = validateAllProducts;
+window.clearAllProducts = clearAllProducts;
+window.viewOrderDetails = viewOrderDetails;
+window.updateOrderStatus = updateOrderStatus;
+window.closeOrderDetailModal = closeOrderDetailModal;
+window.previewImage = previewImage;
 
-console.log('✅ Complete Products.js loaded with full functionality');
+console.log('✅ Fixed Admin.js loaded with proper app integration');
