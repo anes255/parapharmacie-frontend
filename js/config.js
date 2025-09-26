@@ -1,208 +1,268 @@
-// Fixed Configuration for Shifa Parapharmacie Frontend-Backend Connection
-const API_CONFIG = {
-    // Environment
-    environment: 'production',
-    appName: 'Shifa - Parapharmacie',
+// API Configuration for PharmacieGaherApp
+console.log('🔧 Loading API configuration...');
+
+// API Configuration
+window.API_CONFIG = {
+    // Production API URL - Render deployment
+    baseURL: 'https://parapharmacie-gaher.onrender.com',
     
-    // Backend URL configuration - Using your provided URL
-    BASE_URL: 'https://parapharmacie-gaher.onrender.com/api',
+    // Development fallback (if needed)
+    devURL: 'http://localhost:5000',
     
-    // Request configuration
-    TIMEOUT: 30000, // 30 seconds for Render cold starts
-    RETRY_ATTEMPTS: 3,
-    RETRY_DELAY: 2000, // 2 seconds
-    
-    // App Settings - Fixed missing properties
-    SETTINGS: {
-        fraisLivraison: 300,
-        livraisonGratuite: 5000,
-        FREE_SHIPPING_THRESHOLD: 5000, // Added for compatibility
-        maxQuantity: 10,
-        adminEmail: 'pharmaciegaher@gmail.com',
-        adminPassword: 'anesaya75',
-        nomSite: 'Shifa - Parapharmacie',
-        couleurPrimaire: '#10b981',
-        couleurSecondaire: '#059669',
-        couleurAccent: '#34d399'
+    // API endpoints
+    endpoints: {
+        auth: {
+            login: '/api/auth/login',
+            register: '/api/auth/register',
+            me: '/api/auth/me',
+            profile: '/api/auth/profile',
+            changePassword: '/api/auth/change-password'
+        },
+        products: {
+            all: '/api/products',
+            byId: '/api/products/:id',
+            create: '/api/products',
+            update: '/api/products/:id',
+            delete: '/api/products/:id',
+            featured: '/api/products/featured/all',
+            promotions: '/api/products/promotions/all',
+            categories: '/api/products/categories/all'
+        },
+        orders: {
+            all: '/api/orders',
+            byId: '/api/orders/:id',
+            create: '/api/orders',
+            updateStatus: '/api/orders/:id/status',
+            stats: '/api/orders/stats/dashboard'
+        },
+        admin: {
+            dashboard: '/api/admin/dashboard',
+            analytics: '/api/admin/analytics',
+            users: '/api/admin/users'
+        },
+        settings: {
+            get: '/api/settings',
+            update: '/api/settings',
+            public: '/api/settings/public',
+            appearance: '/api/settings/appearance',
+            shipping: '/api/settings/shipping',
+            payment: '/api/settings/payment'
+        }
     },
     
-    // Endpoints
-    ENDPOINTS: {
-        AUTH: {
-            LOGIN: '/auth/login',
-            REGISTER: '/auth/register',
-            PROFILE: '/auth/profile'
-        },
-        PRODUCTS: {
-            LIST: '/products',
-            DETAIL: '/products/',
-            CATEGORIES: '/products/categories/all',
-            FEATURED: '/products/featured/all',
-            PROMOTIONS: '/products/promotions/all'
-        },
-        ORDERS: {
-            CREATE: '/orders',
-            DETAIL: '/orders/',
-            USER_ORDERS: '/orders/user/all'
-        },
-        ADMIN: {
-            DASHBOARD: '/admin/dashboard',
-            PRODUCTS: '/admin/products',
-            ORDERS: '/admin/orders'
-        },
-        HEALTH: '/health'
+    // Request timeout (ms)
+    timeout: 30000,
+    
+    // Retry configuration
+    retry: {
+        attempts: 3,
+        delay: 1000
+    },
+    
+    // Cache configuration
+    cache: {
+        products: 5 * 60 * 1000, // 5 minutes
+        settings: 10 * 60 * 1000, // 10 minutes
+        user: 2 * 60 * 1000 // 2 minutes
     }
 };
 
-// Helper function to build API URLs
-function buildApiUrl(endpoint) {
-    const url = API_CONFIG.BASE_URL + endpoint;
-    console.log(`🌐 API URL: ${url}`);
-    return url;
-}
-
-// Enhanced API call function with better error handling
-async function apiCall(endpoint, options = {}) {
-    const url = buildApiUrl(endpoint);
+// Utility functions for API calls
+window.API_UTILS = {
+    // Build full URL
+    buildURL(endpoint, params = {}) {
+        let url = window.API_CONFIG.baseURL + endpoint;
+        
+        // Replace path parameters
+        Object.keys(params).forEach(key => {
+            url = url.replace(`:${key}`, params[key]);
+        });
+        
+        return url;
+    },
     
-    const defaultOptions = {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        },
-        mode: 'cors'
-    };
-    
-    // Add auth token if available
-    const token = localStorage.getItem('token');
-    if (token) {
-        defaultOptions.headers['x-auth-token'] = token;
-    }
-    
-    const finalOptions = {
-        ...defaultOptions,
-        ...options,
-        headers: {
-            ...defaultOptions.headers,
-            ...options.headers
+    // Build query string
+    buildQueryString(params) {
+        if (!params || Object.keys(params).length === 0) {
+            return '';
         }
-    };
+        
+        const searchParams = new URLSearchParams();
+        Object.keys(params).forEach(key => {
+            if (params[key] !== null && params[key] !== undefined) {
+                searchParams.append(key, params[key]);
+            }
+        });
+        
+        const queryString = searchParams.toString();
+        return queryString ? `?${queryString}` : '';
+    },
     
-    // Retry logic for Render cold starts
-    for (let attempt = 1; attempt <= API_CONFIG.RETRY_ATTEMPTS; attempt++) {
+    // Get auth headers
+    getAuthHeaders() {
+        const token = localStorage.getItem('authToken');
+        if (!token) return {};
+        
+        return {
+            'x-auth-token': token,
+            'Authorization': `Bearer ${token}`
+        };
+    },
+    
+    // Check if URL is available
+    async checkConnection(url = window.API_CONFIG.baseURL) {
         try {
-            console.log(`🔄 API Call Attempt ${attempt}: ${finalOptions.method} ${url}`);
+            const response = await fetch(url, { 
+                method: 'HEAD',
+                timeout: 5000 
+            });
+            return response.ok;
+        } catch (error) {
+            console.log('API connection check failed:', error.message);
+            return false;
+        }
+    }
+};
+
+// Enhanced fetch wrapper with retry logic
+window.API_FETCH = async function(endpoint, options = {}) {
+    const config = window.API_CONFIG;
+    const maxAttempts = config.retry.attempts;
+    const delay = config.retry.delay;
+    
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            console.log(`📡 API Request (attempt ${attempt}/${maxAttempts}): ${options.method || 'GET'} ${endpoint}`);
             
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => {
-                controller.abort();
-            }, API_CONFIG.TIMEOUT);
+            const timeoutId = setTimeout(() => controller.abort(), config.timeout);
             
-            const response = await fetch(url, {
-                ...finalOptions,
-                signal: controller.signal
+            const response = await fetch(`${config.baseURL}${endpoint}`, {
+                ...options,
+                signal: controller.signal,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...window.API_UTILS.getAuthHeaders(),
+                    ...options.headers
+                }
             });
             
             clearTimeout(timeoutId);
             
-            console.log(`📡 Response: ${response.status} ${response.statusText}`);
-            
-            const contentType = response.headers.get('content-type');
-            let data;
-            
-            if (contentType && contentType.includes('application/json')) {
-                data = await response.json();
-            } else {
-                const text = await response.text();
-                try {
-                    data = JSON.parse(text);
-                } catch {
-                    data = { message: text || 'Empty response' };
-                }
-            }
-            
             if (!response.ok) {
-                console.error(`❌ HTTP Error ${response.status}:`, data);
-                
-                // Don't retry on client errors
-                if (response.status >= 400 && response.status < 500) {
-                    throw new Error(data.message || `Erreur HTTP: ${response.status}`);
-                }
-                
-                // Retry on server errors if we have attempts left
-                if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
-                    continue;
-                }
-                
-                throw new Error(data.message || `Erreur serveur: ${response.status}`);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             
-            console.log('✅ API Success');
-            return data;
+            const result = await response.json();
+            console.log(`✅ API Success (attempt ${attempt}): ${options.method || 'GET'} ${endpoint}`);
+            return result;
             
         } catch (error) {
-            console.error(`💥 API Call Error (Attempt ${attempt}):`, error.message);
+            console.log(`❌ API Error (attempt ${attempt}): ${error.message}`);
+            lastError = error;
             
-            if (error.name === 'AbortError') {
-                if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`⏱️ Timeout - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
-                    continue;
-                } else {
-                    throw new Error('Le serveur met trop de temps à répondre. Réessayez plus tard.');
-                }
-            } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🌐 Network error - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
-                    continue;
-                } else {
-                    throw new Error('Impossible de contacter le serveur. Vérifiez votre connexion.');
-                }
+            // Don't retry on certain errors
+            if (error.name === 'AbortError' || 
+                error.message.includes('401') || 
+                error.message.includes('403') ||
+                attempt === maxAttempts) {
+                break;
             }
             
-            if (attempt === API_CONFIG.RETRY_ATTEMPTS) {
-                throw error;
+            // Wait before retry
+            if (attempt < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, delay * attempt));
             }
-            
-            console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
-            await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
         }
     }
-}
-
-// Test backend connection
-async function testBackendConnection() {
-    try {
-        console.log('🔍 Testing backend connection...');
-        const response = await apiCall('/health');
-        console.log('✅ Backend connection successful:', response);
-        return { success: true, data: response };
-    } catch (error) {
-        console.warn('⚠️ Backend connection failed:', error.message);
-        return { success: false, error: error.message };
-    }
-}
-
-// Export for global access
-window.API_CONFIG = API_CONFIG;
-window.buildApiUrl = buildApiUrl;
-window.apiCall = apiCall;
-window.testBackendConnection = testBackendConnection;
-
-// Also make settings available globally for compatibility
-window.SHIFA_SETTINGS = {
-    ...API_CONFIG.SETTINGS,
-    apiUrl: API_CONFIG.BASE_URL
+    
+    throw lastError || new Error('API request failed after all retry attempts');
 };
 
-console.log('Config loaded successfully', {
-    environment: API_CONFIG.environment,
-    apiUrl: API_CONFIG.BASE_URL,
-    appName: API_CONFIG.appName
+// Connection status monitor
+window.API_MONITOR = {
+    isOnline: true,
+    lastCheck: null,
+    checkInterval: 5 * 60 * 1000, // 5 minutes
+    
+    async start() {
+        console.log('🔍 Starting API connection monitor...');
+        
+        // Initial check
+        await this.checkStatus();
+        
+        // Periodic checks
+        setInterval(async () => {
+            await this.checkStatus();
+        }, this.checkInterval);
+        
+        // Check on page visibility change
+        document.addEventListener('visibilitychange', async () => {
+            if (!document.hidden) {
+                await this.checkStatus();
+            }
+        });
+    },
+    
+    async checkStatus() {
+        try {
+            const wasOnline = this.isOnline;
+            this.isOnline = await window.API_UTILS.checkConnection();
+            this.lastCheck = new Date();
+            
+            // Notify if status changed
+            if (wasOnline !== this.isOnline) {
+                console.log(`🌐 API status changed: ${this.isOnline ? 'ONLINE' : 'OFFLINE'}`);
+                
+                // Dispatch custom event
+                window.dispatchEvent(new CustomEvent('apiStatusChange', {
+                    detail: { isOnline: this.isOnline }
+                }));
+            }
+            
+        } catch (error) {
+            console.error('API status check failed:', error);
+            this.isOnline = false;
+        }
+    }
+};
+
+// Environment detection
+const isDevelopment = window.location.hostname === 'localhost' || 
+                     window.location.hostname === '127.0.0.1' ||
+                     window.location.hostname === '';
+
+// Use development URL if in development mode
+if (isDevelopment && window.location.port !== '3000') {
+    console.log('🔧 Development mode detected, using local API');
+    window.API_CONFIG.baseURL = window.API_CONFIG.devURL;
+}
+
+// Initialize API monitoring when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    // Start connection monitoring
+    window.API_MONITOR.start();
+    
+    // Log configuration
+    console.log('✅ API Configuration loaded:', {
+        baseURL: window.API_CONFIG.baseURL,
+        timeout: window.API_CONFIG.timeout,
+        development: isDevelopment
+    });
 });
 
-console.log('✅ Config.js loaded successfully');
+// Global error handler for API calls
+window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason && event.reason.message && event.reason.message.includes('API')) {
+        console.error('🚨 Unhandled API error:', event.reason);
+        
+        // Show user-friendly message
+        if (window.app && typeof window.app.showMessage === 'function') {
+            window.app.showMessage('Problème de connexion avec le serveur', 'error');
+        }
+    }
+});
+
+console.log('✅ API configuration and utilities loaded successfully');
