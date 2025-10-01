@@ -139,7 +139,7 @@ nav {
     50% { transform: translateY(-20px) rotate(1deg); }
 }
 
-/* Enhanced category cards */
+/* Enhanced category cards - ALL GREEN, NO FADE-IN */
 .category-card {
     background: linear-gradient(145deg, #f7fee7, #ecfdf5);
     border: 2px solid transparent;
@@ -148,6 +148,9 @@ nav {
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     position: relative;
     overflow: hidden;
+    /* NO FADE-IN ANIMATION */
+    opacity: 1 !important;
+    animation: none !important;
 }
 
 .category-card::before {
@@ -178,10 +181,11 @@ nav {
     z-index: 1;
 }
 
+/* ALL CATEGORY ICONS ARE GREEN */
 .category-icon {
     width: 80px;
     height: 80px;
-    background: var(--gradient-primary);
+    background: var(--gradient-primary) !important; /* Force green */
     border-radius: 24px;
     display: flex;
     align-items: center;
@@ -192,12 +196,15 @@ nav {
     box-shadow: var(--shadow-medium);
     transition: all 0.3s ease;
     border: 3px solid rgba(255, 255, 255, 0.2);
+    /* NO FADE-IN ANIMATION */
+    opacity: 1 !important;
+    animation: none !important;
 }
 
 .category-card:hover .category-icon {
     transform: scale(1.1) rotate(10deg);
     box-shadow: var(--shadow-strong);
-    background: var(--gradient-accent);
+    background: var(--gradient-accent) !important; /* Force green on hover */
 }
 
 /* Enhanced product cards */
@@ -645,29 +652,16 @@ button:focus, input:focus, select:focus {
     }
 }
 
-/* Animation classes */
+/* NO FADE-IN ANIMATION CLASS - Remove all animations */
 .fade-in {
-    animation: fadeIn 0.5s ease-in;
+    animation: none !important;
+    opacity: 1 !important;
 }
 
 .slide-up {
-    animation: slideUp 0.6s ease-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    animation: none !important;
+    opacity: 1 !important;
+    transform: translateY(0) !important;
 }
 
 /* Print styles */
