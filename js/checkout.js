@@ -1,4 +1,4 @@
-// Fixed Checkout System for Shifa Parapharmacie - SAVES ORDERS TO API
+// Fixed Checkout System with Better API Handling
 
 class CheckoutSystem {
     constructor() {
@@ -7,7 +7,6 @@ class CheckoutSystem {
         this.isProcessing = false;
     }
 
-    // Initialize checkout process
     init() {
         console.log('Initializing checkout system...');
         this.validateCart();
@@ -15,7 +14,6 @@ class CheckoutSystem {
         this.calculateTotals();
     }
 
-    // Validate cart before checkout
     validateCart() {
         if (!window.app || !window.app.cart || window.app.cart.length === 0) {
             console.error('Cart is empty');
@@ -26,7 +24,6 @@ class CheckoutSystem {
             return false;
         }
 
-        // Check stock availability
         for (let item of window.app.cart) {
             if (item.stock === 0) {
                 if (window.app) {
@@ -45,29 +42,24 @@ class CheckoutSystem {
         return true;
     }
 
-    // Setup form event listeners
     setupEventListeners() {
-        // Real-time form validation
         const inputs = document.querySelectorAll('#checkoutForm input, #checkoutForm select, #checkoutForm textarea');
         inputs.forEach(input => {
             input.addEventListener('blur', () => this.validateField(input));
             input.addEventListener('input', () => this.clearFieldError(input));
         });
 
-        // Payment method selection
         const paymentInputs = document.querySelectorAll('input[name="modePaiement"]');
         paymentInputs.forEach(input => {
             input.addEventListener('change', () => this.handlePaymentMethodChange(input.value));
         });
 
-        // Wilaya change for shipping calculation
         const wilayaSelect = document.getElementById('checkoutWilaya');
         if (wilayaSelect) {
             wilayaSelect.addEventListener('change', () => this.calculateShipping());
         }
     }
 
-    // Validate individual form field
     validateField(field) {
         const value = field.value.trim();
         let isValid = true;
@@ -127,12 +119,9 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // Display field validation result
     displayFieldValidation(field, isValid, errorMessage) {
-        // Remove existing validation classes
         field.classList.remove('border-red-400', 'border-green-400');
         
-        // Remove existing error message
         const existingError = field.parentNode.querySelector('.field-error');
         if (existingError) {
             existingError.remove();
@@ -141,7 +130,6 @@ class CheckoutSystem {
         if (!isValid) {
             field.classList.add('border-red-400');
             
-            // Add error message
             const errorDiv = document.createElement('div');
             errorDiv.className = 'field-error text-red-500 text-sm mt-1';
             errorDiv.textContent = errorMessage;
@@ -151,7 +139,6 @@ class CheckoutSystem {
         }
     }
 
-    // Clear field error styling
     clearFieldError(field) {
         field.classList.remove('border-red-400');
         const existingError = field.parentNode.querySelector('.field-error');
@@ -160,11 +147,9 @@ class CheckoutSystem {
         }
     }
 
-    // Handle payment method change
     handlePaymentMethodChange(method) {
         console.log('Payment method changed to:', method);
         
-        // Update UI based on payment method
         const paymentInfo = document.getElementById('paymentMethodInfo');
         if (paymentInfo) {
             switch (method) {
@@ -192,25 +177,21 @@ class CheckoutSystem {
         }
     }
 
-    // Calculate shipping costs
     calculateShipping() {
         const wilaya = document.getElementById('checkoutWilaya')?.value;
         const sousTotal = window.app ? window.app.getCartTotal() : 0;
         
         let fraisLivraison = 0;
         
-        // Free shipping for orders over 5000 DA
         if (sousTotal >= 5000) {
             fraisLivraison = 0;
         } else {
-            // Different shipping costs by wilaya
             const shippingRates = {
                 'Alger': 250,
                 'Blida': 250,
                 'Boumerdès': 250,
                 'Tipaza': 200,
                 'Médéa': 300,
-                // Default rate for other wilayas
                 'default': 350
             };
             
@@ -223,7 +204,6 @@ class CheckoutSystem {
         return fraisLivraison;
     }
 
-    // Update shipping display
     updateShippingDisplay(fraisLivraison) {
         const shippingElement = document.getElementById('shippingCost');
         if (shippingElement) {
@@ -239,7 +219,6 @@ class CheckoutSystem {
         }
     }
 
-    // Calculate and update totals
     calculateTotals() {
         if (!window.app || !window.app.cart) return;
 
@@ -247,7 +226,6 @@ class CheckoutSystem {
         const fraisLivraison = this.getCurrentShippingCost();
         const total = sousTotal + fraisLivraison;
 
-        // Update display
         const elements = {
             sousTotal: document.getElementById('checkoutSousTotal'),
             fraisLivraison: document.getElementById('checkoutFraisLivraison'),
@@ -258,13 +236,11 @@ class CheckoutSystem {
         if (elements.fraisLivraison) elements.fraisLivraison.textContent = `${fraisLivraison} DA`;
         if (elements.total) elements.total.textContent = `${total} DA`;
 
-        // Show free shipping message
         if (sousTotal >= 5000) {
             this.showFreeShippingMessage();
         }
     }
 
-    // Get current shipping cost
     getCurrentShippingCost() {
         const wilaya = document.getElementById('checkoutWilaya')?.value;
         const sousTotal = window.app ? window.app.getCartTotal() : 0;
@@ -285,7 +261,6 @@ class CheckoutSystem {
         return shippingRates[wilaya] || shippingRates.default;
     }
 
-    // Show free shipping message
     showFreeShippingMessage() {
         const container = document.getElementById('shippingMessage');
         if (container) {
@@ -300,7 +275,6 @@ class CheckoutSystem {
         }
     }
 
-    // Validate entire form
     validateForm() {
         const requiredFields = [
             'checkoutPrenom',
@@ -323,7 +297,7 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // Process the order - MAIN FUNCTION - SAVES TO API
+    // MAIN PROCESS ORDER FUNCTION - FIXED
     async processOrder() {
         try {
             if (this.isProcessing) {
@@ -334,50 +308,83 @@ class CheckoutSystem {
             console.log('🛒 Starting order processing...');
             this.isProcessing = true;
 
-            // Validate cart
             if (!this.validateCart()) {
                 throw new Error('Panier invalide');
             }
 
-            // Validate form
             if (!this.validateForm()) {
                 throw new Error('Veuillez corriger les erreurs dans le formulaire');
             }
 
-            // Disable submit button
             const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
             }
 
-            // Gather form data
+            // Gather and VALIDATE order data
             const orderData = this.gatherOrderData();
             
             console.log('Order data prepared:', orderData);
 
-            // Try to submit to API first
+            // Validate articles have ALL required fields
+            if (!orderData.articles || orderData.articles.length === 0) {
+                throw new Error('Aucun article dans la commande');
+            }
+
+            // Ensure each article has required fields
+            for (let article of orderData.articles) {
+                if (!article.productId || !article.nom || !article.prix || !article.quantite) {
+                    console.error('Article incomplet:', article);
+                    throw new Error('Informations d\'article incomplètes');
+                }
+            }
+
+            // Try API submission first
             let orderSaved = false;
             try {
-                console.log('🌐 Attempting to save order to API...');
-                const response = await apiCall('/orders', {
+                const apiUrl = window.API_CONFIG?.baseURL || 'https://parapharmacie-gaher.onrender.com';
+                
+                const response = await fetch(`${apiUrl}/api/orders`, {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify(orderData)
                 });
                 
-                if (response) {
-                    console.log('✅ Order saved to API successfully');
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('✅ Order saved to API successfully:', result);
                     orderSaved = true;
+                } else {
+                    const error = await response.json();
+                    console.log('⚠️ API error:', error.message);
+                    throw new Error(error.message || 'API error');
                 }
             } catch (apiError) {
-                console.log('⚠️ API save failed, will save locally:', apiError.message);
+                console.log('⚠️ API save failed:', apiError.message);
+                // Continue to save locally
             }
 
-            // Always save locally for admin panel
-            if (window.addOrderToDemo) {
-                const localOrder = window.addOrderToDemo(orderData);
-                if (localOrder) {
+            // ALWAYS save locally for admin panel (with quota management)
+            try {
+                if (window.addOrderToDemo) {
+                    window.addOrderToDemo(orderData);
                     console.log('✅ Order saved locally for admin panel');
+                }
+            } catch (localError) {
+                console.error('Failed to save locally:', localError);
+                if (localError.name === 'QuotaExceededError') {
+                    // Try to cleanup and save again
+                    if (window.cartSystem) {
+                        window.cartSystem.cleanupLocalStorage();
+                    }
+                    try {
+                        window.addOrderToDemo(orderData);
+                    } catch (retryError) {
+                        console.error('Still cannot save after cleanup');
+                    }
                 }
             }
 
@@ -406,7 +413,6 @@ class CheckoutSystem {
                 window.app.showToast(error.message || 'Erreur lors de la validation de la commande', 'error');
             }
             
-            // Re-enable submit button
             const submitBtn = document.querySelector('button[onclick="app.processOrder()"]');
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -417,9 +423,8 @@ class CheckoutSystem {
         }
     }
 
-    // Gather all order data from form
+    // FIXED: Ensure all required article fields are present
     gatherOrderData() {
-        // Get form values
         const prenom = document.getElementById('checkoutPrenom')?.value.trim();
         const nom = document.getElementById('checkoutNom')?.value.trim();
         const email = document.getElementById('checkoutEmail')?.value.trim();
@@ -429,15 +434,29 @@ class CheckoutSystem {
         const modePaiement = document.querySelector('input[name="modePaiement"]:checked')?.value || 'Paiement à la livraison';
         const commentaires = document.getElementById('checkoutCommentaires')?.value.trim() || '';
 
-        // Calculate totals
         const sousTotal = window.app ? window.app.getCartTotal() : 0;
         const fraisLivraison = this.getCurrentShippingCost();
         const total = sousTotal + fraisLivraison;
 
-        // Generate order number
         const orderNumber = this.generateOrderNumber();
 
-        // Prepare order data
+        // CRITICAL: Ensure articles have ALL required fields
+        const articles = window.app ? window.app.cart.map(item => ({
+            productId: item.id || item._id || '',
+            nom: item.nom || '',
+            prix: parseFloat(item.prix) || 0,
+            quantite: parseInt(item.quantite) || 0,
+            image: item.image || ''
+        })) : [];
+
+        // Validate articles
+        for (let article of articles) {
+            if (!article.productId || !article.nom || !article.prix || !article.quantite) {
+                console.error('Article validation failed:', article);
+                throw new Error('Article invalide détecté');
+            }
+        }
+
         const orderData = {
             _id: Date.now().toString(),
             numeroCommande: orderNumber,
@@ -450,13 +469,7 @@ class CheckoutSystem {
                 adresse,
                 wilaya
             },
-            articles: window.app ? window.app.cart.map(item => ({
-                productId: item.id,
-                nom: item.nom,
-                prix: item.prix,
-                quantite: item.quantite,
-                image: item.image
-            })) : [],
+            articles,
             sousTotal,
             fraisLivraison,
             total,
@@ -469,7 +482,6 @@ class CheckoutSystem {
         return orderData;
     }
 
-    // Save order to user's order history
     saveToUserOrders(orderData) {
         if (!window.app?.currentUser?.id) return;
 
@@ -477,12 +489,11 @@ class CheckoutSystem {
             const userOrdersKey = `userOrders_${window.app.currentUser.id}`;
             let userOrders = JSON.parse(localStorage.getItem(userOrdersKey) || '[]');
             
-            // Add new order to the beginning
             userOrders.unshift(orderData);
             
-            // Keep only last 50 orders
-            if (userOrders.length > 50) {
-                userOrders = userOrders.slice(0, 50);
+            // Keep only last 30 orders per user
+            if (userOrders.length > 30) {
+                userOrders = userOrders.slice(0, 30);
             }
             
             localStorage.setItem(userOrdersKey, JSON.stringify(userOrders));
@@ -490,10 +501,15 @@ class CheckoutSystem {
             
         } catch (error) {
             console.error('Error saving to user orders:', error);
+            if (error.name === 'QuotaExceededError') {
+                // Try cleanup
+                if (window.cartSystem) {
+                    window.cartSystem.cleanupLocalStorage();
+                }
+            }
         }
     }
 
-    // Generate unique order number
     generateOrderNumber() {
         const prefix = 'CMD';
         const timestamp = Date.now().toString().slice(-8);
@@ -501,20 +517,17 @@ class CheckoutSystem {
         return `${prefix}${timestamp}${random}`;
     }
 
-    // Email validation
     validateEmail(email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
     }
 
-    // Phone validation (Algerian format)
     validatePhone(phone) {
         const cleanPhone = phone.replace(/\s+/g, '');
         const phoneRegex = /^(\+213|0)[5-9]\d{8}$/;
         return phoneRegex.test(cleanPhone);
     }
 
-    // Update order progress
     updateProgress(step) {
         this.currentStep = step;
         
@@ -532,13 +545,10 @@ class CheckoutSystem {
         });
     }
 
-    // Apply coupon code
     async applyCoupon(code) {
         try {
-            // This would normally call an API to validate the coupon
             console.log('Applying coupon:', code);
             
-            // Placeholder for coupon logic
             if (code.toUpperCase() === 'WELCOME10') {
                 const discount = Math.round(window.app.getCartTotal() * 0.1);
                 this.appliedDiscount = discount;
@@ -560,7 +570,6 @@ class CheckoutSystem {
         }
     }
 
-    // Remove applied coupon
     removeCoupon() {
         this.appliedDiscount = 0;
         this.calculateTotals();
@@ -579,7 +588,7 @@ function initCheckout() {
     checkoutSystem = new CheckoutSystem();
     checkoutSystem.init();
     window.checkoutSystem = checkoutSystem;
-    console.log('✅ Checkout system initialized');
+    console.log('✅ Checkout system initialized with better API handling');
 }
 
 // Global functions for checkout
@@ -611,7 +620,7 @@ function removeCheckoutCoupon() {
     }
 }
 
-// Auto-initialize if DOM is already loaded
+// Auto-initialize
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCheckout);
 } else {
@@ -626,4 +635,4 @@ window.processCheckoutOrder = processCheckoutOrder;
 window.applyCheckoutCoupon = applyCheckoutCoupon;
 window.removeCheckoutCoupon = removeCheckoutCoupon;
 
-console.log('✅ Checkout.js loaded - Orders SAVE to API successfully');
+console.log('✅ Checkout.js loaded with fixed API handling');
