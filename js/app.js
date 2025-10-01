@@ -1,4 +1,4 @@
-// Clean PharmacieGaherApp - Updated with proper admin integration and GREEN ICONS
+// COMPLETE PharmacieGaherApp - WITH ALL METHODS
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -287,7 +287,7 @@ class PharmacieGaherApp {
     }
     
     async loadCategories() {
-        // Show all 10 categories with Vitalité first - ALL GREEN ICONS
+        // Show all 10 categories with Vitalité first
         const mainPageCategories = [
             { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
             { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
@@ -436,6 +436,435 @@ class PharmacieGaherApp {
                     <div class="flex items-center justify-between text-sm">
                         <span class="text-emerald-600">Stock: ${product.stock}</span>
                         <span class="text-emerald-700 font-semibold">${product.marque || ''}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // MISSING METHODS START HERE
+
+    async loadProductsPage(params = {}) {
+        console.log('Loading products page with params:', params);
+        
+        let filteredProducts = [...this.allProducts];
+        
+        // Filter by category
+        if (params.categorie) {
+            filteredProducts = filteredProducts.filter(p => p.categorie === params.categorie);
+        }
+        
+        // Filter by search
+        if (params.search) {
+            const searchLower = params.search.toLowerCase();
+            filteredProducts = filteredProducts.filter(p => 
+                p.nom.toLowerCase().includes(searchLower) ||
+                (p.description && p.description.toLowerCase().includes(searchLower)) ||
+                (p.marque && p.marque.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="mb-8">
+                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">
+                        ${params.categorie ? `Catégorie: ${params.categorie}` : params.search ? `Résultats pour "${params.search}"` : 'Tous nos produits'}
+                    </h1>
+                    <p class="text-emerald-600 text-lg">${filteredProducts.length} produit(s) trouvé(s)</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    ${filteredProducts.map(product => this.createProductCard(product)).join('')}
+                </div>
+                
+                ${filteredProducts.length === 0 ? `
+                    <div class="text-center py-16">
+                        <i class="fas fa-search text-6xl text-emerald-200 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit trouvé</h3>
+                        <button onclick="app.showPage('home')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-home mr-2"></i>Retour à l'accueil
+                        </button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    async loadProductPage(productId) {
+        console.log('Loading product page for ID:', productId);
+        
+        const product = this.allProducts.find(p => p._id === productId);
+        
+        if (!product) {
+            this.showToast('Produit non trouvé', 'error');
+            this.showPage('products');
+            return;
+        }
+        
+        let imageUrl;
+        if (product.image && product.image.startsWith('http')) {
+            imageUrl = product.image;
+        } else if (product.image && product.image.startsWith('data:image')) {
+            imageUrl = product.image;
+        } else {
+            const getCategoryColor = (category) => {
+                const colors = {
+                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                    'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
+                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                    'Dentaire': '6366f1'
+                };
+                return colors[product.categorie] || '10b981';
+            };
+            
+            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+            const categoryColor = getCategoryColor(product.categorie);
+            imageUrl = `https://via.placeholder.com/500x500/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+        }
+        
+        const isOutOfStock = product.stock === 0;
+        const hasPromotion = product.enPromotion && product.prixOriginal;
+        
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <button onclick="history.back()" class="text-emerald-600 hover:text-emerald-800 mb-6 flex items-center">
+                    <i class="fas fa-arrow-left mr-2"></i>Retour
+                </button>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div>
+                        <img src="${imageUrl}" alt="${product.nom}" class="w-full rounded-2xl shadow-2xl" 
+                             onerror="this.src='https://via.placeholder.com/500x500/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
+                    </div>
+                    
+                    <div>
+                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">${product.nom}</h1>
+                        <p class="text-emerald-600 mb-4">${product.marque || ''}</p>
+                        
+                        <div class="flex items-center space-x-4 mb-6">
+                            ${hasPromotion ? `
+                                <span class="text-2xl text-gray-400 line-through">${product.prixOriginal} DA</span>
+                                <span class="text-4xl font-bold text-red-600">${product.prix} DA</span>
+                                <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-semibold">
+                                    -${Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%
+                                </span>
+                            ` : `
+                                <span class="text-4xl font-bold text-emerald-700">${product.prix} DA</span>
+                            `}
+                        </div>
+                        
+                        <p class="text-gray-700 mb-6">${product.description || 'Aucune description disponible'}</p>
+                        
+                        <div class="bg-emerald-50 p-4 rounded-xl mb-6">
+                            <p class="text-emerald-700">
+                                <i class="fas fa-warehouse mr-2"></i>
+                                Stock: <strong>${product.stock} unités</strong>
+                            </p>
+                        </div>
+                        
+                        ${!isOutOfStock ? `
+                            <div class="flex items-center space-x-4 mb-6">
+                                <label class="text-gray-700 font-semibold">Quantité:</label>
+                                <div class="quantity-selector">
+                                    <button onclick="updateProductQuantity('minus')">-</button>
+                                    <input type="number" id="productQuantity" value="1" min="1" max="${product.stock}">
+                                    <button onclick="updateProductQuantity('plus')">+</button>
+                                </div>
+                            </div>
+                            
+                            <button onclick="addProductToCart('${product._id}')" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg text-lg">
+                                <i class="fas fa-shopping-cart mr-2"></i>Ajouter au panier
+                            </button>
+                        ` : `
+                            <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                                <i class="fas fa-exclamation-circle text-red-600 text-3xl mb-2"></i>
+                                <p class="text-red-800 font-semibold">Produit en rupture de stock</p>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadCheckoutPage() {
+        if (this.cart.length === 0) {
+            this.showToast('Votre panier est vide', 'warning');
+            this.showPage('products');
+            return;
+        }
+        
+        const sousTotal = this.getCartTotal();
+        
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+                <h1 class="text-4xl font-bold text-emerald-800 mb-8">Finaliser la commande</h1>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2">
+                        <div class="bg-white rounded-2xl shadow-xl p-8">
+                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Informations de livraison</h2>
+                            
+                            <form id="checkoutForm" class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
+                                        <input type="text" id="checkoutPrenom" required class="form-input">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
+                                        <input type="text" id="checkoutNom" required class="form-input">
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
+                                    <input type="email" id="checkoutEmail" required class="form-input">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
+                                    <input type="tel" id="checkoutTelephone" required class="form-input" placeholder="+213 XXX XXX XXX">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Adresse complète *</label>
+                                    <textarea id="checkoutAdresse" required rows="3" class="form-input"></textarea>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
+                                    <select id="checkoutWilaya" required class="form-input">
+                                        <option value="">Sélectionnez une wilaya</option>
+                                        <option value="Alger">Alger</option>
+                                        <option value="Blida">Blida</option>
+                                        <option value="Boumerdès">Boumerdès</option>
+                                        <option value="Tipaza">Tipaza</option>
+                                        <option value="Médéa">Médéa</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Commentaires (optionnel)</label>
+                                    <textarea id="checkoutCommentaires" rows="3" class="form-input" placeholder="Instructions spéciales pour la livraison"></textarea>
+                                </div>
+                                
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-700 mb-4">Mode de paiement</h3>
+                                    <div class="space-y-3">
+                                        <label class="flex items-center p-4 border-2 border-emerald-200 rounded-xl cursor-pointer hover:bg-emerald-50">
+                                            <input type="radio" name="modePaiement" value="Paiement à la livraison" checked class="mr-3">
+                                            <div>
+                                                <p class="font-semibold">Paiement à la livraison</p>
+                                                <p class="text-sm text-gray-600">Payez en espèces lors de la réception</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <div id="paymentMethodInfo"></div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="lg:col-span-1">
+                        <div class="bg-white rounded-2xl shadow-xl p-8 sticky top-4">
+                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Récapitulatif</h2>
+                            
+                            <div class="space-y-4 mb-6">
+                                ${this.cart.map(item => `
+                                    <div class="flex items-center space-x-3 pb-3 border-b">
+                                        <img src="${item.image}" alt="${item.nom}" class="w-16 h-16 object-cover rounded-lg">
+                                        <div class="flex-1">
+                                            <p class="font-semibold text-sm">${item.nom}</p>
+                                            <p class="text-xs text-gray-600">${item.quantite} × ${item.prix} DA</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <div class="space-y-3 mb-6">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Sous-total:</span>
+                                    <span id="checkoutSousTotal" class="font-semibold">${sousTotal} DA</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Frais de livraison:</span>
+                                    <span id="checkoutFraisLivraison" class="font-semibold">${sousTotal >= 5000 ? 0 : 300} DA</span>
+                                </div>
+                                <div class="flex justify-between text-lg font-bold border-t pt-3">
+                                    <span class="text-emerald-800">Total:</span>
+                                    <span id="checkoutTotal" class="text-emerald-600">${sousTotal + (sousTotal >= 5000 ? 0 : 300)} DA</span>
+                                </div>
+                            </div>
+                            
+                            <div id="shippingMessage"></div>
+                            
+                            <button onclick="app.processOrder()" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg text-lg">
+                                <i class="fas fa-check mr-2"></i>Confirmer la commande
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Initialize checkout system
+        if (window.initCheckout) {
+            window.initCheckout();
+        }
+    }
+
+    async processOrder() {
+        if (window.checkoutSystem && window.checkoutSystem.processOrder) {
+            return window.checkoutSystem.processOrder();
+        }
+    }
+
+    async loadLoginPage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-16 max-w-md">
+                <div class="bg-white rounded-2xl shadow-2xl p-8">
+                    <h1 class="text-3xl font-bold text-emerald-800 mb-2 text-center">Connexion</h1>
+                    <p class="text-emerald-600 mb-8 text-center">Accédez à votre compte</p>
+                    
+                    <form onsubmit="handleLogin(event)" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                            <input type="email" id="loginEmail" required class="form-input">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe</label>
+                            <input type="password" id="loginPassword" required class="form-input">
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            Se connecter
+                        </button>
+                    </form>
+                    
+                    <p class="mt-6 text-center text-gray-600">
+                        Pas encore de compte ? 
+                        <a href="#" onclick="app.showPage('register')" class="text-emerald-600 hover:text-emerald-800 font-semibold">S'inscrire</a>
+                    </p>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadRegisterPage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-16 max-w-md">
+                <div class="bg-white rounded-2xl shadow-2xl p-8">
+                    <h1 class="text-3xl font-bold text-emerald-800 mb-2 text-center">Inscription</h1>
+                    <p class="text-emerald-600 mb-8 text-center">Créez votre compte</p>
+                    
+                    <form onsubmit="handleRegister(event)" class="space-y-6">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prénom</label>
+                                <input type="text" id="registerPrenom" required class="form-input">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom</label>
+                                <input type="text" id="registerNom" required class="form-input">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                            <input type="email" id="registerEmail" required class="form-input">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe</label>
+                            <input type="password" id="registerPassword" required class="form-input" minlength="6">
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            S'inscrire
+                        </button>
+                    </form>
+                    
+                    <p class="mt-6 text-center text-gray-600">
+                        Déjà un compte ? 
+                        <a href="#" onclick="app.showPage('login')" class="text-emerald-600 hover:text-emerald-800 font-semibold">Se connecter</a>
+                    </p>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadProfilePage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <h1 class="text-4xl font-bold text-emerald-800 mb-8">Mon Profil</h1>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="bg-white rounded-2xl shadow-xl p-8">
+                        <div class="text-center mb-6">
+                            <div class="w-24 h-24 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full mx-auto flex items-center justify-center text-white text-3xl font-bold mb-4">
+                                ${this.currentUser.prenom[0]}${this.currentUser.nom[0]}
+                            </div>
+                            <h2 class="text-2xl font-bold text-emerald-800">${this.currentUser.prenom} ${this.currentUser.nom}</h2>
+                            <p class="text-emerald-600">${this.currentUser.email}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="lg:col-span-2 bg-white rounded-2xl shadow-xl p-8">
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-6">Informations</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-sm font-semibold text-gray-600">Nom complet</label>
+                                <p class="text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-semibold text-gray-600">Email</label>
+                                <p class="text-lg">${this.currentUser.email}</p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-semibold text-gray-600">Rôle</label>
+                                <p class="text-lg capitalize">${this.currentUser.role}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadOrderConfirmationPage(orderNumber) {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-16 max-w-2xl text-center">
+                <div class="bg-white rounded-2xl shadow-2xl p-12">
+                    <div class="w-24 h-24 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full mx-auto flex items-center justify-center mb-6">
+                        <i class="fas fa-check text-white text-4xl"></i>
+                    </div>
+                    
+                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
+                    <p class="text-xl text-emerald-600 mb-8">Merci pour votre commande</p>
+                    
+                    <div class="bg-emerald-50 rounded-xl p-6 mb-8">
+                        <p class="text-sm text-emerald-600 mb-2">Numéro de commande</p>
+                        <p class="text-3xl font-bold text-emerald-800">${orderNumber}</p>
+                    </div>
+                    
+                    <p class="text-gray-600 mb-8">
+                        Nous avons bien reçu votre commande et nous la préparons avec soin.
+                        Vous recevrez bientôt un email de confirmation.
+                    </p>
+                    
+                    <div class="flex gap-4 justify-center">
+                        <button onclick="app.showPage('home')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            Retour à l'accueil
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1007,48 +1436,6 @@ class PharmacieGaherApp {
         };
         return icons[type] || icons.info;
     }
-    
-    // Method to check if user is authenticated for protected actions
-    requireAuth() {
-        if (!this.currentUser) {
-            this.showToast('Veuillez vous connecter pour continuer', 'warning');
-            this.showPage('login');
-            return false;
-        }
-        return true;
-    }
-    
-    // Method to check if user is admin
-    requireAdmin() {
-        if (!this.currentUser || this.currentUser.role !== 'admin') {
-            this.showToast('Accès administrateur requis', 'error');
-            this.showPage('home');
-            return false;
-        }
-        return true;
-    }
-    
-    // Enhanced error handling for authentication
-    handleAuthError(error, context = '') {
-        console.error(`Auth Error ${context}:`, error);
-        
-        if (error.message.includes('401') || error.message.includes('Token invalide')) {
-            // Token expired or invalid
-            localStorage.removeItem('token');
-            this.currentUser = null;
-            this.updateUserUI();
-            this.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
-            this.showPage('login');
-        } else if (error.message.includes('403')) {
-            this.showToast('Accès refusé', 'error');
-        } else if (error.message.includes('404')) {
-            this.showToast('Ressource non trouvée', 'error');
-        } else if (error.message.includes('500')) {
-            this.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
-        } else {
-            this.showToast(error.message || 'Une erreur est survenue', 'error');
-        }
-    }
 }
 
 // Global functions - CRITICAL FIXES
@@ -1058,6 +1445,29 @@ function addToCartFromCard(productId, quantity = 1) {
         window.app.addToCart(productId, quantity);
     } else {
         console.error('App not available');
+    }
+}
+
+// Helper function for product page
+function updateProductQuantity(action) {
+    const input = document.getElementById('productQuantity');
+    if (!input) return;
+    
+    let value = parseInt(input.value);
+    if (action === 'plus') {
+        value = Math.min(value + 1, parseInt(input.max));
+    } else if (action === 'minus') {
+        value = Math.max(value - 1, 1);
+    }
+    input.value = value;
+}
+
+function addProductToCart(productId) {
+    const quantityInput = document.getElementById('productQuantity');
+    const quantity = quantityInput ? parseInt(quantityInput.value) : 1;
+    
+    if (window.app) {
+        window.app.addToCart(productId, quantity);
     }
 }
 
@@ -1141,4 +1551,4 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('App initialized and made globally available');
 });
 
-console.log('✅ Fixed app.js loaded with proper admin integration and GREEN ICONS');
+console.log('✅ COMPLETE app.js loaded with ALL methods + API integration');
