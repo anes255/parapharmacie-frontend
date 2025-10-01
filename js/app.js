@@ -1,710 +1,1081 @@
-// Complete PharmacieGaherApp - Fixed version with localStorage cleanup
-
+// COMPLETE PharmacieGaherApp - WITH ALL METHODS
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
-        this.cart = [];
-        this.allProducts = [];
-        this.adminCurrentSection = 'dashboard';
-        this.currentEditingProduct = null;
+        this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        this.allProducts = []; // Cache for all products
         this.settings = {
             couleurPrimaire: '#10b981',
             couleurSecondaire: '#059669',
             couleurAccent: '#34d399',
-            nomSite: 'Pharmacie Gaher',
-            descriptionSite: 'Votre parapharmacie de confiance',
-            adresse: '123 Rue de la Santé, Alger',
-            telephone: '0555 123 456',
-            email: 'contact@pharmaciegaher.com',
-            horaires: 'Lun-Sam: 9h-19h, Dim: 10h-18h',
+            nomSite: 'Shifa - Parapharmacie',
             fraisLivraison: 300,
-            fraisLivraisonGratuite: 5000,
-            tva: 0.20
+            livraisonGratuite: 5000
         };
-        
-        this.apiUrl = window.API_CONFIG?.baseURL || 'https://parapharmacie-gaher.onrender.com';
-        console.log('App initialized with API URL:', this.apiUrl);
+        this.currentPage = 'home';
         
         this.init();
     }
-
+    
     async init() {
         try {
-            // Clean up localStorage on init
-            this.performStartupCleanup();
-            
-            // Load cart safely
-            this.loadCart();
-            
             await this.checkAuth();
-            await this.loadSettings();
-            await this.loadProducts();
+            await this.loadProductsCache(); // Load products from localStorage/API
+            this.initUI();
+            await this.showPage('home');
             this.updateCartUI();
-            this.initializeEventListeners();
-            this.showPage('home');
-            
-            console.log('✅ App fully initialized');
+            this.initSearch();
         } catch (error) {
-            console.error('❌ Error initializing app:', error);
-            this.handleError(error);
+            console.error('Erreur initialisation app:', error);
+            this.showToast('Erreur de chargement de l\'application', 'error');
         }
     }
-
-    // CRITICAL: Startup cleanup to prevent quota issues
-    performStartupCleanup() {
+    
+    // New method to load and cache products
+    async loadProductsCache() {
         try {
-            console.log('🧹 Performing startup cleanup...');
+            console.log('Loading products cache...');
             
-            // Keep only last 10 admin orders
-            const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-            if (orders.length > 10) {
-                localStorage.setItem('adminOrders', JSON.stringify(orders.slice(0, 10)));
-                console.log(`✅ Cleaned adminOrders: ${orders.length} → 10`);
-            }
+            // Start with localStorage products
+            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            this.allProducts = [...localProducts];
             
-            // Keep only last 30 products
-            const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            if (products.length > 30) {
-                localStorage.setItem('demoProducts', JSON.stringify(products.slice(0, 30)));
-                console.log(`✅ Cleaned demoProducts: ${products.length} → 30`);
-            }
-            
-            // Clean old user orders (older than 30 days)
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('userOrders_')) {
-                    try {
-                        const userOrders = JSON.parse(localStorage.getItem(key) || '[]');
-                        const recentOrders = userOrders.filter(order => {
-                            const orderDate = new Date(order.dateCommande);
-                            return orderDate > thirtyDaysAgo;
-                        });
+            // Try to load from API and merge
+            try {
+                const response = await fetch(buildApiUrl('/products'));
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.products && data.products.length > 0) {
+                        // Merge API products with local ones, avoiding duplicates
+                        const localIds = localProducts.map(p => p._id);
+                        const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
                         
-                        if (recentOrders.length < userOrders.length) {
-                            localStorage.setItem(key, JSON.stringify(recentOrders.slice(0, 10)));
-                            console.log(`✅ Cleaned ${key}`);
-                        }
-                    } catch (e) {
-                        console.error(`Error cleaning ${key}:`, e);
-                    }
-                }
-            }
-            
-            console.log('✅ Startup cleanup completed');
-        } catch (error) {
-            console.error('Error during startup cleanup:', error);
-        }
-    }
-
-    // Load cart safely with error handling
-    loadCart() {
-        try {
-            const cartData = localStorage.getItem('cart');
-            this.cart = cartData ? JSON.parse(cartData) : [];
-            console.log('Cart loaded:', this.cart.length, 'items');
-        } catch (error) {
-            console.error('Error loading cart, clearing corrupted data:', error);
-            localStorage.removeItem('cart');
-            this.cart = [];
-        }
-    }
-
-    // FIXED: Save cart with automatic cleanup on quota error
-    saveCart() {
-        try {
-            localStorage.setItem('cart', JSON.stringify(this.cart));
-            
-            // Trigger storage event for other tabs
-            window.dispatchEvent(new StorageEvent('storage', {
-                key: 'cart',
-                newValue: JSON.stringify(this.cart)
-            }));
-            
-        } catch (error) {
-            if (error.name === 'QuotaExceededError') {
-                console.error('❌ LocalStorage quota exceeded! Performing emergency cleanup...');
-                
-                // EMERGENCY CLEANUP
-                try {
-                    // 1. Clear admin orders (keep only 5)
-                    const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-                    if (orders.length > 5) {
-                        localStorage.setItem('adminOrders', JSON.stringify(orders.slice(0, 5)));
-                        console.log(`✅ Emergency: Cleaned adminOrders ${orders.length} → 5`);
-                    }
-                    
-                    // 2. Clear demo products (keep only 20)
-                    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-                    if (products.length > 20) {
-                        localStorage.setItem('demoProducts', JSON.stringify(products.slice(0, 20)));
-                        console.log(`✅ Emergency: Cleaned demoProducts ${products.length} → 20`);
-                    }
-                    
-                    // 3. Clear ALL user orders
-                    for (let i = localStorage.length - 1; i >= 0; i--) {
-                        const key = localStorage.key(i);
-                        if (key && key.startsWith('userOrders_')) {
-                            localStorage.removeItem(key);
-                            console.log(`✅ Emergency: Removed ${key}`);
+                        if (newApiProducts.length > 0) {
+                            this.allProducts = [...localProducts, ...newApiProducts];
+                            // Update localStorage with merged data
+                            localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
                         }
                     }
-                    
-                    // 4. Try to save cart again
-                    localStorage.setItem('cart', JSON.stringify(this.cart));
-                    console.log('✅ Cart saved after emergency cleanup');
-                    
-                    this.showToast('Nettoyage automatique effectué', 'info');
-                    
-                } catch (retryError) {
-                    console.error('❌ Still cannot save cart after cleanup');
-                    this.showToast('Erreur: Mémoire pleine. Veuillez vider votre panier.', 'error');
                 }
-            } else {
-                console.error('Error saving cart:', error);
-                this.showToast('Erreur lors de la sauvegarde du panier', 'error');
+            } catch (error) {
+                console.log('API unavailable, using local products only:', error.message);
             }
-        }
-    }
-
-    // Authentication methods
-    async checkAuth() {
-        const token = localStorage.getItem('authToken');
-        if (!token) {
-            this.currentUser = null;
-            return;
-        }
-
-        try {
-            const response = await fetch(`${this.apiUrl}/api/auth/verify`, {
-                headers: {
-                    'x-auth-token': token
-                }
-            });
-
-            if (response.ok) {
-                this.currentUser = await response.json();
-                console.log('User authenticated:', this.currentUser);
-            } else {
-                localStorage.removeItem('authToken');
-                this.currentUser = null;
-            }
+            
+            console.log(`Products cache loaded: ${this.allProducts.length} products`);
+            
         } catch (error) {
-            console.error('Auth check failed:', error);
-            this.currentUser = null;
+            console.error('Error loading products cache:', error);
+            this.allProducts = [];
         }
     }
-
-    async loadSettings() {
-        try {
-            const response = await fetch(`${this.apiUrl}/api/settings`);
-            if (response.ok) {
-                const data = await response.json();
-                this.settings = { ...this.settings, ...data };
-            }
-        } catch (error) {
-            console.log('Using default settings');
-        }
-    }
-
-    async loadProducts() {
-        try {
-            // Try to load from API first
-            const response = await fetch(`${this.apiUrl}/api/products`);
-            if (response.ok) {
-                const data = await response.json();
-                this.allProducts = data.products || [];
-                
-                // Save to localStorage for offline use
-                localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
-                console.log('Products loaded from API:', this.allProducts.length);
-            } else {
-                throw new Error('API not available');
-            }
-        } catch (error) {
-            // Fallback to localStorage
-            console.log('Loading products from localStorage');
-            const localProducts = localStorage.getItem('demoProducts');
-            this.allProducts = localProducts ? JSON.parse(localProducts) : [];
-            console.log('Products loaded from localStorage:', this.allProducts.length);
-        }
-    }
-
+    
+    // New method to refresh products cache (called from admin when products are modified)
     refreshProductsCache() {
-        this.loadProducts();
+        console.log('Refreshing products cache...');
+        
+        // Reload from localStorage
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        this.allProducts = [...localProducts];
+        
+        console.log(`Products cache refreshed: ${this.allProducts.length} products`);
+        
+        // If we're on the home page, refresh the displayed products
+        if (this.currentPage === 'home') {
+            this.refreshHomePage();
+        } else if (this.currentPage === 'products') {
+            // Refresh products page if we're on it
+            this.showPage('products');
+        }
     }
-
-    initializeEventListeners() {
-        // Navigation
-        document.addEventListener('click', (e) => {
-            const navLink = e.target.closest('[data-page]');
-            if (navLink) {
-                e.preventDefault();
-                const page = navLink.dataset.page;
-                this.showPage(page);
-            }
-        });
-
-        // Cart toggle
-        const cartBtn = document.getElementById('cartBtn');
-        if (cartBtn) {
-            cartBtn.addEventListener('click', () => {
-                if (window.cartSystem) {
-                    window.cartSystem.toggle();
+    
+    // New method to refresh home page content
+    refreshHomePage() {
+        console.log('Refreshing home page content...');
+        
+        // Refresh featured products
+        this.loadFeaturedProducts();
+        // Refresh promotion products  
+        this.loadPromotionProducts();
+    }
+    
+    async checkAuth() {
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                const response = await fetch(buildApiUrl('/auth/profile'), {
+                    headers: { 'x-auth-token': token }
+                });
+                
+                if (response.ok) {
+                    this.currentUser = await response.json();
+                    this.updateUserUI();
+                } else {
+                    localStorage.removeItem('token');
                 }
-            });
+            } catch (error) {
+                console.error('Erreur vérification auth:', error);
+                localStorage.removeItem('token');
+            }
         }
-
-        // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const mobileMenu = document.getElementById('mobileMenu');
-        if (mobileMenuBtn && mobileMenu) {
-            mobileMenuBtn.addEventListener('click', () => {
-                mobileMenu.classList.toggle('hidden');
-            });
-        }
-
-        // Search functionality
+    }
+    
+    initUI() {
         const searchInput = document.getElementById('searchInput');
         if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                this.handleSearch(e.target.value);
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.performSearch(e.target.value);
+                }
             });
         }
+        
+        this.updateCartUI();
+        window.app = this; // Critical: Make globally available
     }
-
-    showPage(page, params = {}) {
-        console.log('Showing page:', page);
-
-        // Update URL without reload
-        history.pushState({ page, params }, '', `#${page}`);
-
-        // Hide all pages
-        const pages = document.querySelectorAll('.page-content');
-        pages.forEach(p => p.classList.add('hidden'));
-
-        // Show requested page
-        const pageElement = document.getElementById(`${page}Page`);
-        if (pageElement) {
-            pageElement.classList.remove('hidden');
-        }
-
-        // Update navigation
-        this.updateNavigation(page);
-
-        // Load page-specific content
-        switch (page) {
-            case 'home':
-                this.loadHomePage();
-                break;
-            case 'products':
-                this.loadProductsPage();
-                break;
-            case 'product':
-                if (params.id) {
-                    this.loadProductPage(params.id);
-                }
-                break;
-            case 'checkout':
-                this.loadCheckoutPage();
-                break;
-            case 'admin':
-                this.loadAdminPage();
-                break;
-            case 'login':
-                this.loadLoginPage();
-                break;
-            case 'register':
-                this.loadRegisterPage();
-                break;
-            case 'profile':
-                this.loadProfilePage();
-                break;
-            case 'order-confirmation':
-                this.loadOrderConfirmationPage(params);
-                break;
-            default:
-                this.loadHomePage();
-        }
-
-        // Scroll to top
-        window.scrollTo(0, 0);
-    }
-
-    updateNavigation(currentPage) {
-        const navLinks = document.querySelectorAll('[data-page]');
-        navLinks.forEach(link => {
-            const page = link.dataset.page;
-            if (page === currentPage) {
-                link.classList.add('active', 'text-emerald-600', 'font-semibold');
-            } else {
-                link.classList.remove('active', 'text-emerald-600', 'font-semibold');
+    
+    updateUserUI() {
+        const guestMenu = document.getElementById('guestMenu');
+        const userLoggedMenu = document.getElementById('userLoggedMenu');
+        const adminMenuLink = document.getElementById('adminMenuLink');
+        
+        if (this.currentUser) {
+            if (guestMenu) guestMenu.style.display = 'none';
+            if (userLoggedMenu) userLoggedMenu.style.display = 'block';
+            
+            if (this.currentUser.role === 'admin' && adminMenuLink) {
+                adminMenuLink.style.display = 'block';
             }
-        });
+        } else {
+            if (guestMenu) guestMenu.style.display = 'block';
+            if (userLoggedMenu) userLoggedMenu.style.display = 'none';
+            if (adminMenuLink) adminMenuLink.style.display = 'none';
+        }
     }
-
-    loadHomePage() {
-        // Load featured products
-        const featuredProducts = this.allProducts.filter(p => p.enVedette).slice(0, 8);
-        this.renderFeaturedProducts(featuredProducts);
+    
+    async showPage(pageName, params = {}) {
+        try {
+            this.showLoading();
+            this.currentPage = pageName;
+            
+            switch (pageName) {
+                case 'home':
+                    await this.loadHomePage();
+                    break;
+                case 'products':
+                    await this.loadProductsPage(params);
+                    break;
+                case 'product':
+                    await this.loadProductPage(params.id);
+                    break;
+                case 'login':
+                    await this.loadLoginPage();
+                    break;
+                case 'register':
+                    await this.loadRegisterPage();
+                    break;
+                case 'profile':
+                    if (!this.currentUser) {
+                        await this.showPage('login');
+                        return;
+                    }
+                    await this.loadProfilePage();
+                    break;
+                case 'checkout':
+                    await this.loadCheckoutPage();
+                    break;
+                case 'order-confirmation':
+                    await this.loadOrderConfirmationPage(params.orderNumber);
+                    break;
+                case 'contact':
+                    await this.loadContactPage();
+                    break;
+                case 'admin':
+                    if (!this.currentUser || this.currentUser.role !== 'admin') {
+                        this.showToast('Accès refusé', 'error');
+                        await this.showPage('home');
+                        return;
+                    }
+                    await this.loadAdminPage();
+                    break;
+                default:
+                    await this.loadHomePage();
+            }
+            
+            this.hideLoading();
+        } catch (error) {
+            console.error('Erreur chargement page:', error);
+            this.hideLoading();
+            this.showToast('Erreur de chargement de la page', 'error');
+        }
     }
-
-    renderFeaturedProducts(products) {
+    
+    async loadHomePage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <section class="hero-gradient text-white py-24 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-green-600/30 to-teal-700/20"></div>
+                <div class="container mx-auto px-4 relative z-10">
+                    <div class="max-w-4xl mx-auto text-center">
+                        <div class="flex justify-center mb-8">
+                            <div class="w-40 h-40 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center shadow-2xl border-2 border-white/30 float-animation">
+                                <i class="fas fa-seedling text-7xl text-white drop-shadow-lg"></i>
+                            </div>
+                        </div>
+                        <h1 class="text-6xl md:text-8xl font-bold mb-4 bg-gradient-to-r from-white to-green-100 bg-clip-text text-transparent drop-shadow-2xl">
+                            Shifa
+                        </h1>
+                        <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-green-100">
+                            Parapharmacie
+                        </h2>
+                        <p class="text-xl md:text-2xl mb-12 opacity-90 text-green-50">
+                            Votre bien-être, notre mission naturelle
+                        </p>
+                        <div class="flex justify-center">
+                            <button onclick="app.showPage('products')" class="btn-primary bg-white text-emerald-600 hover:bg-green-50 text-lg px-10 py-5 transform hover:scale-105">
+                                <i class="fas fa-leaf mr-3"></i>
+                                Explorer nos produits naturels
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-50 to-transparent"></div>
+            </section>
+            
+            <!-- Categories Section -->
+            <section class="py-16 bg-gradient-to-br from-green-50 to-emerald-100">
+                <div class="container mx-auto px-4">
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Catégories</h2>
+                        <p class="text-xl text-emerald-600">Découvrez notre gamme complète de produits</p>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="categoriesGrid">
+                        <!-- Categories will be loaded here -->
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Featured Products -->
+            <section class="py-16 bg-white">
+                <div class="container mx-auto px-4">
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Coups de Cœur</h2>
+                        <p class="text-xl text-emerald-600">Produits sélectionnés pour vous</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="featuredProducts">
+                        <!-- Featured products will be loaded here -->
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Promotions -->
+            <section class="py-16 bg-gradient-to-br from-red-50 to-pink-100">
+                <div class="container mx-auto px-4">
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl font-bold text-red-800 mb-4">Promotions</h2>
+                        <p class="text-xl text-red-600">Offres spéciales et réductions</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="promotionProducts">
+                        <!-- Promotion products will be loaded here -->
+                    </div>
+                </div>
+            </section>
+        `;
+        
+        await this.loadCategories();
+        await this.loadFeaturedProducts();
+        await this.loadPromotionProducts();
+    }
+    
+    async loadCategories() {
+        // Show all 10 categories with Vitalité first
+        const mainPageCategories = [
+            { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
+            { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
+            { nom: 'Visage', description: 'Soins du visage', icon: 'fa-smile' },
+            { nom: 'Cheveux', description: 'Soins capillaires', icon: 'fa-cut' },
+            { nom: 'Solaire', description: 'Protection solaire', icon: 'fa-sun' },
+            { nom: 'Intime', description: 'Hygiène intime', icon: 'fa-heart' },
+            { nom: 'Soins', description: 'Soins corporels', icon: 'fa-spa' },
+            { nom: 'Bébé', description: 'Soins bébé', icon: 'fa-baby-carriage' },
+            { nom: 'Homme', description: 'Soins masculins', icon: 'fa-user-tie' },
+            { nom: 'Dentaire', description: 'Hygiène dentaire', icon: 'fa-tooth' }
+        ];
+        
+        const categoriesGrid = document.getElementById('categoriesGrid');
+        if (categoriesGrid) {
+            categoriesGrid.innerHTML = mainPageCategories.map((category, index) => `
+                <div class="category-card text-center cursor-pointer p-6 bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-sm rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 border border-emerald-200/50 ${index === 0 ? 'ring-2 ring-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100' : ''}"
+                     onclick="app.filterByCategory('${category.nom}')">
+                    <div class="category-icon mx-auto ${index === 0 ? 'pulse-slow' : ''}">
+                        <i class="fas ${category.icon} drop-shadow-lg"></i>
+                    </div>
+                    <h3 class="font-bold text-emerald-800 mb-2 text-sm lg:text-base">${category.nom}</h3>
+                    <p class="text-xs lg:text-sm text-emerald-600 font-medium">${category.description}</p>
+                    ${index === 0 ? '<div class="mt-2"><span class="text-xs bg-emerald-500 text-white px-2 py-1 rounded-full font-semibold">★ POPULAIRE</span></div>' : ''}
+                </div>
+            `).join('');
+        }
+    }
+    
+    async loadFeaturedProducts() {
+        console.log('Loading featured products...');
+        
+        // Use cached products and filter for featured products
+        const featuredProducts = this.allProducts.filter(p => p.enVedette && p.actif !== false);
+        
+        console.log(`Found ${featuredProducts.length} featured products`);
+        
         const container = document.getElementById('featuredProducts');
-        if (!container) return;
-
-        if (products.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-center py-8">Aucun produit en vedette</p>';
-            return;
+        if (container) {
+            if (featuredProducts.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-16">
+                        <i class="fas fa-star text-6xl text-emerald-200 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit en vedette</h3>
+                        <p class="text-emerald-600 mb-8">Ajoutez des produits en vedette depuis l'administration</p>
+                        ${this.currentUser && this.currentUser.role === 'admin' ? `
+                        <button onclick="app.showPage('admin')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-cog mr-2"></i>Aller à l'administration
+                        </button>
+                        ` : ''}
+                    </div>
+                `;
+            } else {
+                container.innerHTML = featuredProducts.slice(0, 8).map(product => this.createProductCard(product)).join('');
+            }
         }
-
-        container.innerHTML = products.map(product => this.renderProductCard(product)).join('');
     }
-
-    loadProductsPage() {
-        const container = document.getElementById('productsGrid');
-        if (!container) return;
-
-        if (this.allProducts.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-center py-8">Aucun produit disponible</p>';
-            return;
+    
+    async loadPromotionProducts() {
+        console.log('Loading promotion products...');
+        
+        // Use cached products and filter for promotion products
+        const promotionProducts = this.allProducts.filter(p => p.enPromotion && p.actif !== false);
+        
+        console.log(`Found ${promotionProducts.length} promotion products`);
+        
+        const container = document.getElementById('promotionProducts');
+        if (container) {
+            if (promotionProducts.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-16">
+                        <i class="fas fa-tags text-6xl text-red-300 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-red-800 mb-4">Aucune promotion active</h3>
+                        <p class="text-red-600 mb-8">Créez des promotions depuis l'administration</p>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = promotionProducts.slice(0, 8).map(product => this.createProductCard(product)).join('');
+            }
         }
-
-        container.innerHTML = this.allProducts.map(product => this.renderProductCard(product)).join('');
     }
-
-    renderProductCard(product) {
-        const imageUrl = product.image || this.generatePlaceholderImage(product);
+    
+    createProductCard(product) {
+        const isOutOfStock = product.stock === 0;
+        const hasPromotion = product.enPromotion && product.prixOriginal;
+        
+        let imageUrl;
+        if (product.image && product.image.startsWith('http')) {
+            imageUrl = product.image;
+        } else if (product.image && product.image.startsWith('data:image')) {
+            imageUrl = product.image;
+        } else if (product.image) {
+            imageUrl = `./images/products/${product.image}`;
+        } else {
+            const getCategoryColor = (category) => {
+                const colors = {
+                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                    'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
+                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                    'Dentaire': '6366f1'
+                };
+                return colors[category] || '10b981';
+            };
+            
+            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+            const categoryColor = getCategoryColor(product.categorie);
+            imageUrl = `https://via.placeholder.com/300x300/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+        }
         
         return `
-            <div class="product-card bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 border border-emerald-100">
-                <div class="relative">
-                    <img src="${imageUrl}" 
-                         alt="${product.nom}" 
-                         class="w-full h-48 object-cover"
-                         onerror="this.src='${this.generatePlaceholderImage(product)}'">
-                    ${product.enVedette ? '<span class="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-semibold">★ Vedette</span>' : ''}
-                    ${product.enPromotion ? `<span class="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-semibold">-${product.pourcentagePromotion || 10}%</span>` : ''}
+            <div class="product-card bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-2xl overflow-hidden transition-all duration-500 cursor-pointer relative border border-emerald-200/50 hover:border-emerald-400/60 ${isOutOfStock ? 'opacity-75' : ''}"
+                 onclick="app.showPage('product', {id: '${product._id}'})">
+                ${hasPromotion ? `<div class="badge-promotion absolute top-4 left-4 z-20">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
+                ${isOutOfStock ? `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10 rounded-2xl">
+                    <span class="text-white font-bold text-lg">Rupture de stock</span>
+                </div>` : ''}
+                
+                <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden relative">
+                    <img src="${imageUrl}" alt="${product.nom}" 
+                         class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                         onerror="this.src='https://via.placeholder.com/300x300/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
                 </div>
-                <div class="p-4">
-                    <h3 class="font-semibold text-gray-800 mb-2 line-clamp-2">${product.nom}</h3>
-                    <p class="text-sm text-gray-600 mb-3">${product.marque || 'Sans marque'}</p>
+                
+                <div class="p-6">
+                    <h3 class="font-bold text-emerald-800 mb-3 text-lg line-clamp-2">${product.nom}</h3>
+                    <p class="text-sm text-emerald-600 mb-4 line-clamp-2">${product.description || 'Description du produit'}</p>
                     
-                    <div class="flex items-center justify-between mb-3">
-                        <div>
-                            ${product.enPromotion && product.prixOriginal ? `
-                                <span class="text-gray-400 line-through text-sm">${product.prixOriginal} DA</span>
-                                <span class="text-emerald-600 font-bold text-lg ml-2">${product.prix} DA</span>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            ${hasPromotion ? `
+                                <span class="text-sm text-gray-400 line-through">${product.prixOriginal} DA</span>
+                                <span class="text-xl font-bold text-red-600">${product.prix} DA</span>
                             ` : `
-                                <span class="text-emerald-600 font-bold text-lg">${product.prix} DA</span>
+                                <span class="text-xl font-bold text-emerald-700">${product.prix} DA</span>
                             `}
                         </div>
-                        <span class="text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}">
-                            ${product.stock > 0 ? `En stock (${product.stock})` : 'Rupture'}
-                        </span>
+                        
+                        ${!isOutOfStock ? `
+                            <button onclick="event.stopPropagation(); addToCartFromCard('${product._id}')" 
+                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-5 py-2 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
+                                <i class="fas fa-cart-plus"></i>
+                            </button>
+                        ` : ''}
                     </div>
                     
-                    <div class="flex space-x-2">
-                        <button onclick="app.addToCart('${product._id}')" 
-                                class="flex-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-2 px-4 rounded-lg hover:from-emerald-600 hover:to-green-700 transition-all shadow-md"
-                                ${product.stock === 0 ? 'disabled' : ''}>
-                            <i class="fas fa-shopping-cart mr-2"></i>Ajouter
-                        </button>
-                        <button onclick="app.showPage('product', {id: '${product._id}'})" 
-                                class="bg-white border-2 border-emerald-500 text-emerald-600 py-2 px-4 rounded-lg hover:bg-emerald-50 transition-all">
-                            <i class="fas fa-eye"></i>
-                        </button>
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-emerald-600">Stock: ${product.stock}</span>
+                        <span class="text-emerald-700 font-semibold">${product.marque || ''}</span>
                     </div>
                 </div>
             </div>
         `;
     }
 
-    generatePlaceholderImage(product) {
-        const getCategoryColor = (category) => {
-            const colors = {
-                'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
-                'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-                'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
-                'Dentaire': '6366f1'
-            };
-            return colors[category] || '10b981';
-        };
+    // MISSING METHODS START HERE
+
+    async loadProductsPage(params = {}) {
+        console.log('Loading products page with params:', params);
         
-        const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
-        const categoryColor = getCategoryColor(product.categorie);
-        return `https://via.placeholder.com/300x300/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+        let filteredProducts = [...this.allProducts];
+        
+        // Filter by category
+        if (params.categorie) {
+            filteredProducts = filteredProducts.filter(p => p.categorie === params.categorie);
+        }
+        
+        // Filter by search
+        if (params.search) {
+            const searchLower = params.search.toLowerCase();
+            filteredProducts = filteredProducts.filter(p => 
+                p.nom.toLowerCase().includes(searchLower) ||
+                (p.description && p.description.toLowerCase().includes(searchLower)) ||
+                (p.marque && p.marque.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="mb-8">
+                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">
+                        ${params.categorie ? `Catégorie: ${params.categorie}` : params.search ? `Résultats pour "${params.search}"` : 'Tous nos produits'}
+                    </h1>
+                    <p class="text-emerald-600 text-lg">${filteredProducts.length} produit(s) trouvé(s)</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    ${filteredProducts.map(product => this.createProductCard(product)).join('')}
+                </div>
+                
+                ${filteredProducts.length === 0 ? `
+                    <div class="text-center py-16">
+                        <i class="fas fa-search text-6xl text-emerald-200 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit trouvé</h3>
+                        <button onclick="app.showPage('home')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-home mr-2"></i>Retour à l'accueil
+                        </button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
     }
 
-    loadProductPage(productId) {
+    async loadProductPage(productId) {
+        console.log('Loading product page for ID:', productId);
+        
         const product = this.allProducts.find(p => p._id === productId);
+        
         if (!product) {
             this.showToast('Produit non trouvé', 'error');
             this.showPage('products');
             return;
         }
-
-        const container = document.getElementById('productDetail');
-        if (!container) return;
-
-        const imageUrl = product.image || this.generatePlaceholderImage(product);
-
-        container.innerHTML = `
-            <div class="max-w-6xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
+        
+        let imageUrl;
+        if (product.image && product.image.startsWith('http')) {
+            imageUrl = product.image;
+        } else if (product.image && product.image.startsWith('data:image')) {
+            imageUrl = product.image;
+        } else {
+            const getCategoryColor = (category) => {
+                const colors = {
+                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                    'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
+                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                    'Dentaire': '6366f1'
+                };
+                return colors[product.categorie] || '10b981';
+            };
+            
+            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+            const categoryColor = getCategoryColor(product.categorie);
+            imageUrl = `https://via.placeholder.com/500x500/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+        }
+        
+        const isOutOfStock = product.stock === 0;
+        const hasPromotion = product.enPromotion && product.prixOriginal;
+        
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <button onclick="history.back()" class="text-emerald-600 hover:text-emerald-800 mb-6 flex items-center">
+                    <i class="fas fa-arrow-left mr-2"></i>Retour
+                </button>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     <div>
-                        <img src="${imageUrl}" 
-                             alt="${product.nom}" 
-                             class="w-full rounded-xl shadow-lg"
-                             onerror="this.src='${this.generatePlaceholderImage(product)}'">
+                        <img src="${imageUrl}" alt="${product.nom}" class="w-full rounded-2xl shadow-2xl" 
+                             onerror="this.src='https://via.placeholder.com/500x500/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
                     </div>
                     
-                    <div class="space-y-6">
-                        <div>
-                            <h1 class="text-3xl font-bold text-gray-900 mb-2">${product.nom}</h1>
-                            <p class="text-lg text-gray-600">${product.marque || 'Sans marque'}</p>
-                            <span class="inline-block mt-2 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-sm font-semibold">
-                                ${product.categorie}
-                            </span>
-                        </div>
+                    <div>
+                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">${product.nom}</h1>
+                        <p class="text-emerald-600 mb-4">${product.marque || ''}</p>
                         
-                        <div class="border-t border-b border-gray-200 py-4">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    ${product.enPromotion && product.prixOriginal ? `
-                                        <span class="text-gray-400 line-through text-xl">${product.prixOriginal} DA</span>
-                                        <span class="text-emerald-600 font-bold text-3xl ml-3">${product.prix} DA</span>
-                                    ` : `
-                                        <span class="text-emerald-600 font-bold text-3xl">${product.prix} DA</span>
-                                    `}
-                                </div>
-                                <span class="text-lg ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}">
-                                    ${product.stock > 0 ? `En stock (${product.stock})` : 'Rupture de stock'}
+                        <div class="flex items-center space-x-4 mb-6">
+                            ${hasPromotion ? `
+                                <span class="text-2xl text-gray-400 line-through">${product.prixOriginal} DA</span>
+                                <span class="text-4xl font-bold text-red-600">${product.prix} DA</span>
+                                <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-semibold">
+                                    -${Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%
                                 </span>
-                            </div>
+                            ` : `
+                                <span class="text-4xl font-bold text-emerald-700">${product.prix} DA</span>
+                            `}
                         </div>
                         
-                        <div>
-                            <h3 class="font-semibold text-gray-900 mb-2">Description</h3>
-                            <p class="text-gray-700">${product.description || 'Aucune description disponible'}</p>
+                        <p class="text-gray-700 mb-6">${product.description || 'Aucune description disponible'}</p>
+                        
+                        <div class="bg-emerald-50 p-4 rounded-xl mb-6">
+                            <p class="text-emerald-700">
+                                <i class="fas fa-warehouse mr-2"></i>
+                                Stock: <strong>${product.stock} unités</strong>
+                            </p>
                         </div>
                         
-                        ${product.ingredients ? `
-                            <div>
-                                <h3 class="font-semibold text-gray-900 mb-2">Ingrédients</h3>
-                                <p class="text-gray-700">${product.ingredients}</p>
+                        ${!isOutOfStock ? `
+                            <div class="flex items-center space-x-4 mb-6">
+                                <label class="text-gray-700 font-semibold">Quantité:</label>
+                                <div class="quantity-selector">
+                                    <button onclick="updateProductQuantity('minus')">-</button>
+                                    <input type="number" id="productQuantity" value="1" min="1" max="${product.stock}">
+                                    <button onclick="updateProductQuantity('plus')">+</button>
+                                </div>
                             </div>
-                        ` : ''}
-                        
-                        ${product.modeEmploi ? `
-                            <div>
-                                <h3 class="font-semibold text-gray-900 mb-2">Mode d'emploi</h3>
-                                <p class="text-gray-700">${product.modeEmploi}</p>
-                            </div>
-                        ` : ''}
-                        
-                        <div class="flex space-x-4">
-                            <button onclick="app.addToCart('${product._id}')" 
-                                    class="flex-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg text-lg font-semibold"
-                                    ${product.stock === 0 ? 'disabled' : ''}>
+                            
+                            <button onclick="addProductToCart('${product._id}')" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg text-lg">
                                 <i class="fas fa-shopping-cart mr-2"></i>Ajouter au panier
                             </button>
-                            <button onclick="app.showPage('products')" 
-                                    class="bg-white border-2 border-emerald-500 text-emerald-600 py-3 px-6 rounded-xl hover:bg-emerald-50 transition-all">
-                                <i class="fas fa-arrow-left mr-2"></i>Retour
-                            </button>
-                        </div>
+                        ` : `
+                            <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                                <i class="fas fa-exclamation-circle text-red-600 text-3xl mb-2"></i>
+                                <p class="text-red-800 font-semibold">Produit en rupture de stock</p>
+                            </div>
+                        `}
                     </div>
                 </div>
             </div>
         `;
     }
 
-    loadCheckoutPage() {
+    async loadCheckoutPage() {
+        if (this.cart.length === 0) {
+            this.showToast('Votre panier est vide', 'warning');
+            this.showPage('products');
+            return;
+        }
+        
+        const sousTotal = this.getCartTotal();
+        
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+                <h1 class="text-4xl font-bold text-emerald-800 mb-8">Finaliser la commande</h1>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2">
+                        <div class="bg-white rounded-2xl shadow-xl p-8">
+                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Informations de livraison</h2>
+                            
+                            <form id="checkoutForm" class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
+                                        <input type="text" id="checkoutPrenom" required class="form-input">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
+                                        <input type="text" id="checkoutNom" required class="form-input">
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
+                                    <input type="email" id="checkoutEmail" required class="form-input">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
+                                    <input type="tel" id="checkoutTelephone" required class="form-input" placeholder="+213 XXX XXX XXX">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Adresse complète *</label>
+                                    <textarea id="checkoutAdresse" required rows="3" class="form-input"></textarea>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
+                                    <select id="checkoutWilaya" required class="form-input">
+                                        <option value="">Sélectionnez une wilaya</option>
+                                        <option value="Alger">Alger</option>
+                                        <option value="Blida">Blida</option>
+                                        <option value="Boumerdès">Boumerdès</option>
+                                        <option value="Tipaza">Tipaza</option>
+                                        <option value="Médéa">Médéa</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Commentaires (optionnel)</label>
+                                    <textarea id="checkoutCommentaires" rows="3" class="form-input" placeholder="Instructions spéciales pour la livraison"></textarea>
+                                </div>
+                                
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-700 mb-4">Mode de paiement</h3>
+                                    <div class="space-y-3">
+                                        <label class="flex items-center p-4 border-2 border-emerald-200 rounded-xl cursor-pointer hover:bg-emerald-50">
+                                            <input type="radio" name="modePaiement" value="Paiement à la livraison" checked class="mr-3">
+                                            <div>
+                                                <p class="font-semibold">Paiement à la livraison</p>
+                                                <p class="text-sm text-gray-600">Payez en espèces lors de la réception</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <div id="paymentMethodInfo"></div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="lg:col-span-1">
+                        <div class="bg-white rounded-2xl shadow-xl p-8 sticky top-4">
+                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Récapitulatif</h2>
+                            
+                            <div class="space-y-4 mb-6">
+                                ${this.cart.map(item => `
+                                    <div class="flex items-center space-x-3 pb-3 border-b">
+                                        <img src="${item.image}" alt="${item.nom}" class="w-16 h-16 object-cover rounded-lg">
+                                        <div class="flex-1">
+                                            <p class="font-semibold text-sm">${item.nom}</p>
+                                            <p class="text-xs text-gray-600">${item.quantite} × ${item.prix} DA</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <div class="space-y-3 mb-6">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Sous-total:</span>
+                                    <span id="checkoutSousTotal" class="font-semibold">${sousTotal} DA</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Frais de livraison:</span>
+                                    <span id="checkoutFraisLivraison" class="font-semibold">${sousTotal >= 5000 ? 0 : 300} DA</span>
+                                </div>
+                                <div class="flex justify-between text-lg font-bold border-t pt-3">
+                                    <span class="text-emerald-800">Total:</span>
+                                    <span id="checkoutTotal" class="text-emerald-600">${sousTotal + (sousTotal >= 5000 ? 0 : 300)} DA</span>
+                                </div>
+                            </div>
+                            
+                            <div id="shippingMessage"></div>
+                            
+                            <button onclick="app.processOrder()" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg text-lg">
+                                <i class="fas fa-check mr-2"></i>Confirmer la commande
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
         // Initialize checkout system
         if (window.initCheckout) {
             window.initCheckout();
         }
     }
 
-    loadLoginPage() {
-        // Login page content
-        console.log('Login page loaded');
-    }
-
-    loadRegisterPage() {
-        // Register page content
-        console.log('Register page loaded');
-    }
-
-    loadProfilePage() {
-        // Profile page content
-        console.log('Profile page loaded');
-    }
-
-    loadOrderConfirmationPage(params) {
-        const container = document.getElementById('orderConfirmation');
-        if (!container) return;
-
-        container.innerHTML = `
-            <div class="max-w-2xl mx-auto text-center">
-                <div class="bg-green-100 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
-                    <i class="fas fa-check text-green-600 text-4xl"></i>
-                </div>
-                <h1 class="text-3xl font-bold text-gray-900 mb-4">Commande confirmée !</h1>
-                <p class="text-xl text-gray-600 mb-6">Numéro de commande: <strong>${params.orderNumber || 'N/A'}</strong></p>
-                <p class="text-gray-700 mb-8">Merci pour votre commande. Vous recevrez un email de confirmation sous peu.</p>
-                <div class="flex justify-center space-x-4">
-                    <button onclick="app.showPage('home')" 
-                            class="bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                        Retour à l'accueil
-                    </button>
-                    <button onclick="app.showPage('products')" 
-                            class="bg-white border-2 border-emerald-500 text-emerald-600 py-3 px-8 rounded-xl hover:bg-emerald-50 transition-all">
-                        Continuer vos achats
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-
-    loadAdminPage() {
-        if (!this.currentUser || this.currentUser.role !== 'admin') {
-            this.showToast('Accès refusé', 'error');
-            this.showPage('home');
-            return;
+    async processOrder() {
+        if (window.checkoutSystem && window.checkoutSystem.processOrder) {
+            return window.checkoutSystem.processOrder();
         }
-
-        this.loadAdminDashboard();
     }
 
-    loadAdminDashboard() {
-        const container = document.getElementById('adminContent');
-        if (!container) return;
-
-        const stats = this.getAdminStats();
-
-        container.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
-                    <div class="flex items-center justify-between">
+    async loadLoginPage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-16 max-w-md">
+                <div class="bg-white rounded-2xl shadow-2xl p-8">
+                    <h1 class="text-3xl font-bold text-emerald-800 mb-2 text-center">Connexion</h1>
+                    <p class="text-emerald-600 mb-8 text-center">Accédez à votre compte</p>
+                    
+                    <form onsubmit="handleLogin(event)" class="space-y-6">
                         <div>
-                            <p class="text-blue-100 text-sm font-medium">Total Produits</p>
-                            <p class="text-3xl font-bold mt-2">${stats.totalProducts}</p>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                            <input type="email" id="loginEmail" required class="form-input">
                         </div>
-                        <i class="fas fa-boxes text-4xl text-blue-200"></i>
-                    </div>
-                </div>
-                
-                <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
-                    <div class="flex items-center justify-between">
+                        
                         <div>
-                            <p class="text-green-100 text-sm font-medium">Commandes</p>
-                            <p class="text-3xl font-bold mt-2">${stats.totalOrders}</p>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe</label>
+                            <input type="password" id="loginPassword" required class="form-input">
                         </div>
-                        <i class="fas fa-shopping-cart text-4xl text-green-200"></i>
-                    </div>
+                        
+                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            Se connecter
+                        </button>
+                    </form>
+                    
+                    <p class="mt-6 text-center text-gray-600">
+                        Pas encore de compte ? 
+                        <a href="#" onclick="app.showPage('register')" class="text-emerald-600 hover:text-emerald-800 font-semibold">S'inscrire</a>
+                    </p>
                 </div>
-                
-                <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-purple-100 text-sm font-medium">En Vedette</p>
-                            <p class="text-3xl font-bold mt-2">${stats.featuredProducts}</p>
-                        </div>
-                        <i class="fas fa-star text-4xl text-purple-200"></i>
-                    </div>
-                </div>
-                
-                <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-orange-100 text-sm font-medium">Stock Faible</p>
-                            <p class="text-3xl font-bold mt-2">${stats.lowStock}</p>
-                        </div>
-                        <i class="fas fa-exclamation-triangle text-4xl text-orange-200"></i>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <h3 class="text-xl font-bold text-gray-900 mb-4">Bienvenue dans le panneau d'administration</h3>
-                <p class="text-gray-600">Utilisez le menu latéral pour gérer vos produits, commandes et paramètres.</p>
             </div>
         `;
     }
 
-    getAdminStats() {
-        const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        const products = this.allProducts;
-
-        return {
-            totalProducts: products.length,
-            totalOrders: orders.length,
-            featuredProducts: products.filter(p => p.enVedette).length,
-            lowStock: products.filter(p => p.stock < 10).length
-        };
+    async loadRegisterPage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-16 max-w-md">
+                <div class="bg-white rounded-2xl shadow-2xl p-8">
+                    <h1 class="text-3xl font-bold text-emerald-800 mb-2 text-center">Inscription</h1>
+                    <p class="text-emerald-600 mb-8 text-center">Créez votre compte</p>
+                    
+                    <form onsubmit="handleRegister(event)" class="space-y-6">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prénom</label>
+                                <input type="text" id="registerPrenom" required class="form-input">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom</label>
+                                <input type="text" id="registerNom" required class="form-input">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                            <input type="email" id="registerEmail" required class="form-input">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe</label>
+                            <input type="password" id="registerPassword" required class="form-input" minlength="6">
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            S'inscrire
+                        </button>
+                    </form>
+                    
+                    <p class="mt-6 text-center text-gray-600">
+                        Déjà un compte ? 
+                        <a href="#" onclick="app.showPage('login')" class="text-emerald-600 hover:text-emerald-800 font-semibold">Se connecter</a>
+                    </p>
+                </div>
+            </div>
+        `;
     }
 
-    // FIXED: Add to cart with proper error handling
-    addToCart(productId, quantity = 1) {
+    async loadProfilePage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <h1 class="text-4xl font-bold text-emerald-800 mb-8">Mon Profil</h1>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="bg-white rounded-2xl shadow-xl p-8">
+                        <div class="text-center mb-6">
+                            <div class="w-24 h-24 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full mx-auto flex items-center justify-center text-white text-3xl font-bold mb-4">
+                                ${this.currentUser.prenom[0]}${this.currentUser.nom[0]}
+                            </div>
+                            <h2 class="text-2xl font-bold text-emerald-800">${this.currentUser.prenom} ${this.currentUser.nom}</h2>
+                            <p class="text-emerald-600">${this.currentUser.email}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="lg:col-span-2 bg-white rounded-2xl shadow-xl p-8">
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-6">Informations</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-sm font-semibold text-gray-600">Nom complet</label>
+                                <p class="text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-semibold text-gray-600">Email</label>
+                                <p class="text-lg">${this.currentUser.email}</p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-semibold text-gray-600">Rôle</label>
+                                <p class="text-lg capitalize">${this.currentUser.role}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadOrderConfirmationPage(orderNumber) {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-16 max-w-2xl text-center">
+                <div class="bg-white rounded-2xl shadow-2xl p-12">
+                    <div class="w-24 h-24 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full mx-auto flex items-center justify-center mb-6">
+                        <i class="fas fa-check text-white text-4xl"></i>
+                    </div>
+                    
+                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
+                    <p class="text-xl text-emerald-600 mb-8">Merci pour votre commande</p>
+                    
+                    <div class="bg-emerald-50 rounded-xl p-6 mb-8">
+                        <p class="text-sm text-emerald-600 mb-2">Numéro de commande</p>
+                        <p class="text-3xl font-bold text-emerald-800">${orderNumber}</p>
+                    </div>
+                    
+                    <p class="text-gray-600 mb-8">
+                        Nous avons bien reçu votre commande et nous la préparons avec soin.
+                        Vous recevrez bientôt un email de confirmation.
+                    </p>
+                    
+                    <div class="flex gap-4 justify-center">
+                        <button onclick="app.showPage('home')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            Retour à l'accueil
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    async filterByCategory(category) {
+        await this.showPage('products', { categorie: category });
+    }
+    
+    async performSearch(query) {
+        if (query.trim()) {
+            await this.showPage('products', { search: query });
+        }
+    }
+    
+    initSearch() {
+        const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    if (e.target.value.trim()) {
+                        this.performSearch(e.target.value);
+                    }
+                }, 500);
+            });
+        }
+    }
+    
+    // ADD TO CART FUNCTIONALITY - FIXED
+    async addToCart(productId, quantity = 1) {
         try {
             console.log('Adding to cart:', productId, quantity);
-
+            
+            // Find product in our cached products
             const product = this.allProducts.find(p => p._id === productId);
+            
             if (!product) {
                 throw new Error('Produit non trouvé');
             }
-
+            
             if (product.stock === 0) {
-                throw new Error('Ce produit est en rupture de stock');
+                this.showToast('Ce produit est en rupture de stock', 'error');
+                return;
             }
-
+            
             if (quantity > product.stock) {
-                throw new Error(`Stock insuffisant. Maximum disponible: ${product.stock}`);
+                this.showToast(`Stock insuffisant. Maximum disponible: ${product.stock}`, 'error');
+                return;
             }
-
+            
+            // Generate image URL
+            const getCategoryColor = (category) => {
+                const colors = {
+                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                    'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
+                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                    'Dentaire': '6366f1'
+                };
+                return colors[category] || '10b981';
+            };
+            
+            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+            const categoryColor = getCategoryColor(product.categorie);
+            let imageUrl;
+            
+            if (product.image && product.image.startsWith('data:image')) {
+                imageUrl = product.image;
+            } else if (product.image && product.image.startsWith('http')) {
+                imageUrl = product.image;
+            } else {
+                imageUrl = `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+            }
+            
+            // Check if product already in cart
             const existingIndex = this.cart.findIndex(item => item.id === productId);
-
+            
             if (existingIndex > -1) {
                 const newQuantity = this.cart[existingIndex].quantite + quantity;
                 
                 if (newQuantity > product.stock) {
-                    throw new Error(`Stock insuffisant. Maximum disponible: ${product.stock}`);
+                    this.showToast(`Stock insuffisant. Maximum disponible: ${product.stock}`, 'error');
+                    return;
                 }
-
+                
                 this.cart[existingIndex].quantite = newQuantity;
             } else {
                 const cartItem = {
                     id: product._id,
                     nom: product.nom,
                     prix: product.prix,
-                    image: product.image || this.generatePlaceholderImage(product),
+                    image: imageUrl,
                     quantite: quantity,
                     stock: product.stock,
-                    categorie: product.categorie,
-                    marque: product.marque || ''
+                    categorie: product.categorie
                 };
-
+                
                 this.cart.push(cartItem);
             }
-
+            
             this.saveCart();
             this.updateCartUI();
             this.showToast(`${product.nom} ajouté au panier`, 'success');
-
-            console.log('✅ Product added to cart successfully');
-            return true;
-
+            
         } catch (error) {
-            console.error('❌ Erreur ajout au panier:', error);
-            this.showToast(error.message, 'error');
-            return false;
+            console.error('Erreur ajout au panier:', error);
+            this.showToast('Erreur lors de l\'ajout au panier', 'error');
         }
     }
-
+    
+    updateCartUI() {
+        const cartCount = document.getElementById('cartCount');
+        if (cartCount) {
+            const totalItems = this.cart.reduce((sum, item) => sum + item.quantite, 0);
+            cartCount.textContent = totalItems;
+            
+            if (totalItems > 0) {
+                cartCount.classList.add('pulse');
+            } else {
+                cartCount.classList.remove('pulse');
+            }
+        }
+        
+        this.updateCartSidebar();
+    }
+    
+    updateCartSidebar() {
+        const cartItems = document.getElementById('cartItems');
+        const cartSummary = document.getElementById('cartSummary');
+        
+        if (!cartItems) return;
+        
+        if (this.cart.length === 0) {
+            cartItems.innerHTML = `
+                <div class="text-emerald-600 text-center py-8">
+                    <i class="fas fa-shopping-cart text-4xl mb-4 opacity-50"></i>
+                    <p>Votre panier est vide</p>
+                </div>
+            `;
+            if (cartSummary) cartSummary.classList.add('hidden');
+            return;
+        }
+        
+        cartItems.innerHTML = this.cart.map(item => `
+            <div class="cart-item">
+                <div class="flex items-center space-x-3">
+                    <img src="${item.image}" alt="${item.nom}" 
+                         class="w-16 h-16 object-cover rounded-lg">
+                    <div class="flex-1">
+                        <h4 class="font-medium text-emerald-800">${item.nom}</h4>
+                        <p class="text-sm text-emerald-600">${item.prix} DA</p>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <div class="quantity-selector">
+                                <button onclick="app.updateCartQuantity('${item.id}', ${item.quantite - 1})">-</button>
+                                <input type="number" value="${item.quantite}" min="1" 
+                                       onchange="app.updateCartQuantity('${item.id}', parseInt(this.value))">
+                                <button onclick="app.updateCartQuantity('${item.id}', ${item.quantite + 1})">+</button>
+                            </div>
+                            <button onclick="app.removeFromCart('${item.id}')" 
+                                    class="text-red-500 hover:text-red-700 ml-2">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        this.updateCartTotals();
+        if (cartSummary) cartSummary.classList.remove('hidden');
+    }
+    
+    async updateCartTotals() {
+        const sousTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
+        const total = sousTotal + fraisLivraison;
+        
+        const cartSubtotal = document.getElementById('cartSubtotal');
+        const cartShipping = document.getElementById('cartShipping');
+        const cartTotal = document.getElementById('cartTotal');
+        
+        if (cartSubtotal) cartSubtotal.textContent = `${sousTotal} DA`;
+        if (cartShipping) cartShipping.textContent = `${fraisLivraison} DA`;
+        if (cartTotal) cartTotal.textContent = `${total} DA`;
+    }
+    
+    updateCartQuantity(productId, newQuantity) {
+        const itemIndex = this.cart.findIndex(item => item.id === productId);
+        
+        if (itemIndex === -1) return;
+        
+        if (newQuantity <= 0) {
+            this.removeFromCart(productId);
+            return;
+        }
+        
+        const item = this.cart[itemIndex];
+        
+        if (newQuantity > item.stock) {
+            this.showToast(`Stock insuffisant. Maximum disponible: ${item.stock}`, 'error');
+            return;
+        }
+        
+        item.quantite = newQuantity;
+        this.saveCart();
+        this.updateCartUI();
+    }
+    
     removeFromCart(productId) {
         const itemIndex = this.cart.findIndex(item => item.id === productId);
         
@@ -714,155 +1085,470 @@ class PharmacieGaherApp {
             this.saveCart();
             this.updateCartUI();
             this.showToast(`${item.nom} retiré du panier`, 'success');
-            return true;
         }
-        
-        return false;
     }
-
-    updateCartQuantity(productId, newQuantity) {
-        const itemIndex = this.cart.findIndex(item => item.id === productId);
-        
-        if (itemIndex === -1) {
-            return false;
-        }
-
-        if (newQuantity <= 0) {
-            return this.removeFromCart(productId);
-        }
-
-        const item = this.cart[itemIndex];
-
-        if (newQuantity > item.stock) {
-            this.showToast(`Stock insuffisant. Maximum disponible: ${item.stock}`, 'error');
-            return false;
-        }
-
-        item.quantite = newQuantity;
-        this.saveCart();
-        this.updateCartUI();
-        
-        return true;
-    }
-
+    
     clearCart() {
         this.cart = [];
         this.saveCart();
         this.updateCartUI();
         this.showToast('Panier vidé', 'success');
     }
-
+    
+    saveCart() {
+        localStorage.setItem('cart', JSON.stringify(this.cart));
+    }
+    
     getCartTotal() {
-        return this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+        return this.cart.reduce((total, item) => total + (item.prix * item.quantite), 0);
     }
-
-    updateCartUI() {
-        // Update cart count
-        const cartCount = document.getElementById('cartCount');
-        if (cartCount) {
-            const totalItems = this.cart.reduce((sum, item) => sum + item.quantite, 0);
-            cartCount.textContent = totalItems;
-        }
-
-        // Update cart system if available
-        if (window.cartSystem) {
-            window.cartSystem.cart = this.cart;
-            window.cartSystem.updateUI();
-        }
+    
+    getCartItemCount() {
+        return this.cart.reduce((count, item) => count + item.quantite, 0);
     }
-
-    handleSearch(query) {
-        if (!query.trim()) {
-            this.loadProductsPage();
-            return;
-        }
-
-        const filtered = this.allProducts.filter(product => 
-            product.nom.toLowerCase().includes(query.toLowerCase()) ||
-            product.categorie.toLowerCase().includes(query.toLowerCase()) ||
-            (product.marque && product.marque.toLowerCase().includes(query.toLowerCase()))
-        );
-
-        const container = document.getElementById('productsGrid');
-        if (!container) return;
-
-        if (filtered.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-center py-8">Aucun produit trouvé</p>';
-            return;
-        }
-
-        container.innerHTML = filtered.map(product => this.renderProductCard(product)).join('');
+    
+    logout() {
+        localStorage.removeItem('token');
+        this.currentUser = null;
+        this.updateUserUI();
+        this.showToast('Déconnexion réussie', 'success');
+        this.showPage('home');
     }
-
-    processOrder() {
-        if (window.checkoutSystem) {
-            return window.checkoutSystem.processOrder();
-        }
-    }
-
-    showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        const colors = {
-            success: 'bg-green-500',
-            error: 'bg-red-500',
-            warning: 'bg-yellow-500',
-            info: 'bg-blue-500'
-        };
-
-        toast.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 transform translate-x-full transition-transform duration-300`;
-        toast.innerHTML = `
-            <div class="flex items-center">
-                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-3"></i>
-                <span>${message}</span>
+    
+    async loadContactPage() {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
+                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div class="space-y-8">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Nos coordonnées</h2>
+                            
+                            <div class="space-y-6">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-map-marker-alt text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Adresse</h3>
+                                        <p class="text-gray-600">Tipaza, Algérie</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-phone text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Téléphone</h3>
+                                        <p class="text-gray-600">+213 123 456 789</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-envelope text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Email</h3>
+                                        <a href="mailto:pharmaciegaher@gmail.com" class="text-primary hover:text-secondary">
+                                            pharmaciegaher@gmail.com
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-lg p-8">
+                        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Envoyez-nous un message</h2>
+                        
+                        <form id="contactForm" onsubmit="handleContactForm(event)" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="contactName" class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
+                                    <input type="text" id="contactName" name="name" required class="form-input" placeholder="Votre nom complet">
+                                </div>
+                                <div>
+                                    <label for="contactEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                                    <input type="email" id="contactEmail" name="email" required class="form-input" placeholder="votre@email.com">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label for="contactMessage" class="block text-sm font-medium text-gray-700 mb-2">Message *</label>
+                                <textarea id="contactMessage" name="message" rows="5" required class="form-input resize-none" placeholder="Votre message..."></textarea>
+                            </div>
+                            
+                            <button type="submit" class="w-full btn-primary py-3" id="contactSubmitBtn">
+                                <span id="contactSubmitText">Envoyer le message</span>
+                                <i id="contactSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
         `;
-
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-            toast.classList.remove('translate-x-full');
-        }, 100);
-
-        setTimeout(() => {
-            toast.classList.add('translate-x-full');
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.parentNode.removeChild(toast);
-                }
-            }, 300);
-        }, 3000);
     }
+    
+    // ADMIN METHODS - These need to be part of the main app class
+    async loadAdminPage() {
+        if (!this.currentUser || this.currentUser.role !== 'admin') {
+            this.showToast('Accès refusé - Droits administrateur requis', 'error');
+            this.showPage('home');
+            return;
+        }
 
-    handleError(error) {
-        console.error('App error:', error);
-        this.showToast('Une erreur est survenue', 'error');
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <!-- Admin Header -->
+                <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                        <div>
+                            <h1 class="text-4xl font-bold text-emerald-800 mb-2">Panel d'Administration</h1>
+                            <p class="text-emerald-600 text-lg">Gestion complète de Shifa - Parapharmacie</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-sm text-emerald-500">Connecté en tant que</p>
+                                <p class="font-bold text-emerald-800 text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
+                                <p class="text-sm text-emerald-600">${this.currentUser.email}</p>
+                            </div>
+                            <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/30">
+                                <i class="fas fa-user-shield text-white text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Navigation Admin -->
+                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 mb-8 overflow-hidden">
+                    <nav class="flex flex-wrap">
+                        <button onclick="switchAdminSection('dashboard')" 
+                                class="admin-nav-btn dashboard flex-1 min-w-max px-6 py-4 text-sm font-bold bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+                            <i class="fas fa-chart-line mr-2"></i>Tableau de bord
+                        </button>
+                        <button onclick="switchAdminSection('products')" 
+                                class="admin-nav-btn products flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
+                            <i class="fas fa-pills mr-2"></i>Produits
+                        </button>
+                        <button onclick="switchAdminSection('orders')" 
+                                class="admin-nav-btn orders flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
+                            <i class="fas fa-shopping-bag mr-2"></i>Commandes
+                        </button>
+                        <button onclick="switchAdminSection('featured')" 
+                                class="admin-nav-btn featured flex-1 min-w-max px-6 py-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-all border-r border-emerald-100">
+                            <i class="fas fa-star mr-2"></i>Coups de Coeur
+                        </button>
+                        <button onclick="switchAdminSection('cleanup')" 
+                                class="admin-nav-btn cleanup flex-1 min-w-max px-6 py-4 text-sm font-semibold text-red-700 hover:bg-red-50 transition-all">
+                            <i class="fas fa-broom mr-2"></i>Nettoyage
+                        </button>
+                    </nav>
+                </div>
+                
+                <!-- Admin Content -->
+                <div id="adminContent" class="min-h-96">
+                    <!-- Content will be loaded here -->
+                </div>
+            </div>
+        `;
+        
+        await this.loadAdminDashboard();
+    }
+    
+    async loadAdminDashboard() {
+        try {
+            // Get stats from localStorage and cached products
+            const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            const products = this.allProducts;
+            
+            let stats = {
+                totalProducts: products.length,
+                totalOrders: adminOrders.length,
+                pendingOrders: adminOrders.filter(o => o.statut === 'en-attente').length,
+                totalUsers: 1,
+                monthlyRevenue: adminOrders.reduce((sum, o) => sum + (o.total || 0), 0)
+            };
+
+            try {
+                const data = await apiCall('/admin/dashboard');
+                if (data && data.stats) {
+                    stats = { ...stats, ...data.stats };
+                }
+            } catch (error) {
+                console.log('API unavailable, using local stats');
+            }
+            
+            document.getElementById('adminContent').innerHTML = `
+                <!-- Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-blue-600 uppercase tracking-wide">Produits</p>
+                                <p class="text-3xl font-bold text-blue-800">${stats.totalProducts}</p>
+                                <p class="text-xs text-blue-500 mt-1">Total actifs</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-pills text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-green-600 uppercase tracking-wide">Commandes</p>
+                                <p class="text-3xl font-bold text-green-800">${stats.totalOrders}</p>
+                                <p class="text-xs text-green-500 mt-1">Total reçues</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-shopping-bag text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-yellow-600 uppercase tracking-wide">En attente</p>
+                                <p class="text-3xl font-bold text-yellow-800">${stats.pendingOrders}</p>
+                                <p class="text-xs text-yellow-500 mt-1">Commandes</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-clock text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-purple-600 uppercase tracking-wide">Revenus</p>
+                                <p class="text-3xl font-bold text-purple-800">${stats.monthlyRevenue} DA</p>
+                                <p class="text-xs text-purple-500 mt-1">Ce mois</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-coins text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('products')">
+                        <i class="fas fa-plus-circle text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Gérer les produits</h3>
+                        <p class="text-emerald-100">Ajouter, modifier et gérer vos produits</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('orders')">
+                        <i class="fas fa-shopping-bag text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Commandes</h3>
+                        <p class="text-blue-100">Voir et gérer les commandes</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('featured')">
+                        <i class="fas fa-star text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Coups de Coeur</h3>
+                        <p class="text-yellow-100">Gérer les produits mis en avant</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('cleanup')">
+                        <i class="fas fa-broom text-4xl mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Nettoyage</h3>
+                        <p class="text-red-100">Supprimer produits indésirables</p>
+                    </div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+            document.getElementById('adminContent').innerHTML = `
+                <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                    <p class="text-red-800">Erreur de chargement du tableau de bord</p>
+                </div>
+            `;
+        }
+    }
+    
+    showLoading() {
+        const spinner = document.getElementById('loadingSpinner');
+        if (spinner) {
+            spinner.classList.remove('hidden');
+        }
+    }
+    
+    hideLoading() {
+        const spinner = document.getElementById('loadingSpinner');
+        if (spinner) {
+            spinner.classList.add('hidden');
+        }
+    }
+    
+    showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas ${this.getToastIcon(type)} mr-3"></i>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-900">${message}</p>
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        
+        const container = document.getElementById('toastContainer');
+        if (container) {
+            container.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 5000);
+        }
+    }
+    
+    getToastIcon(type) {
+        const icons = {
+            'info': 'fa-info-circle',
+            'success': 'fa-check-circle',
+            'error': 'fa-exclamation-circle',
+            'warning': 'fa-exclamation-triangle'
+        };
+        return icons[type] || icons.info;
     }
 }
 
-// Global functions for easy access
-function addToCartFromCard(productId) {
+// Global functions - CRITICAL FIXES
+function addToCartFromCard(productId, quantity = 1) {
     console.log('Add to cart from card called:', productId);
+    if (window.app && typeof window.app.addToCart === 'function') {
+        window.app.addToCart(productId, quantity);
+    } else {
+        console.error('App not available');
+    }
+}
+
+// Helper function for product page
+function updateProductQuantity(action) {
+    const input = document.getElementById('productQuantity');
+    if (!input) return;
+    
+    let value = parseInt(input.value);
+    if (action === 'plus') {
+        value = Math.min(value + 1, parseInt(input.max));
+    } else if (action === 'minus') {
+        value = Math.max(value - 1, 1);
+    }
+    input.value = value;
+}
+
+function addProductToCart(productId) {
+    const quantityInput = document.getElementById('productQuantity');
+    const quantity = quantityInput ? parseInt(quantityInput.value) : 1;
+    
     if (window.app) {
-        window.app.addToCart(productId);
+        window.app.addToCart(productId, quantity);
+    }
+}
+
+function showPage(page, params) {
+    if (window.app) {
+        window.app.showPage(page, params);
+    }
+}
+
+function filterByCategory(category) {
+    if (window.app) {
+        window.app.filterByCategory(category);
+    }
+}
+
+function toggleMobileMenu() {
+    const mobileMenu = document.getElementById('mobileMenu');
+    if (mobileMenu) {
+        mobileMenu.classList.toggle('hidden');
+    }
+}
+
+function toggleCart() {
+    const cartSidebar = document.getElementById('cartSidebar');
+    const cartOverlay = document.getElementById('cartOverlay');
+    
+    if (cartSidebar && cartOverlay) {
+        cartSidebar.classList.toggle('translate-x-full');
+        cartOverlay.classList.toggle('hidden');
+    }
+}
+
+function proceedToCheckout() {
+    if (window.app) {
+        if (window.app.cart.length === 0) {
+            window.app.showToast('Votre panier est vide', 'warning');
+            return;
+        }
+        
+        toggleCart();
+        window.app.showPage('checkout');
+    }
+}
+
+function handleContactForm(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('contactSubmitBtn');
+    const submitText = document.getElementById('contactSubmitText');
+    const submitSpinner = document.getElementById('contactSubmitSpinner');
+    
+    submitBtn.disabled = true;
+    submitText.textContent = 'Envoi en cours...';
+    submitSpinner.classList.remove('hidden');
+    
+    setTimeout(() => {
+        submitBtn.disabled = false;
+        submitText.textContent = 'Envoyer le message';
+        submitSpinner.classList.add('hidden');
+        
+        event.target.reset();
+        
+        if (window.app) {
+            window.app.showToast('Message envoyé avec succès !', 'success');
+        }
+    }, 2000);
+}
+
+function logout() {
+    if (window.app) {
+        window.app.logout();
     }
 }
 
 // Initialize app
 let app;
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        app = new PharmacieGaherApp();
-        window.app = app;
-        console.log('✅ App initialized on DOMContentLoaded');
-    });
-} else {
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('Initializing app...');
     app = new PharmacieGaherApp();
     window.app = app;
-    console.log('✅ App initialized immediately');
-}
+    console.log('App initialized and made globally available');
+});
 
-// Export for global access
-window.addToCartFromCard = addToCartFromCard;
-
-console.log('✅ Complete app.js loaded successfully');
+console.log('✅ COMPLETE app.js loaded with ALL methods + API integration');
