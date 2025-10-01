@@ -1,18 +1,20 @@
 /* ==========================================
-   🌿 Shifa Parapharmacie - Enhanced Styles
-   Modern, Professional & User-Friendly Design
+   🌿 Shifa Parapharmacie - HEALTH VIBE
+   Natural Green Theme
    ========================================== */
 
 :root {
-    /* Primary Colors */
-    --primary: #10b981;
-    --primary-light: #34d399;
-    --primary-dark: #059669;
-    --primary-darker: #047857;
+    /* Primary Colors - More saturated greens */
+    --primary: #059669;
+    --primary-light: #10b981;
+    --primary-dark: #047857;
+    --primary-darker: #065f46;
     
-    /* Secondary Colors */
-    --secondary: #059669;
-    --accent: #34d399;
+    /* Health Greens */
+    --emerald: #10b981;
+    --mint: #6ee7b7;
+    --forest: #064e3b;
+    --sage: #d1fae5;
     
     /* Neutral Colors */
     --gray-50: #f9fafb;
@@ -26,36 +28,20 @@
     --gray-800: #1f2937;
     --gray-900: #111827;
     
-    /* Status Colors */
-    --success: #10b981;
-    --warning: #f59e0b;
-    --error: #ef4444;
-    --info: #3b82f6;
-    
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    --gradient-secondary: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+    /* Gradients with more green */
+    --gradient-primary: linear-gradient(135deg, #059669 0%, #047857 100%);
+    --gradient-secondary: linear-gradient(135deg, #10b981 0%, #059669 100%);
     --gradient-warm: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
-    --gradient-cool: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
     
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    --shadow-colored: 0 10px 30px rgba(16, 185, 129, 0.2);
-    
-    /* Transitions */
-    --transition-fast: 150ms ease-in-out;
-    --transition-base: 300ms ease-in-out;
-    --transition-slow: 500ms ease-in-out;
+    /* Shadows with green tint */
+    --shadow-sm: 0 1px 2px 0 rgba(5, 150, 105, 0.05);
+    --shadow: 0 1px 3px 0 rgba(5, 150, 105, 0.1), 0 1px 2px 0 rgba(5, 150, 105, 0.06);
+    --shadow-md: 0 4px 6px -1px rgba(5, 150, 105, 0.1), 0 2px 4px -1px rgba(5, 150, 105, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(5, 150, 105, 0.1), 0 4px 6px -2px rgba(5, 150, 105, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(5, 150, 105, 0.1), 0 10px 10px -5px rgba(5, 150, 105, 0.04);
+    --shadow-2xl: 0 25px 50px -12px rgba(5, 150, 105, 0.25);
+    --shadow-colored: 0 10px 30px rgba(5, 150, 105, 0.3);
 }
-
-/* ==========================================
-   GLOBAL STYLES
-   ========================================== */
 
 * {
     margin: 0;
@@ -67,94 +53,47 @@ html {
     scroll-behavior: smooth;
 }
 
+/* STRONGER GREEN BACKGROUND */
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 
-                 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     line-height: 1.6;
     color: var(--gray-800);
-    background: linear-gradient(to bottom right, #d1fae5, #a7f3d0);
+    background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 50%, #10b981 100%);
+    background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* ==========================================
-   TYPOGRAPHY
-   ========================================== */
-
-h1, h2, h3, h4, h5, h6 {
-    font-weight: 700;
-    line-height: 1.2;
-    color: var(--gray-900);
-}
-
-h1 { font-size: 2.5rem; }
-h2 { font-size: 2rem; }
-h3 { font-size: 1.75rem; }
-h4 { font-size: 1.5rem; }
-h5 { font-size: 1.25rem; }
-h6 { font-size: 1rem; }
-
-p {
-    margin-bottom: 1rem;
-    line-height: 1.75;
-}
-
-a {
-    color: var(--primary);
-    text-decoration: none;
-    transition: color var(--transition-fast);
-}
-
-a:hover {
-    color: var(--primary-dark);
-}
-
-/* ==========================================
-   CUSTOM SCROLLBAR
-   ========================================== */
-
+/* Scrollbar with green theme */
 ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--gray-100);
+    background: #d1fae5;
     border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb {
     background: var(--gradient-primary);
     border-radius: 5px;
-    transition: background var(--transition-fast);
 }
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--gradient-secondary);
 }
 
-/* ==========================================
-   TEXT SELECTION
-   ========================================== */
-
 ::selection {
     background: var(--primary-light);
     color: white;
 }
 
-::-moz-selection {
-    background: var(--primary-light);
-    color: white;
-}
-
-/* ==========================================
-   NAVIGATION
-   ========================================== */
-
+/* Navigation */
 nav {
     background: var(--gradient-primary);
     backdrop-filter: blur(10px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 4px 20px rgba(5, 150, 105, 0.3);
     position: sticky;
     top: 0;
     z-index: 1000;
@@ -164,44 +103,17 @@ nav {
     position: relative;
     padding: 0.5rem 0;
     font-weight: 500;
-    transition: all var(--transition-fast);
+    transition: all 0.3s ease;
 }
 
-.nav-link::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 0;
-    height: 2px;
-    background: white;
-    transition: width var(--transition-base);
+/* Hero section */
+.hero-gradient {
+    background: linear-gradient(135deg, #047857 0%, #059669 50%, #10b981 100%);
+    position: relative;
+    overflow: hidden;
 }
 
-.nav-link:hover::after {
-    width: 100%;
-}
-
-/* ==========================================
-   LOGO
-   ========================================== */
-
-.logo-container {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    cursor: pointer;
-    transition: transform var(--transition-base);
-}
-
-.logo-container:hover {
-    transform: scale(1.02);
-}
-
-/* ==========================================
-   BUTTONS
-   ========================================== */
-
+/* Buttons */
 .btn-primary {
     background: var(--gradient-primary);
     color: white;
@@ -211,38 +123,27 @@ nav {
     font-weight: 600;
     font-size: 1rem;
     cursor: pointer;
-    transition: all var(--transition-base);
+    transition: all 0.3s ease;
     box-shadow: var(--shadow-colored);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    position: relative;
-    overflow: hidden;
-}
-
-.btn-primary::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: left var(--transition-slow);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-xl);
-}
-
-.btn-primary:hover::before {
-    left: 100%;
+    background: var(--gradient-secondary);
 }
 
 .btn-primary:active {
     transform: translateY(0);
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .btn-secondary {
@@ -253,7 +154,7 @@ nav {
     border-radius: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: all var(--transition-base);
+    transition: all 0.3s ease;
 }
 
 .btn-secondary:hover {
@@ -263,21 +164,18 @@ nav {
     box-shadow: var(--shadow-lg);
 }
 
-/* ==========================================
-   FORM INPUTS
-   ========================================== */
-
+/* Form inputs */
 .form-input,
 .form-select,
 .form-textarea {
     width: 100%;
     padding: 0.875rem 1rem;
-    border: 2px solid var(--gray-200);
+    border: 2px solid rgba(5, 150, 105, 0.2);
     border-radius: 10px;
     font-size: 1rem;
     font-family: inherit;
     background: white;
-    transition: all var(--transition-base);
+    transition: all 0.3s ease;
 }
 
 .form-input:focus,
@@ -285,11 +183,7 @@ nav {
 .form-textarea:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-}
-
-.form-input::placeholder {
-    color: var(--gray-400);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
 }
 
 .form-textarea {
@@ -297,17 +191,14 @@ nav {
     min-height: 120px;
 }
 
-/* ==========================================
-   CARDS
-   ========================================== */
-
+/* Cards */
 .card {
     background: white;
     border-radius: 16px;
     padding: 1.5rem;
     box-shadow: var(--shadow);
-    transition: all var(--transition-base);
-    border: 1px solid var(--gray-100);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(5, 150, 105, 0.1);
 }
 
 .card:hover {
@@ -315,47 +206,42 @@ nav {
     transform: translateY(-2px);
 }
 
-/* ==========================================
-   PRODUCT CARDS
-   ========================================== */
-
+/* Product cards */
 .product-card {
     background: white;
     border-radius: 16px;
     overflow: hidden;
     box-shadow: var(--shadow);
-    transition: all var(--transition-base);
-    border: 1px solid var(--gray-100);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(5, 150, 105, 0.1);
     cursor: pointer;
 }
 
 .product-card:hover {
     box-shadow: var(--shadow-xl);
     transform: translateY(-4px);
+    border-color: var(--primary);
 }
 
 .product-card img {
     width: 100%;
     height: 300px;
     object-fit: cover;
-    transition: transform var(--transition-slow);
+    transition: transform 0.5s ease;
 }
 
 .product-card:hover img {
     transform: scale(1.05);
 }
 
-/* ==========================================
-   CATEGORY CARDS
-   ========================================== */
-
+/* Category cards */
 .category-card {
     background: white;
     border-radius: 16px;
     padding: 2rem 1rem;
     text-align: center;
     cursor: pointer;
-    transition: all var(--transition-base);
+    transition: all 0.3s ease;
     border: 2px solid transparent;
     box-shadow: var(--shadow);
 }
@@ -378,17 +264,14 @@ nav {
     font-size: 2.5rem;
     color: white;
     box-shadow: var(--shadow-colored);
-    transition: all var(--transition-base);
+    transition: all 0.3s ease;
 }
 
 .category-card:hover .category-icon {
     transform: scale(1.1) rotate(5deg);
 }
 
-/* ==========================================
-   BADGES
-   ========================================== */
-
+/* Badges */
 .badge-promotion {
     background: linear-gradient(135deg, #ef4444, #dc2626);
     color: white;
@@ -406,59 +289,23 @@ nav {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    box-shadow: var(--shadow-sm);
 }
 
-.status-en-attente {
-    background: #fef3c7;
-    color: #92400e;
-}
-
-.status-confirmée {
-    background: #d1fae5;
-    color: #065f46;
-}
-
-.status-préparée {
-    background: #dbeafe;
-    color: #1e40af;
-}
-
-.status-expédiée {
-    background: #e0e7ff;
-    color: #3730a3;
-}
-
-.status-livrée {
-    background: #d1fae5;
-    color: #065f46;
-}
-
-.status-annulée {
-    background: #fee2e2;
-    color: #991b1b;
-}
-
-/* ==========================================
-   SHOPPING CART
-   ========================================== */
-
+/* Shopping cart */
 #cartSidebar {
-    background: white;
-    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(10px);
+    background: linear-gradient(to bottom, #ecfdf5, #d1fae5);
+    box-shadow: -8px 0 32px rgba(5, 150, 105, 0.2);
 }
 
 .cart-item {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
+    background: white;
+    border: 1px solid rgba(5, 150, 105, 0.2);
     border-radius: 12px;
     padding: 1rem;
-    transition: all var(--transition-fast);
+    transition: all 0.3s ease;
 }
 
 .cart-item:hover {
-    background: white;
     border-color: var(--primary);
     box-shadow: var(--shadow);
 }
@@ -466,20 +313,20 @@ nav {
 .quantity-selector {
     display: flex;
     align-items: center;
-    border: 2px solid var(--gray-200);
+    border: 2px solid rgba(5, 150, 105, 0.2);
     border-radius: 8px;
     overflow: hidden;
     background: white;
 }
 
 .quantity-selector button {
-    background: var(--gray-100);
+    background: #ecfdf5;
     color: var(--primary);
     border: none;
     padding: 0.5rem 0.75rem;
     font-weight: 700;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 0.3s ease;
 }
 
 .quantity-selector button:hover {
@@ -495,10 +342,7 @@ nav {
     font-weight: 600;
 }
 
-/* ==========================================
-   TOAST NOTIFICATIONS
-   ========================================== */
-
+/* Toast notifications */
 .toast {
     background: white;
     border-radius: 12px;
@@ -508,7 +352,7 @@ nav {
     border-left: 4px solid var(--primary);
     opacity: 0;
     transform: translateX(100%);
-    transition: all var(--transition-base);
+    transition: all 0.3s ease;
     max-width: 400px;
 }
 
@@ -518,36 +362,24 @@ nav {
 }
 
 .toast.success {
-    border-left-color: var(--success);
-    background: linear-gradient(to right, #f0fdf4, white);
+    border-left-color: var(--primary);
+    background: linear-gradient(to right, #ecfdf5, white);
 }
 
 .toast.error {
-    border-left-color: var(--error);
+    border-left-color: #ef4444;
     background: linear-gradient(to right, #fef2f2, white);
 }
 
 .toast.warning {
-    border-left-color: var(--warning);
+    border-left-color: #f59e0b;
     background: linear-gradient(to right, #fffbeb, white);
 }
 
-.toast.info {
-    border-left-color: var(--info);
-    background: linear-gradient(to right, #eff6ff, white);
-}
-
-/* ==========================================
-   ANIMATIONS
-   ========================================== */
-
+/* Animations */
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 @keyframes slideUp {
@@ -561,84 +393,40 @@ nav {
     }
 }
 
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
 @keyframes pulse {
-    0%, 100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.05);
-    }
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
 }
 
 @keyframes float {
-    0%, 100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(-10px);
-    }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
 }
 
-.fade-in {
-    animation: fadeIn 0.5s ease-in;
-}
+.fade-in { animation: fadeIn 0.5s ease-in; }
+.slide-up { animation: slideUp 0.6s ease-out; }
+.pulse { animation: pulse 2s infinite; }
+.float-animation { animation: float 3s ease-in-out infinite; }
+.pulse-slow { animation: pulse 3s infinite; }
 
-.slide-up {
-    animation: slideUp 0.6s ease-out;
-}
-
-.slide-down {
-    animation: slideDown 0.6s ease-out;
-}
-
-.pulse {
-    animation: pulse 2s infinite;
-}
-
-.float-animation {
-    animation: float 3s ease-in-out infinite;
-}
-
-.pulse-slow {
-    animation: pulse 3s infinite;
-}
-
-/* ==========================================
-   LOADING STATES
-   ========================================== */
-
+/* Loading */
 .loading-skeleton {
     background: linear-gradient(90deg, 
-        var(--gray-200) 25%, 
-        var(--gray-100) 50%, 
-        var(--gray-200) 75%);
+        rgba(5, 150, 105, 0.1) 25%, 
+        rgba(16, 185, 129, 0.2) 50%, 
+        rgba(5, 150, 105, 0.1) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
     border-radius: 8px;
 }
 
 @keyframes shimmer {
-    0% {
-        background-position: 200% 0;
-    }
-    100% {
-        background-position: -200% 0;
-    }
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 .spinner {
-    border: 3px solid var(--gray-200);
+    border: 3px solid rgba(5, 150, 105, 0.2);
     border-top: 3px solid var(--primary);
     border-radius: 50%;
     width: 40px;
@@ -647,32 +435,13 @@ nav {
 }
 
 @keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
-/* ==========================================
-   UTILITIES
-   ========================================== */
-
-.text-primary {
-    color: var(--primary);
-}
-
-.bg-primary {
-    background: var(--gradient-primary);
-}
-
-.gradient-text {
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
+/* Utilities */
+.text-primary { color: var(--primary); }
+.bg-primary { background: var(--gradient-primary); }
 
 .line-clamp-2 {
     display: -webkit-box;
@@ -688,15 +457,8 @@ nav {
     overflow: hidden;
 }
 
-/* ==========================================
-   RESPONSIVE
-   ========================================== */
-
+/* Responsive */
 @media (max-width: 768px) {
-    h1 { font-size: 2rem; }
-    h2 { font-size: 1.75rem; }
-    h3 { font-size: 1.5rem; }
-    
     .category-icon {
         width: 60px;
         height: 60px;
@@ -706,28 +468,15 @@ nav {
     .product-card img {
         height: 200px;
     }
-    
-    .btn-primary,
-    .btn-secondary {
-        padding: 0.625rem 1.5rem;
-        font-size: 0.9rem;
-    }
 }
 
 @media (max-width: 640px) {
     #cartSidebar {
         width: 100% !important;
     }
-    
-    .category-card {
-        padding: 1.5rem 1rem;
-    }
 }
 
-/* ==========================================
-   FOCUS STATES
-   ========================================== */
-
+/* Focus states */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -737,23 +486,13 @@ textarea:focus-visible {
     outline-offset: 2px;
 }
 
-/* ==========================================
-   PRINT STYLES
-   ========================================== */
-
+/* Print */
 @media print {
-    nav,
-    footer,
-    .no-print {
+    nav, footer, .no-print {
         display: none !important;
     }
     
     body {
         background: white;
-    }
-    
-    .card {
-        box-shadow: none;
-        border: 1px solid var(--gray-300);
     }
 }
