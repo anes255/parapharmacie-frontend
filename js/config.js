@@ -1,268 +1,367 @@
-// API Configuration for PharmacieGaherApp
-console.log('🔧 Loading API configuration...');
+// ==========================================
+// 🌿 Shifa Parapharmacie - Configuration
+// ==========================================
 
-// API Configuration
-window.API_CONFIG = {
-    // Production API URL - Render deployment
-    baseURL: 'https://parapharmacie-gaher.onrender.com',
+const CONFIG = {
+    // API Configuration
+    API_BASE_URL: 'http://localhost:5000/api',
+    API_TIMEOUT: 10000, // 10 seconds
     
-    // Development fallback (if needed)
-    devURL: 'http://localhost:5000',
+    // Site Information
+    SITE_NAME: 'Shifa - Parapharmacie',
+    SITE_DESCRIPTION: 'Parapharmacie Gaher à Tipaza, Algérie',
+    CONTACT_EMAIL: 'pharmaciegaher@gmail.com',
+    CONTACT_PHONE: '+213 123 456 789',
+    ADDRESS: 'Tipaza, Algérie',
     
-    // API endpoints
-    endpoints: {
-        auth: {
-            login: '/api/auth/login',
-            register: '/api/auth/register',
-            me: '/api/auth/me',
-            profile: '/api/auth/profile',
-            changePassword: '/api/auth/change-password'
-        },
-        products: {
-            all: '/api/products',
-            byId: '/api/products/:id',
-            create: '/api/products',
-            update: '/api/products/:id',
-            delete: '/api/products/:id',
-            featured: '/api/products/featured/all',
-            promotions: '/api/products/promotions/all',
-            categories: '/api/products/categories/all'
-        },
-        orders: {
-            all: '/api/orders',
-            byId: '/api/orders/:id',
-            create: '/api/orders',
-            updateStatus: '/api/orders/:id/status',
-            stats: '/api/orders/stats/dashboard'
-        },
-        admin: {
-            dashboard: '/api/admin/dashboard',
-            analytics: '/api/admin/analytics',
-            users: '/api/admin/users'
-        },
-        settings: {
-            get: '/api/settings',
-            update: '/api/settings',
-            public: '/api/settings/public',
-            appearance: '/api/settings/appearance',
-            shipping: '/api/settings/shipping',
-            payment: '/api/settings/payment'
-        }
-    },
+    // Delivery Settings
+    FRAIS_LIVRAISON: 300,
+    LIVRAISON_GRATUITE_SEUIL: 5000,
     
-    // Request timeout (ms)
-    timeout: 30000,
+    // Categories
+    CATEGORIES: [
+        { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
+        { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
+        { nom: 'Visage', description: 'Soins du visage', icon: 'fa-smile' },
+        { nom: 'Cheveux', description: 'Soins capillaires', icon: 'fa-cut' },
+        { nom: 'Solaire', description: 'Protection solaire', icon: 'fa-sun' },
+        { nom: 'Intime', description: 'Hygiène intime', icon: 'fa-heart' },
+        { nom: 'Soins', description: 'Soins corporels', icon: 'fa-spa' },
+        { nom: 'Bébé', description: 'Soins bébé', icon: 'fa-baby-carriage' },
+        { nom: 'Homme', description: 'Soins masculins', icon: 'fa-user-tie' },
+        { nom: 'Dentaire', description: 'Hygiène dentaire', icon: 'fa-tooth' }
+    ],
     
-    // Retry configuration
-    retry: {
-        attempts: 3,
-        delay: 1000
-    },
+    // Wilayas
+    WILAYAS: [
+        'Adrar', 'Chlef', 'Laghouat', 'Oum El Bouaghi', 'Batna', 'Béjaïa', 'Biskra', 
+        'Béchar', 'Blida', 'Bouira', 'Tamanrasset', 'Tébessa', 'Tlemcen', 'Tiaret', 
+        'Tizi Ouzou', 'Alger', 'Djelfa', 'Jijel', 'Sétif', 'Saïda', 'Skikda', 
+        'Sidi Bel Abbès', 'Annaba', 'Guelma', 'Constantine', 'Médéa', 'Mostaganem', 
+        'M\'Sila', 'Mascara', 'Ouargla', 'Oran', 'El Bayadh', 'Illizi', 'Bordj Bou Arreridj', 
+        'Boumerdès', 'El Tarf', 'Tindouf', 'Tissemsilt', 'El Oued', 'Khenchela', 
+        'Souk Ahras', 'Tipaza', 'Mila', 'Aïn Defla', 'Naâma', 'Aïn Témouchent', 
+        'Ghardaïa', 'Relizane', 'Timimoun', 'Bordj Badji Mokhtar', 'Ouled Djellal', 
+        'Béni Abbès', 'In Salah', 'In Guezzam', 'Touggourt', 'Djanet', 'El M\'Ghair', 'El Meniaa'
+    ],
     
-    // Cache configuration
-    cache: {
-        products: 5 * 60 * 1000, // 5 minutes
-        settings: 10 * 60 * 1000, // 10 minutes
-        user: 2 * 60 * 1000 // 2 minutes
-    }
+    // Pagination
+    PRODUCTS_PER_PAGE: 12,
+    
+    // Image Settings
+    MAX_IMAGE_SIZE: 5 * 1024 * 1024, // 5MB
+    ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    
+    // Toast Settings
+    TOAST_DURATION: 5000, // 5 seconds
+    
+    // Debug Mode
+    DEBUG: true
 };
 
-// Utility functions for API calls
-window.API_UTILS = {
-    // Build full URL
-    buildURL(endpoint, params = {}) {
-        let url = window.API_CONFIG.baseURL + endpoint;
-        
-        // Replace path parameters
-        Object.keys(params).forEach(key => {
-            url = url.replace(`:${key}`, params[key]);
-        });
-        
-        return url;
-    },
-    
-    // Build query string
-    buildQueryString(params) {
-        if (!params || Object.keys(params).length === 0) {
-            return '';
-        }
-        
-        const searchParams = new URLSearchParams();
-        Object.keys(params).forEach(key => {
-            if (params[key] !== null && params[key] !== undefined) {
-                searchParams.append(key, params[key]);
-            }
-        });
-        
-        const queryString = searchParams.toString();
-        return queryString ? `?${queryString}` : '';
-    },
-    
-    // Get auth headers
-    getAuthHeaders() {
-        const token = localStorage.getItem('authToken');
-        if (!token) return {};
-        
-        return {
-            'x-auth-token': token,
-            'Authorization': `Bearer ${token}`
-        };
-    },
-    
-    // Check if URL is available
-    async checkConnection(url = window.API_CONFIG.baseURL) {
-        try {
-            const response = await fetch(url, { 
-                method: 'HEAD',
-                timeout: 5000 
-            });
-            return response.ok;
-        } catch (error) {
-            console.log('API connection check failed:', error.message);
-            return false;
-        }
-    }
-};
+// ==========================================
+// Helper Functions
+// ==========================================
 
-// Enhanced fetch wrapper with retry logic
-window.API_FETCH = async function(endpoint, options = {}) {
-    const config = window.API_CONFIG;
-    const maxAttempts = config.retry.attempts;
-    const delay = config.retry.delay;
-    
-    let lastError = null;
-    
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            console.log(`📡 API Request (attempt ${attempt}/${maxAttempts}): ${options.method || 'GET'} ${endpoint}`);
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), config.timeout);
-            
-            const response = await fetch(`${config.baseURL}${endpoint}`, {
-                ...options,
-                signal: controller.signal,
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...window.API_UTILS.getAuthHeaders(),
-                    ...options.headers
-                }
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const result = await response.json();
-            console.log(`✅ API Success (attempt ${attempt}): ${options.method || 'GET'} ${endpoint}`);
-            return result;
-            
-        } catch (error) {
-            console.log(`❌ API Error (attempt ${attempt}): ${error.message}`);
-            lastError = error;
-            
-            // Don't retry on certain errors
-            if (error.name === 'AbortError' || 
-                error.message.includes('401') || 
-                error.message.includes('403') ||
-                attempt === maxAttempts) {
-                break;
-            }
-            
-            // Wait before retry
-            if (attempt < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, delay * attempt));
-            }
-        }
-    }
-    
-    throw lastError || new Error('API request failed after all retry attempts');
-};
-
-// Connection status monitor
-window.API_MONITOR = {
-    isOnline: true,
-    lastCheck: null,
-    checkInterval: 5 * 60 * 1000, // 5 minutes
-    
-    async start() {
-        console.log('🔍 Starting API connection monitor...');
-        
-        // Initial check
-        await this.checkStatus();
-        
-        // Periodic checks
-        setInterval(async () => {
-            await this.checkStatus();
-        }, this.checkInterval);
-        
-        // Check on page visibility change
-        document.addEventListener('visibilitychange', async () => {
-            if (!document.hidden) {
-                await this.checkStatus();
-            }
-        });
-    },
-    
-    async checkStatus() {
-        try {
-            const wasOnline = this.isOnline;
-            this.isOnline = await window.API_UTILS.checkConnection();
-            this.lastCheck = new Date();
-            
-            // Notify if status changed
-            if (wasOnline !== this.isOnline) {
-                console.log(`🌐 API status changed: ${this.isOnline ? 'ONLINE' : 'OFFLINE'}`);
-                
-                // Dispatch custom event
-                window.dispatchEvent(new CustomEvent('apiStatusChange', {
-                    detail: { isOnline: this.isOnline }
-                }));
-            }
-            
-        } catch (error) {
-            console.error('API status check failed:', error);
-            this.isOnline = false;
-        }
-    }
-};
-
-// Environment detection
-const isDevelopment = window.location.hostname === 'localhost' || 
-                     window.location.hostname === '127.0.0.1' ||
-                     window.location.hostname === '';
-
-// Use development URL if in development mode
-if (isDevelopment && window.location.port !== '3000') {
-    console.log('🔧 Development mode detected, using local API');
-    window.API_CONFIG.baseURL = window.API_CONFIG.devURL;
+/**
+ * Build full API URL
+ * @param {string} endpoint - API endpoint
+ * @returns {string} Full API URL
+ */
+function buildApiUrl(endpoint) {
+    // Remove leading slash if present
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+    return `${CONFIG.API_BASE_URL}/${cleanEndpoint}`;
 }
 
-// Initialize API monitoring when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    // Start connection monitoring
-    window.API_MONITOR.start();
-    
-    // Log configuration
-    console.log('✅ API Configuration loaded:', {
-        baseURL: window.API_CONFIG.baseURL,
-        timeout: window.API_CONFIG.timeout,
-        development: isDevelopment
-    });
-});
+/**
+ * Get authentication token
+ * @returns {string|null} JWT token or null
+ */
+function getAuthToken() {
+    return localStorage.getItem('token');
+}
 
-// Global error handler for API calls
-window.addEventListener('unhandledrejection', (event) => {
-    if (event.reason && event.reason.message && event.reason.message.includes('API')) {
-        console.error('🚨 Unhandled API error:', event.reason);
+/**
+ * Build request headers with authentication
+ * @returns {object} Headers object
+ */
+function buildHeaders() {
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    
+    const token = getAuthToken();
+    if (token) {
+        headers['x-auth-token'] = token;
+    }
+    
+    return headers;
+}
+
+/**
+ * Enhanced API call with error handling
+ * @param {string} endpoint - API endpoint
+ * @param {object} options - Fetch options
+ * @returns {Promise} API response
+ */
+async function apiCall(endpoint, options = {}) {
+    const url = buildApiUrl(endpoint);
+    const defaultOptions = {
+        headers: buildHeaders(),
+        timeout: CONFIG.API_TIMEOUT
+    };
+    
+    const mergedOptions = { ...defaultOptions, ...options };
+    
+    // Merge headers properly
+    if (options.headers) {
+        mergedOptions.headers = { ...defaultOptions.headers, ...options.headers };
+    }
+    
+    try {
+        if (CONFIG.DEBUG) {
+            console.log('🌐 API Call:', {
+                url,
+                method: mergedOptions.method || 'GET',
+                headers: mergedOptions.headers
+            });
+        }
         
-        // Show user-friendly message
-        if (window.app && typeof window.app.showMessage === 'function') {
-            window.app.showMessage('Problème de connexion avec le serveur', 'error');
+        const response = await fetch(url, mergedOptions);
+        
+        if (CONFIG.DEBUG) {
+            console.log('📥 API Response:', {
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok
+            });
+        }
+        
+        // Handle non-JSON responses
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Réponse non-JSON du serveur: ${text.substring(0, 100)}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || `Erreur HTTP: ${response.status}`);
+        }
+        
+        return data;
+    } catch (error) {
+        console.error('❌ API Error:', {
+            endpoint,
+            error: error.message
+        });
+        
+        // Check if network error
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+            throw new Error('Impossible de se connecter au serveur. Vérifiez votre connexion internet.');
+        }
+        
+        throw error;
+    }
+}
+
+/**
+ * Format price in DA
+ * @param {number} price - Price value
+ * @returns {string} Formatted price
+ */
+function formatPrice(price) {
+    return `${price.toLocaleString('fr-DZ')} DA`;
+}
+
+/**
+ * Format date
+ * @param {string|Date} date - Date to format
+ * @returns {string} Formatted date
+ */
+function formatDate(date) {
+    const d = new Date(date);
+    return d.toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
+
+/**
+ * Format date and time
+ * @param {string|Date} date - Date to format
+ * @returns {string} Formatted date and time
+ */
+function formatDateTime(date) {
+    const d = new Date(date);
+    return d.toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+/**
+ * Validate email
+ * @param {string} email - Email to validate
+ * @returns {boolean} Is valid email
+ */
+function isValidEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+}
+
+/**
+ * Validate phone number (Algerian)
+ * @param {string} phone - Phone number to validate
+ * @returns {boolean} Is valid phone
+ */
+function isValidPhone(phone) {
+    const re = /^(0|\+213)[567]\d{8}$/;
+    return re.test(phone.replace(/\s/g, ''));
+}
+
+/**
+ * Validate image file
+ * @param {File} file - File to validate
+ * @returns {object} Validation result
+ */
+function validateImageFile(file) {
+    if (!file) {
+        return { valid: false, error: 'Aucun fichier sélectionné' };
+    }
+    
+    if (!CONFIG.ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        return { 
+            valid: false, 
+            error: 'Format d\'image non supporté. Utilisez JPG, PNG ou WebP.' 
+        };
+    }
+    
+    if (file.size > CONFIG.MAX_IMAGE_SIZE) {
+        return { 
+            valid: false, 
+            error: `La taille de l'image doit être inférieure à ${CONFIG.MAX_IMAGE_SIZE / 1024 / 1024}MB` 
+        };
+    }
+    
+    return { valid: true };
+}
+
+/**
+ * Convert file to Base64
+ * @param {File} file - File to convert
+ * @returns {Promise<string>} Base64 string
+ */
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+}
+
+/**
+ * Debounce function
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Wait time in ms
+ * @returns {Function} Debounced function
+ */
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+/**
+ * Generate unique ID
+ * @returns {string} Unique ID
+ */
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+/**
+ * Get category color
+ * @param {string} category - Category name
+ * @returns {string} Hex color code
+ */
+function getCategoryColor(category) {
+    const colors = {
+        'Vitalité': '10b981',
+        'Sport': 'f43f5e',
+        'Visage': 'ec4899',
+        'Cheveux': 'f59e0b',
+        'Solaire': 'f97316',
+        'Intime': 'ef4444',
+        'Bébé': '06b6d4',
+        'Homme': '3b82f6',
+        'Soins': '22c55e',
+        'Dentaire': '6366f1'
+    };
+    return colors[category] || '10b981';
+}
+
+/**
+ * Generate placeholder image URL
+ * @param {string} text - Text to display
+ * @param {string} category - Category for color
+ * @returns {string} Placeholder image URL
+ */
+function generatePlaceholderImage(text, category) {
+    const color = getCategoryColor(category);
+    const initials = text.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+    return `https://via.placeholder.com/300x300/${color}/ffffff?text=${encodeURIComponent(initials)}`;
+}
+
+/**
+ * Log function for debugging
+ * @param {string} message - Message to log
+ * @param {*} data - Data to log
+ */
+function log(message, data = null) {
+    if (CONFIG.DEBUG) {
+        if (data) {
+            console.log(`🌿 ${message}`, data);
+        } else {
+            console.log(`🌿 ${message}`);
         }
     }
-});
+}
 
-console.log('✅ API configuration and utilities loaded successfully');
+// Export configuration and functions
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        CONFIG,
+        buildApiUrl,
+        getAuthToken,
+        buildHeaders,
+        apiCall,
+        formatPrice,
+        formatDate,
+        formatDateTime,
+        isValidEmail,
+        isValidPhone,
+        validateImageFile,
+        fileToBase64,
+        debounce,
+        generateId,
+        getCategoryColor,
+        generatePlaceholderImage,
+        log
+    };
+}
+
+console.log('✅ Config.js loaded successfully');
