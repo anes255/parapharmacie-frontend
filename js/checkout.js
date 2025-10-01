@@ -272,7 +272,7 @@ class CheckoutSystem {
                 throw new Error('Veuillez corriger les erreurs dans le formulaire');
             }
 
-            const submitBtn = document.querySelector('button[onclick*="processOrder"]');
+            const submitBtn = document.querySelector('button[onclick*="processCheckoutOrder"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Envoi au serveur...';
@@ -280,10 +280,10 @@ class CheckoutSystem {
 
             const orderData = this.gatherOrderData();
             
-            console.log('📦 Order data to send:', orderData);
+            console.log('📦 Order data to send to API:', orderData);
 
             // SAVE TO API - THIS IS THE CRITICAL PART
-            console.log('📡 Sending order to API...');
+            console.log('📡 Sending order to Render API...');
             const apiResponse = await apiCall('/orders', {
                 method: 'POST',
                 body: JSON.stringify(orderData)
@@ -291,20 +291,23 @@ class CheckoutSystem {
             
             console.log('✅ Order saved to API successfully:', apiResponse);
 
-            // Also save locally as backup
+            // Also save locally as backup for admin panel
             if (window.addOrderToDemo) {
                 window.addOrderToDemo(orderData);
-                console.log('✅ Order saved locally as backup');
+                console.log('✅ Order also saved locally as backup');
             }
 
+            // Save to user history if logged in
             if (window.app && window.app.currentUser) {
                 this.saveToUserOrders(orderData);
             }
 
+            // Clear cart
             if (window.app) {
                 window.app.clearCart();
             }
 
+            // Show success and redirect
             if (window.app) {
                 window.app.showToast('✅ Commande enregistrée dans la base de données !', 'success');
                 
@@ -322,12 +325,12 @@ class CheckoutSystem {
             
             if (window.app) {
                 window.app.showToast(
-                    '❌ Erreur: ' + (error.message || 'Impossible d\'enregistrer la commande'), 
+                    '❌ Erreur: ' + (error.message || 'Impossible d\'enregistrer la commande sur le serveur'), 
                     'error'
                 );
             }
             
-            const submitBtn = document.querySelector('button[onclick*="processOrder"]');
+            const submitBtn = document.querySelector('button[onclick*="processCheckoutOrder"]');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirmer la commande';
@@ -453,4 +456,4 @@ if (document.readyState === 'loading') {
 window.initCheckout = initCheckout;
 window.checkoutSystem = checkoutSystem;
 
-console.log('✅ Checkout.js loaded successfully - API integrated');
+console.log('✅ Complete checkout.js loaded - API integrated');
