@@ -229,17 +229,34 @@ async function loadCheckoutPage() {
             </div>
         </div>
     `;
+    
+    // Attach event listener to the form
+    setTimeout(() => {
+        const form = document.getElementById('checkoutForm');
+        if (form) {
+            form.addEventListener('submit', handleCheckout);
+            console.log('Checkout form listener attached');
+        }
+    }, 100);
 }
 
 /**
- * Handle checkout submission
+ * Handle checkout submission - FIXED
  */
 async function handleCheckout(event) {
     event.preventDefault();
     
+    console.log('Checkout form submitted');
+    
     const btn = document.getElementById('checkoutBtn');
     const btnText = document.getElementById('checkoutBtnText');
     const btnSpinner = document.getElementById('checkoutBtnSpinner');
+    
+    if (!btn || !btnText || !btnSpinner) {
+        console.error('Checkout button elements not found');
+        window.app.showToast('Erreur: Éléments du formulaire introuvables', 'error');
+        return;
+    }
     
     try {
         // Disable button
@@ -280,7 +297,7 @@ async function handleCheckout(event) {
             dateCommande: new Date().toISOString()
         };
         
-        log('Submitting order', order);
+        console.log('Submitting order:', order);
         
         // Try to save to backend
         try {
@@ -288,9 +305,9 @@ async function handleCheckout(event) {
                 method: 'POST',
                 body: JSON.stringify(order)
             });
-            log('Order saved to backend');
+            console.log('Order saved to backend');
         } catch (error) {
-            log('Backend unavailable, saving locally', error.message);
+            console.log('Backend unavailable, saving locally:', error.message);
         }
         
         // Save order locally
@@ -313,9 +330,11 @@ async function handleCheckout(event) {
         window.app.showToast(error.message || 'Erreur lors de la validation de la commande', 'error');
         
         // Re-enable button
-        btn.disabled = false;
-        btnText.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Confirmer la commande';
-        btnSpinner.classList.add('hidden');
+        if (btn && btnText && btnSpinner) {
+            btn.disabled = false;
+            btnText.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Confirmer la commande';
+            btnSpinner.classList.add('hidden');
+        }
     }
 }
 
