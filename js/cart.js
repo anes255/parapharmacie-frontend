@@ -1,7 +1,8 @@
-// Fixed Cart System - Properly integrated with app
+// Fixed Cart System with localStorage Cleanup for Shifa Parapharmacie
+
 class CartSystem {
     constructor() {
-        this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        this.cart = this.loadCart();
         this.isOpen = false;
         this.settings = {
             fraisLivraison: 300,
@@ -12,80 +13,115 @@ class CartSystem {
         this.init();
     }
 
+    // Load cart with error handling
+    loadCart() {
+        try {
+            const cartData = localStorage.getItem('cart');
+            return cartData ? JSON.parse(cartData) : [];
+        } catch (error) {
+            console.error('Error loading cart, clearing corrupted data:', error);
+            localStorage.removeItem('cart');
+            return [];
+        }
+    }
+
     init() {
         console.log('Initializing cart system...');
+        // Clean up old localStorage data on init
+        this.cleanupLocalStorage();
         this.updateUI();
         this.setupEventListeners();
     }
 
+    // CRITICAL: Clean up localStorage to prevent quota errors
+    cleanupLocalStorage() {
+        try {
+            // Keep only last 50 admin orders
+            const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            if (adminOrders.length > 50) {
+                const recentOrders = adminOrders.slice(0, 50);
+                localStorage.setItem('adminOrders', JSON.stringify(recentOrders));
+                console.log(`✅ Cleaned up ${adminOrders.length - 50} old orders`);
+            }
+
+            // Clean up old demo products (keep only last 100)
+            const demoProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            if (demoProducts.length > 100) {
+                const recentProducts = demoProducts.slice(0, 100);
+                localStorage.setItem('demoProducts', JSON.stringify(recentProducts));
+                console.log(`✅ Cleaned up ${demoProducts.length - 100} old products`);
+            }
+
+            // Clean up user orders older than 30 days for all users
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('userOrders_')) {
+                    try {
+                        const userOrders = JSON.parse(localStorage.getItem(key) || '[]');
+                        const thirtyDaysAgo = new Date();
+                        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                        
+                        const recentOrders = userOrders.filter(order => {
+                            const orderDate = new Date(order.dateCommande);
+                            return orderDate > thirtyDaysAgo;
+                        });
+                        
+                        if (recentOrders.length < userOrders.length) {
+                            localStorage.setItem(key, JSON.stringify(recentOrders));
+                            console.log(`✅ Cleaned up ${userOrders.length - recentOrders.length} old orders for user`);
+                        }
+                    } catch (e) {
+                        console.error('Error cleaning user orders:', e);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error during cleanup:', error);
+        }
+    }
+
+    // Setup cart event listeners
     setupEventListeners() {
-        // Cart toggle
         document.addEventListener('click', (e) => {
             if (e.target.matches('[data-cart-toggle]') || e.target.closest('[data-cart-toggle]')) {
                 this.toggle();
             }
         });
 
-        // Cart overlay click to close
         document.addEventListener('click', (e) => {
             if (e.target.matches('#cartOverlay')) {
                 this.close();
             }
         });
 
-        // Escape key to close cart
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.isOpen) {
                 this.close();
             }
         });
 
-        // Update cart when storage changes (multiple tabs)
         window.addEventListener('storage', (e) => {
             if (e.key === 'cart') {
                 this.cart = JSON.parse(e.newValue || '[]');
                 this.updateUI();
-                this.syncWithApp();
             }
         });
     }
 
-    // FIXED: Sync with main app when cart changes
-    syncWithApp() {
-        if (window.app && window.app.cart) {
-            window.app.cart = [...this.cart];
-            console.log('Cart synced with main app:', this.cart.length, 'items');
-        }
-    }
-
-    // FIXED: Add item to cart with proper product resolution
+    // Add item to cart
     async addItem(productId, quantity = 1, product = null) {
         try {
             console.log('Adding to cart:', productId, quantity);
 
-            // FIXED: Get product from app's cache first
             if (!product && window.app?.allProducts) {
                 product = window.app.allProducts.find(p => p._id === productId);
-                console.log('Product found in app cache:', !!product);
             }
 
-            // If still not found, try to find in localStorage
-            if (!product) {
-                const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-                product = localProducts.find(p => p._id === productId);
-                console.log('Product found in localStorage:', !!product);
-            }
-
-            // Last resort: try API
             if (!product) {
                 try {
-                    const response = await fetch(buildApiUrl(`/products/${productId}`));
-                    if (response.ok) {
-                        product = await response.json();
-                        console.log('Product found via API:', !!product);
-                    }
+                    product = await apiCall(`/products/${productId}`);
                 } catch (error) {
-                    console.log('API call failed:', error.message);
+                    throw new Error('Produit non trouvé');
                 }
             }
 
@@ -105,10 +141,7 @@ class CartSystem {
                 throw new Error(`Quantité maximum autorisée: ${this.settings.maxQuantity}`);
             }
 
-            // Generate image URL
             const imageUrl = this.generateImageUrl(product);
-
-            // Check if item already exists in cart
             const existingIndex = this.cart.findIndex(item => item.id === productId);
 
             if (existingIndex > -1) {
@@ -124,7 +157,6 @@ class CartSystem {
 
                 this.cart[existingIndex].quantite = newQuantity;
             } else {
-                // Add new item
                 const cartItem = {
                     id: product._id,
                     nom: product.nom,
@@ -142,7 +174,6 @@ class CartSystem {
 
             this.saveCart();
             this.updateUI();
-            this.syncWithApp(); // FIXED: Sync with app
             this.showAddedNotification(product.nom, quantity);
 
             console.log('✅ Item added to cart successfully');
@@ -166,7 +197,6 @@ class CartSystem {
             this.cart.splice(itemIndex, 1);
             this.saveCart();
             this.updateUI();
-            this.syncWithApp(); // FIXED: Sync with app
             
             if (window.app) {
                 window.app.showToast(`${item.nom} retiré du panier`, 'success');
@@ -211,7 +241,6 @@ class CartSystem {
         item.quantite = newQuantity;
         this.saveCart();
         this.updateUI();
-        this.syncWithApp(); // FIXED: Sync with app
         
         console.log('Quantity updated:', item.nom, newQuantity);
         return true;
@@ -222,7 +251,6 @@ class CartSystem {
         this.cart = [];
         this.saveCart();
         this.updateUI();
-        this.syncWithApp(); // FIXED: Sync with app
         
         if (window.app) {
             window.app.showToast('Panier vidé', 'success');
@@ -246,15 +274,35 @@ class CartSystem {
         };
     }
 
-    // FIXED: Save cart and sync
+    // Save cart to localStorage with error handling
     saveCart() {
-        localStorage.setItem('cart', JSON.stringify(this.cart));
-        
-        // Trigger storage event for other tabs
-        window.dispatchEvent(new StorageEvent('storage', {
-            key: 'cart',
-            newValue: JSON.stringify(this.cart)
-        }));
+        try {
+            localStorage.setItem('cart', JSON.stringify(this.cart));
+            
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'cart',
+                newValue: JSON.stringify(this.cart)
+            }));
+        } catch (error) {
+            if (error.name === 'QuotaExceededError') {
+                console.error('❌ LocalStorage quota exceeded! Cleaning up...');
+                
+                // Emergency cleanup
+                this.cleanupLocalStorage();
+                
+                // Try again
+                try {
+                    localStorage.setItem('cart', JSON.stringify(this.cart));
+                } catch (retryError) {
+                    console.error('❌ Still cannot save cart after cleanup');
+                    if (window.app) {
+                        window.app.showToast('Erreur: Mémoire pleine. Veuillez vider votre panier.', 'error');
+                    }
+                }
+            } else {
+                console.error('Error saving cart:', error);
+            }
+        }
     }
 
     // Update cart UI
@@ -264,7 +312,7 @@ class CartSystem {
         this.updateCartTotals();
     }
 
-    // Update cart count badge  
+    // Update cart count badge
     updateCartCount() {
         const cartCount = document.getElementById('cartCount');
         if (cartCount) {
@@ -388,11 +436,9 @@ class CartSystem {
             
             if (totals.fraisLivraison === 0 && totals.sousTotal > 0) {
                 elements.cartShipping.classList.add('text-green-600', 'font-semibold');
-                elements.cartShipping.classList.remove('text-gray-700');
                 elements.cartShipping.innerHTML = `<span class="line-through text-gray-400">${this.settings.fraisLivraison} DA</span> <span class="text-green-600">GRATUIT</span>`;
             } else {
                 elements.cartShipping.classList.remove('text-green-600', 'font-semibold');
-                elements.cartShipping.classList.add('text-gray-700');
             }
         }
         
@@ -494,7 +540,7 @@ class CartSystem {
         }, 3000);
     }
 
-    // Cart controls
+    // Open cart sidebar
     open() {
         const cartSidebar = document.getElementById('cartSidebar');
         const cartOverlay = document.getElementById('cartOverlay');
@@ -504,10 +550,12 @@ class CartSystem {
             cartOverlay.classList.remove('hidden');
             document.body.classList.add('overflow-hidden');
             this.isOpen = true;
+            
             this.updateUI();
         }
     }
 
+    // Close cart sidebar
     close() {
         const cartSidebar = document.getElementById('cartSidebar');
         const cartOverlay = document.getElementById('cartOverlay');
@@ -520,6 +568,7 @@ class CartSystem {
         }
     }
 
+    // Toggle cart sidebar
     toggle() {
         if (this.isOpen) {
             this.close();
@@ -528,6 +577,7 @@ class CartSystem {
         }
     }
 
+    // Proceed to checkout
     proceedToCheckout() {
         if (this.cart.length === 0) {
             if (window.app) {
@@ -543,6 +593,7 @@ class CartSystem {
         }
     }
 
+    // Get cart summary for checkout
     getCartSummary() {
         return {
             items: [...this.cart],
@@ -551,16 +602,17 @@ class CartSystem {
         };
     }
 
+    // Import cart
     importCart(cartData) {
         if (Array.isArray(cartData)) {
             this.cart = cartData;
             this.saveCart();
             this.updateUI();
-            this.syncWithApp();
             console.log('Cart imported successfully');
         }
     }
 
+    // Export cart data
     exportCart() {
         return {
             items: this.cart,
@@ -577,10 +629,10 @@ let cartSystem;
 function initCart() {
     cartSystem = new CartSystem();
     window.cartSystem = cartSystem;
-    console.log('✅ Cart system initialized');
+    console.log('✅ Cart system initialized with localStorage cleanup');
 }
 
-// FIXED: Enhanced global cart functions
+// Global cart functions
 function toggleCart() {
     if (cartSystem) {
         cartSystem.toggle();
@@ -590,19 +642,6 @@ function toggleCart() {
 function addToCart(productId, quantity = 1) {
     if (cartSystem) {
         return cartSystem.addItem(productId, quantity);
-    }
-}
-
-// FIXED: Global function for card add to cart
-function addToCartFromCard(productId, quantity = 1) {
-    console.log('Add to cart from card called:', productId);
-    if (cartSystem) {
-        return cartSystem.addItem(productId, quantity);
-    } else if (window.app && typeof window.app.addToCart === 'function') {
-        return window.app.addToCart(productId, quantity);
-    } else {
-        console.error('No cart system available');
-        return false;
     }
 }
 
@@ -630,7 +669,7 @@ function proceedToCheckout() {
     }
 }
 
-// Auto-initialize if DOM is already loaded
+// Auto-initialize
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCart);
 } else {
@@ -642,10 +681,9 @@ window.initCart = initCart;
 window.cartSystem = cartSystem;
 window.toggleCart = toggleCart;
 window.addToCart = addToCart;
-window.addToCartFromCard = addToCartFromCard;
 window.removeFromCart = removeFromCart;
 window.updateCartQuantity = updateCartQuantity;
 window.clearCart = clearCart;
 window.proceedToCheckout = proceedToCheckout;
 
-console.log('✅ Fixed Cart.js loaded successfully');
+console.log('✅ Cart.js loaded with localStorage cleanup');
