@@ -1,296 +1,372 @@
-// ==========================================
-// 🌿 Authentication - WORKING VERSION
-// ==========================================
+// Fixed Authentication System for Shifa Parapharmacie
 
-/**
- * Load login page
- */
-async function loadLoginPage() {
-    const mainContent = document.getElementById('mainContent');
-    
-    mainContent.innerHTML = `
-        <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-            <div class="max-w-md w-full">
-                <div class="bg-white rounded-3xl shadow-2xl p-8">
-                    <div class="text-center mb-8">
-                        <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl mb-4 shadow-lg">
-                            <i class="fas fa-seedling text-white text-3xl"></i>
-                        </div>
-                        <h2 class="text-3xl font-bold text-emerald-900">Connexion</h2>
-                        <p class="text-gray-600 mt-2">Connectez-vous à votre compte</p>
-                    </div>
-                    
-                    <form id="loginForm" class="space-y-6">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="fas fa-envelope text-emerald-500 mr-2"></i>Email
-                            </label>
-                            <input type="email" name="email" required 
-                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none"
-                                   placeholder="votre@email.com">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="fas fa-lock text-emerald-500 mr-2"></i>Mot de passe
-                            </label>
-                            <input type="password" name="password" required 
-                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none"
-                                   placeholder="••••••••">
-                        </div>
-                        
-                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-lg hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg disabled:opacity-50">
-                            <span class="submit-text">Se connecter</span>
-                            <i class="fas fa-spinner fa-spin ml-2 hidden submit-spinner"></i>
-                        </button>
-                    </form>
-                    
-                    <div class="mt-6 text-center">
-                        <p class="text-sm text-gray-600">
-                            Pas encore de compte?
-                            <a href="#" onclick="event.preventDefault(); window.app.showPage('register')" class="font-semibold text-emerald-600 hover:text-emerald-700">
-                                S'inscrire
-                            </a>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Attach event listener after DOM is ready
-    setTimeout(() => {
-        const form = document.getElementById('loginForm');
-        if (form) {
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const button = form.querySelector('button[type="submit"]');
-                const submitText = button.querySelector('.submit-text');
-                const submitSpinner = button.querySelector('.submit-spinner');
-                
-                try {
-                    button.disabled = true;
-                    submitText.textContent = 'Connexion...';
-                    submitSpinner.classList.remove('hidden');
-                    
-                    const formData = new FormData(form);
-                    const email = formData.get('email');
-                    const password = formData.get('password');
-                    
-                    console.log('Login attempt:', email);
-                    
-                    // Try API first
-                    try {
-                        const response = await fetch(buildApiUrl('/auth/login'), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email, password })
-                        });
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            localStorage.setItem('token', data.token);
-                            window.app.currentUser = data.user;
-                            window.app.updateUserUI();
-                            window.app.showToast('Connexion réussie!', 'success');
-                            setTimeout(() => window.app.showPage('home'), 500);
-                            return;
-                        }
-                    } catch (apiError) {
-                        console.log('API error, trying local auth');
-                    }
-                    
-                    // Local fallback
-                    if (email === 'pharmaciegaher@gmail.com' && password === 'anesaya75') {
-                        localStorage.setItem('token', 'local-admin-token');
-                        window.app.currentUser = {
-                            _id: 'admin-local',
-                            nom: 'Gaher',
-                            prenom: 'Parapharmacie',
-                            email: 'pharmaciegaher@gmail.com',
-                            role: 'admin'
-                        };
-                        window.app.updateUserUI();
-                        window.app.showToast('Connexion admin réussie!', 'success');
-                        setTimeout(() => window.app.showPage('home'), 500);
-                        return;
-                    }
-                    
-                    throw new Error('Email ou mot de passe incorrect');
-                    
-                } catch (error) {
-                    console.error('Login error:', error);
-                    window.app.showToast(error.message || 'Erreur de connexion', 'error');
-                } finally {
-                    button.disabled = false;
-                    submitText.textContent = 'Se connecter';
-                    submitSpinner.classList.add('hidden');
-                }
-            });
-            console.log('✅ Login form listener attached');
+class AuthenticationSystem {
+    constructor() {
+        this.currentUser = null;
+        this.token = localStorage.getItem('token');
+        this.init();
+    }
+
+    async init() {
+        if (this.token) {
+            await this.validateToken();
         }
-    }, 100);
+    }
+
+    async validateToken() {
+        try {
+            const response = await apiCall('/auth/profile');
+            if (response) {
+                this.currentUser = response;
+                return true;
+            }
+        } catch (error) {
+            console.log('Token validation failed:', error.message);
+            this.logout();
+        }
+        return false;
+    }
+
+    async login(email, password) {
+        try {
+            console.log('🔐 Attempting login for:', email);
+            
+            if (!email || !password) {
+                throw new Error('Email et mot de passe requis');
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                throw new Error('Format d\'email invalide');
+            }
+
+            const response = await apiCall('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    email: email.toLowerCase().trim(),
+                    password: password
+                })
+            });
+
+            if (response.token && response.user) {
+                this.token = response.token;
+                this.currentUser = response.user;
+                
+                localStorage.setItem('token', this.token);
+                
+                console.log('✅ Login successful for:', response.user.email);
+                
+                return {
+                    success: true,
+                    user: response.user,
+                    message: response.message || 'Connexion réussie'
+                };
+            } else {
+                throw new Error('Réponse de connexion invalide');
+            }
+
+        } catch (error) {
+            console.error('❌ Login error:', error);
+            throw new Error(error.message || 'Erreur de connexion');
+        }
+    }
+
+    async register(userData) {
+        try {
+            console.log('📝 Attempting registration for:', userData.email);
+            
+            const required = ['nom', 'prenom', 'email', 'password', 'telephone', 'wilaya'];
+            for (let field of required) {
+                if (!userData[field] || userData[field].trim() === '') {
+                    throw new Error(`Le champ ${field} est requis`);
+                }
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(userData.email)) {
+                throw new Error('Format d\'email invalide');
+            }
+
+            if (userData.password.length < 6) {
+                throw new Error('Le mot de passe doit contenir au moins 6 caractères');
+            }
+
+            const phoneRegex = /^(\+213|0)[5-9]\d{8}$/;
+            if (!phoneRegex.test(userData.telephone.replace(/\s+/g, ''))) {
+                throw new Error('Format de téléphone invalide (numéro algérien requis)');
+            }
+
+            const response = await apiCall('/auth/register', {
+                method: 'POST',
+                body: JSON.stringify({
+                    nom: userData.nom.trim(),
+                    prenom: userData.prenom.trim(),
+                    email: userData.email.toLowerCase().trim(),
+                    password: userData.password,
+                    telephone: userData.telephone.replace(/\s+/g, ''),
+                    adresse: userData.adresse ? userData.adresse.trim() : '',
+                    ville: userData.ville ? userData.ville.trim() : '',
+                    wilaya: userData.wilaya,
+                    codePostal: userData.codePostal ? userData.codePostal.trim() : ''
+                })
+            });
+
+            if (response.token && response.user) {
+                this.token = response.token;
+                this.currentUser = response.user;
+                
+                localStorage.setItem('token', this.token);
+                
+                console.log('✅ Registration successful for:', response.user.email);
+                
+                return {
+                    success: true,
+                    user: response.user,
+                    message: response.message || 'Inscription réussie'
+                };
+            } else {
+                throw new Error('Réponse d\'inscription invalide');
+            }
+
+        } catch (error) {
+            console.error('❌ Registration error:', error);
+            throw new Error(error.message || 'Erreur lors de l\'inscription');
+        }
+    }
+
+    async getProfile() {
+        try {
+            if (!this.token) {
+                throw new Error('Non connecté');
+            }
+
+            const response = await apiCall('/auth/profile');
+            if (response) {
+                this.currentUser = response;
+                return response;
+            }
+        } catch (error) {
+            console.error('Error getting profile:', error);
+            throw error;
+        }
+    }
+
+    async updateProfile(updateData) {
+        try {
+            if (!this.token) {
+                throw new Error('Non connecté');
+            }
+
+            const response = await apiCall('/auth/profile', {
+                method: 'PUT',
+                body: JSON.stringify(updateData)
+            });
+
+            if (response.user) {
+                this.currentUser = response.user;
+                return response;
+            }
+
+            return response;
+
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            throw error;
+        }
+    }
+
+    async changePassword(currentPassword, newPassword) {
+        try {
+            if (!this.token) {
+                throw new Error('Non connecté');
+            }
+
+            if (!currentPassword || !newPassword) {
+                throw new Error('Mot de passe actuel et nouveau mot de passe requis');
+            }
+
+            if (newPassword.length < 6) {
+                throw new Error('Le nouveau mot de passe doit contenir au moins 6 caractères');
+            }
+
+            const response = await apiCall('/auth/change-password', {
+                method: 'POST',
+                body: JSON.stringify({
+                    currentPassword,
+                    newPassword
+                })
+            });
+
+            return response;
+
+        } catch (error) {
+            console.error('Error changing password:', error);
+            throw error;
+        }
+    }
+
+    logout() {
+        console.log('🚪 Logging out user');
+        
+        this.token = null;
+        this.currentUser = null;
+        
+        localStorage.removeItem('token');
+        
+        if (window.app) {
+            window.app.currentUser = null;
+            window.app.updateUserUI();
+        }
+    }
+
+    isAuthenticated() {
+        return !!(this.token && this.currentUser);
+    }
+
+    isAdmin() {
+        return this.isAuthenticated() && this.currentUser.role === 'admin';
+    }
+
+    getRole() {
+        return this.currentUser ? this.currentUser.role : null;
+    }
+
+    getUser() {
+        return this.currentUser;
+    }
+
+    getToken() {
+        return this.token;
+    }
 }
 
-/**
- * Load registration page
- */
-async function loadRegisterPage() {
-    const mainContent = document.getElementById('mainContent');
+// FIXED: Define global functions BEFORE DOMContentLoaded to avoid timing issues
+window.handleLogin = async function(event) {
+    event.preventDefault();
     
-    mainContent.innerHTML = `
-        <div class="min-h-screen flex items-center justify-center py-12 px-4">
-            <div class="max-w-2xl w-full">
-                <div class="bg-white rounded-3xl shadow-2xl p-8">
-                    <div class="text-center mb-8">
-                        <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl mb-4 shadow-lg">
-                            <i class="fas fa-user-plus text-white text-3xl"></i>
-                        </div>
-                        <h2 class="text-3xl font-bold text-emerald-900">Inscription</h2>
-                        <p class="text-gray-600 mt-2">Créez votre compte Shifa</p>
-                    </div>
-                    
-                    <form id="registerForm" class="space-y-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
-                                <input type="text" name="nom" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
-                                <input type="text" name="prenom" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none">
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                            <input type="email" name="email" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
-                            <input type="tel" name="telephone" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
-                            <select name="wilaya" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none">
-                                <option value="">Sélectionnez...</option>
-                                ${CONFIG.WILAYAS.map(w => `<option value="${w}">${w}</option>`).join('')}
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Adresse *</label>
-                            <textarea name="adresse" required rows="3" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none"></textarea>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe *</label>
-                            <input type="password" name="password" required minlength="6" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Confirmer *</label>
-                            <input type="password" name="confirmPassword" required minlength="6" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none">
-                        </div>
-                        
-                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-lg hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg disabled:opacity-50">
-                            <span class="submit-text">Créer mon compte</span>
-                            <i class="fas fa-spinner fa-spin ml-2 hidden submit-spinner"></i>
-                        </button>
-                    </form>
-                    
-                    <div class="mt-6 text-center">
-                        <p class="text-sm text-gray-600">
-                            Déjà un compte?
-                            <a href="#" onclick="event.preventDefault(); window.app.showPage('login')" class="font-semibold text-emerald-600 hover:text-emerald-700">
-                                Se connecter
-                            </a>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
     
-    setTimeout(() => {
-        const form = document.getElementById('registerForm');
-        if (form) {
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const button = form.querySelector('button[type="submit"]');
-                const submitText = button.querySelector('.submit-text');
-                const submitSpinner = button.querySelector('.submit-spinner');
-                
-                try {
-                    button.disabled = true;
-                    submitText.textContent = 'Création...';
-                    submitSpinner.classList.remove('hidden');
-                    
-                    const formData = new FormData(form);
-                    const data = Object.fromEntries(formData);
-                    
-                    if (data.password !== data.confirmPassword) {
-                        throw new Error('Les mots de passe ne correspondent pas');
-                    }
-                    
-                    // Try API
-                    try {
-                        const response = await fetch(buildApiUrl('/auth/register'), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(data)
-                        });
-                        
-                        if (response.ok) {
-                            const result = await response.json();
-                            localStorage.setItem('token', result.token);
-                            window.app.currentUser = result.user;
-                            window.app.updateUserUI();
-                            window.app.showToast('Compte créé!', 'success');
-                            setTimeout(() => window.app.showPage('home'), 500);
-                            return;
-                        }
-                    } catch (apiError) {
-                        console.log('API error, creating local account');
-                    }
-                    
-                    // Local fallback
-                    const users = JSON.parse(localStorage.getItem('localUsers') || '[]');
-                    if (users.find(u => u.email === data.email)) {
-                        throw new Error('Email déjà utilisé');
-                    }
-                    
-                    const newUser = {
-                        _id: 'user-' + Date.now(),
-                        ...data,
-                        role: 'user'
-                    };
-                    delete newUser.confirmPassword;
-                    
-                    users.push(newUser);
-                    localStorage.setItem('localUsers', JSON.stringify(users));
-                    localStorage.setItem('token', 'local-token-' + newUser._id);
-                    window.app.currentUser = newUser;
-                    window.app.updateUserUI();
-                    window.app.showToast('Compte créé!', 'success');
-                    setTimeout(() => window.app.showPage('home'), 500);
-                    
-                } catch (error) {
-                    console.error('Register error:', error);
-                    window.app.showToast(error.message || 'Erreur', 'error');
-                } finally {
-                    button.disabled = false;
-                    submitText.textContent = 'Créer mon compte';
-                    submitSpinner.classList.add('hidden');
-                }
-            });
-            console.log('✅ Register form listener attached');
+    if (!email || !password) {
+        if (window.app) {
+            window.app.showToast('Veuillez remplir tous les champs', 'error');
         }
-    }, 100);
+        return;
+    }
+    
+    try {
+        if (!window.authSystem) {
+            console.error('Auth system not initialized');
+            if (window.app) {
+                window.app.showToast('Système d\'authentification non initialisé', 'error');
+            }
+            return;
+        }
+        
+        const result = await window.authSystem.login(email, password);
+        
+        if (result.success) {
+            if (window.app) {
+                window.app.currentUser = result.user;
+                window.app.updateUserUI();
+                window.app.showToast(result.message, 'success');
+                window.app.showPage('home');
+            }
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        if (window.app) {
+            window.app.showToast(error.message, 'error');
+        }
+    }
+};
+
+window.handleRegister = async function(event) {
+    event.preventDefault();
+    
+    const formData = {
+        prenom: document.getElementById('registerPrenom').value.trim(),
+        nom: document.getElementById('registerNom').value.trim(),
+        email: document.getElementById('registerEmail').value.trim(),
+        telephone: document.getElementById('registerTelephone').value.trim(),
+        password: document.getElementById('registerPassword').value,
+        adresse: document.getElementById('registerAdresse').value.trim(),
+        wilaya: document.getElementById('registerWilaya').value
+    };
+    
+    try {
+        if (!window.authSystem) {
+            console.error('Auth system not initialized');
+            if (window.app) {
+                window.app.showToast('Système d\'authentification non initialisé', 'error');
+            }
+            return;
+        }
+        
+        const result = await window.authSystem.register(formData);
+        
+        if (result.success) {
+            if (window.app) {
+                window.app.currentUser = result.user;
+                window.app.updateUserUI();
+                window.app.showToast(result.message, 'success');
+                window.app.showPage('home');
+            }
+        }
+    } catch (error) {
+        console.error('Registration error:', error);
+        if (window.app) {
+            window.app.showToast(error.message, 'error');
+        }
+    }
+};
+
+window.logout = function() {
+    if (window.authSystem) {
+        window.authSystem.logout();
+    }
+    
+    if (window.app) {
+        window.app.showToast('Déconnexion réussie', 'success');
+        window.app.showPage('home');
+    }
+};
+
+// Helper functions
+function validatePassword(password) {
+    const errors = [];
+    
+    if (password.length < 6) {
+        errors.push('Le mot de passe doit contenir au moins 6 caractères');
+    }
+    
+    return {
+        isValid: errors.length === 0,
+        errors
+    };
 }
 
-console.log('✅ Auth.js (WORKING) loaded');
+function validateEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+function validatePhone(phone) {
+    const phoneRegex = /^(\+213|0)[5-9]\d{8}$/;
+    return phoneRegex.test(phone.replace(/\s+/g, ''));
+}
+
+// Initialize authentication system
+let authSystem;
+document.addEventListener('DOMContentLoaded', () => {
+    authSystem = new AuthenticationSystem();
+    window.authSystem = authSystem;
+    console.log('✅ Authentication system initialized');
+});
+
+// Export functions for global access
+window.validatePassword = validatePassword;
+window.validateEmail = validateEmail;
+window.validatePhone = validatePhone;
+
+console.log('✅ Auth.js loaded successfully');
