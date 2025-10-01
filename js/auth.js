@@ -1,4 +1,4 @@
-// Fixed Authentication System for Shifa Parapharmacie
+// Complete Authentication System for Shifa Parapharmacie
 
 class AuthenticationSystem {
     constructor() {
@@ -254,6 +254,17 @@ window.handleLogin = async function(event) {
         return;
     }
     
+    // Show loading state
+    const submitBtn = document.getElementById('loginSubmitBtn');
+    const submitText = document.getElementById('loginSubmitText');
+    const submitSpinner = document.getElementById('loginSubmitSpinner');
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        if (submitText) submitText.textContent = 'Connexion...';
+        if (submitSpinner) submitSpinner.classList.remove('hidden');
+    }
+    
     try {
         if (!window.authSystem) {
             console.error('Auth system not initialized');
@@ -278,6 +289,13 @@ window.handleLogin = async function(event) {
         if (window.app) {
             window.app.showToast(error.message, 'error');
         }
+    } finally {
+        // Restore button state
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            if (submitText) submitText.textContent = 'Se connecter';
+            if (submitSpinner) submitSpinner.classList.add('hidden');
+        }
     }
 };
 
@@ -293,6 +311,17 @@ window.handleRegister = async function(event) {
         adresse: document.getElementById('registerAdresse').value.trim(),
         wilaya: document.getElementById('registerWilaya').value
     };
+    
+    // Show loading state
+    const submitBtn = document.getElementById('registerSubmitBtn');
+    const submitText = document.getElementById('registerSubmitText');
+    const submitSpinner = document.getElementById('registerSubmitSpinner');
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        if (submitText) submitText.textContent = 'Inscription...';
+        if (submitSpinner) submitSpinner.classList.remove('hidden');
+    }
     
     try {
         if (!window.authSystem) {
@@ -317,6 +346,13 @@ window.handleRegister = async function(event) {
         console.error('Registration error:', error);
         if (window.app) {
             window.app.showToast(error.message, 'error');
+        }
+    } finally {
+        // Restore button state
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            if (submitText) submitText.textContent = 'S\'inscrire';
+            if (submitSpinner) submitSpinner.classList.add('hidden');
         }
     }
 };
@@ -369,4 +405,4 @@ window.validatePassword = validatePassword;
 window.validateEmail = validateEmail;
 window.validatePhone = validatePhone;
 
-console.log('✅ Auth.js loaded successfully');
+console.log('✅ Complete auth.js loaded successfully');
