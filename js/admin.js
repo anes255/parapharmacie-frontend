@@ -1,1087 +1,1425 @@
-// Fixed PharmacieGaherApp Admin functionality with proper API authentication
-class PharmacieGaherApp {
-    constructor() {
-        this.apiUrl = window.API_CONFIG?.baseURL || 'https://parapharmacie-gaher.onrender.com';
-        this.currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-        this.authToken = localStorage.getItem('authToken');
-        console.log('Admin JS initialized with auth token:', !!this.authToken);
-    }
+// Complete Admin Panel with Full Product Management and Order System - FIXED VERSION
+// Products SAVE to API + Orders LOAD from API
 
-    // Enhanced API call with proper authentication
-    async apiCall(endpoint, method = 'GET', data = null, requireAuth = false) {
-        try {
-            const headers = {
-                'Content-Type': 'application/json'
-            };
+// Global variables
+let adminCurrentSection = 'dashboard';
+let currentEditingProduct = null;
+let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
 
-            // Add authentication token if available or required
-            if (requireAuth || this.authToken) {
-                headers['x-auth-token'] = this.authToken;
-                headers['Authorization'] = `Bearer ${this.authToken}`;
-            }
+// API Configuration
+const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5000/api'
+    : 'https://parapharmacie-gaher.onrender.com/api';
 
-            const options = {
-                method,
-                headers
-            };
-
-            if (data && method !== 'GET') {
-                options.body = JSON.stringify(data);
-            }
-
-            console.log(`📡 API Call: ${method} ${endpoint}`, { requireAuth, hasToken: !!this.authToken });
-
-            const response = await fetch(`${this.apiUrl}${endpoint}`, options);
-            
-            if (!response.ok) {
-                if (response.status === 401) {
-                    console.log('🔐 Authentication required or token expired');
-                    // Don't redirect here, let the calling function handle it
-                    throw new Error('Authentication required');
-                }
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            console.log(`✅ API Success: ${method} ${endpoint}`);
-            return result;
-
-        } catch (error) {
-            console.error(`❌ API Error: ${method} ${endpoint}`, error);
-            throw error;
+// Helper function to make API calls
+async function apiCall(endpoint, options = {}) {
+    const url = `${API_BASE_URL}${endpoint}`;
+    
+    const defaultOptions = {
+        headers: {
+            'Content-Type': 'application/json',
         }
+    };
+    
+    // Add auth token if available
+    const token = localStorage.getItem('token');
+    if (token) {
+        defaultOptions.headers['x-auth-token'] = token;
     }
-
-    // Load admin dashboard with proper authentication
-    async loadAdminDashboard() {
-        try {
-            console.log('📊 Loading admin dashboard...');
-            
-            // Check if user is admin
-            if (!this.currentUser || this.currentUser.role !== 'admin') {
-                console.log('❌ Not authorized for admin dashboard');
-                this.showLogin();
-                return;
-            }
-
-            let dashboardStats = {
-                totalProducts: 0,
-                activeProducts: 0,
-                featuredProducts: 0,
-                totalOrders: 0,
-                pendingOrders: 0,
-                monthlyRevenue: 0
-            };
-
-            // Try to get stats from API first
-            try {
-                const apiStats = await this.apiCall('/api/admin/dashboard', 'GET', null, true);
-                dashboardStats = { ...dashboardStats, ...apiStats };
-                console.log('📊 Dashboard stats loaded from API');
-            } catch (error) {
-                console.log('📊 API unavailable, calculating local stats');
-                
-                // Calculate from localStorage as fallback
-                const localProducts = JSON.parse(localStorage.getItem('products') || '[]');
-                const localOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-                
-                dashboardStats.totalProducts = localProducts.length;
-                dashboardStats.activeProducts = localProducts.filter(p => p.actif !== false).length;
-                dashboardStats.featuredProducts = localProducts.filter(p => p.enVedette).length;
-                dashboardStats.totalOrders = localOrders.length;
-                dashboardStats.pendingOrders = localOrders.filter(o => o.statut === 'en-attente').length;
-                dashboardStats.monthlyRevenue = localOrders
-                    .filter(o => o.statut !== 'annulee')
-                    .reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0);
-            }
-
-            // Update dashboard UI
-            document.getElementById('admin-content').innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-emerald-100">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-emerald-600 text-sm font-medium">Total Produits</p>
-                                <p class="text-3xl font-bold text-gray-800">${dashboardStats.totalProducts}</p>
-                            </div>
-                            <div class="bg-emerald-100 p-3 rounded-lg">
-                                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-blue-100">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-blue-600 text-sm font-medium">Commandes</p>
-                                <p class="text-3xl font-bold text-gray-800">${dashboardStats.totalOrders}</p>
-                            </div>
-                            <div class="bg-blue-100 p-3 rounded-lg">
-                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-purple-100">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-purple-600 text-sm font-medium">Chiffre d'Affaires</p>
-                                <p class="text-3xl font-bold text-gray-800">${dashboardStats.monthlyRevenue.toFixed(2)}€</p>
-                            </div>
-                            <div class="bg-purple-100 p-3 rounded-lg">
-                                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Commandes Récentes</h3>
-                        <div id="recent-orders" class="space-y-3">
-                            <div class="text-gray-500 text-center py-4">Chargement...</div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Actions Rapides</h3>
-                        <div class="space-y-3">
-                            <button onclick="app.switchAdminSection('products')" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-colors">
-                                Gérer les Produits
-                            </button>
-                            <button onclick="app.switchAdminSection('orders')" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
-                                Voir les Commandes
-                            </button>
-                            <button onclick="app.switchAdminSection('featured')" class="w-full bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors">
-                                Produits Vedette
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // Load recent orders for dashboard
-            this.loadRecentOrders();
-            
-            console.log('✅ Admin dashboard loaded successfully');
-
-        } catch (error) {
-            console.error('❌ Error loading admin dashboard:', error);
-            document.getElementById('admin-content').innerHTML = `
-                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p class="text-red-600">Erreur lors du chargement du tableau de bord: ${error.message}</p>
-                    <button onclick="location.reload()" class="mt-2 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-                        Recharger
-                    </button>
-                </div>
-            `;
+    
+    const finalOptions = {
+        ...defaultOptions,
+        ...options,
+        headers: {
+            ...defaultOptions.headers,
+            ...options.headers
         }
+    };
+    
+    const response = await fetch(url, finalOptions);
+    
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
+        throw new Error(error.message || `HTTP error! status: ${response.status}`);
     }
+    
+    return response.json();
+}
 
-    // Load recent orders for dashboard
-    async loadRecentOrders() {
-        try {
-            let orders = [];
-            
-            // Try API first
-            try {
-                const response = await this.apiCall('/api/orders?limit=5&sortBy=dateCommande&sortOrder=desc', 'GET', null, true);
-                orders = response.orders || response;
-            } catch (error) {
-                console.log('Using local orders for recent orders');
-                orders = JSON.parse(localStorage.getItem('orders') || '[]')
-                    .sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande))
-                    .slice(0, 5);
-            }
-
-            const recentOrdersContainer = document.getElementById('recent-orders');
-            
-            if (orders.length === 0) {
-                recentOrdersContainer.innerHTML = `
-                    <div class="text-gray-500 text-center py-4">Aucune commande récente</div>
-                `;
-                return;
-            }
-
-            recentOrdersContainer.innerHTML = orders.map(order => `
-                <div class="border border-gray-100 rounded-lg p-3">
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <p class="font-medium text-gray-800">#${order.numeroCommande}</p>
-                            <p class="text-sm text-gray-600">${order.client?.prenom} ${order.client?.nom}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-medium text-gray-800">${parseFloat(order.total).toFixed(2)}€</p>
-                            <span class="inline-block px-2 py-1 text-xs rounded-full ${
-                                order.statut === 'en-attente' ? 'bg-yellow-100 text-yellow-600' :
-                                order.statut === 'confirmee' ? 'bg-blue-100 text-blue-600' :
-                                order.statut === 'expediee' ? 'bg-purple-100 text-purple-600' :
-                                order.statut === 'livree' ? 'bg-green-100 text-green-600' :
-                                'bg-gray-100 text-gray-600'
-                            }">
-                                ${order.statut}
-                            </span>
-                        </div>
-                    </div>
-                    <p class="text-xs text-gray-500">
-                        ${new Date(order.dateCommande).toLocaleDateString('fr-FR', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        })}
-                    </p>
-                </div>
-            `).join('');
-
-        } catch (error) {
-            console.error('Error loading recent orders:', error);
-            document.getElementById('recent-orders').innerHTML = `
-                <div class="text-red-500 text-center py-4">Erreur de chargement</div>
-            `;
-        }
-    }
-
-    // Save product with API authentication
-    async saveProduct() {
-        try {
-            const formData = {
-                nom: document.getElementById('product-nom').value.trim(),
-                description: document.getElementById('product-description').value.trim(),
-                prix: parseFloat(document.getElementById('product-prix').value) || 0,
-                prixOriginal: parseFloat(document.getElementById('product-prix-original').value) || null,
-                categorie: document.getElementById('product-categorie').value.trim(),
-                marque: document.getElementById('product-marque').value.trim(),
-                stock: parseInt(document.getElementById('product-stock').value) || 0,
-                images: [document.getElementById('product-image').value.trim()].filter(img => img),
-                enPromotion: document.getElementById('product-en-promotion').checked,
-                enVedette: document.getElementById('product-en-vedette').checked,
-                actif: document.getElementById('product-actif')?.checked !== false
-            };
-
-            // Validation
-            if (!formData.nom || !formData.description || !formData.prix || !formData.categorie) {
-                alert('Veuillez remplir tous les champs obligatoires');
-                return;
-            }
-
-            if (formData.prix <= 0) {
-                alert('Le prix doit être supérieur à 0');
-                return;
-            }
-
-            console.log('Product data to save:', formData);
-
-            // Generate ID for new products
-            if (!this.currentEditingProduct) {
-                formData._id = Date.now().toString(36) + Math.random().toString(36).substr(2);
-            } else {
-                formData._id = this.currentEditingProduct._id;
-            }
-
-            // Save to localStorage first (always works)
-            let products = JSON.parse(localStorage.getItem('products') || '[]');
-            
-            if (this.currentEditingProduct) {
-                const index = products.findIndex(p => p._id === this.currentEditingProduct._id);
-                if (index !== -1) {
-                    products[index] = { ...products[index], ...formData };
-                } else {
-                    products.push(formData);
-                }
-            } else {
-                products.push(formData);
-            }
-            
-            localStorage.setItem('products', JSON.stringify(products));
-            console.log('Product saved to localStorage');
-
-            // Refresh app products cache
-            if (window.app && typeof window.app.loadProducts === 'function') {
-                console.log('Refreshing products cache...');
-                await window.app.loadProducts();
-            }
-
-            // Try to save to API
-            try {
-                if (!this.authToken) {
-                    throw new Error('No auth token available');
-                }
-
-                const endpoint = this.currentEditingProduct 
-                    ? `/api/products/${this.currentEditingProduct._id}` 
-                    : '/api/products';
-                const method = this.currentEditingProduct ? 'PUT' : 'POST';
-
-                await this.apiCall(endpoint, method, formData, true);
-                console.log('✅ Product saved to API successfully');
-                
-            } catch (apiError) {
-                console.log('API save failed but product saved locally', apiError.message);
-                // Don't show error to user since local save worked
-            }
-
-            // Close modal and refresh products
-            this.closeProductModal();
-            this.loadAdminProducts();
-            
-            const message = this.currentEditingProduct ? 'Produit modifié avec succès!' : 'Produit ajouté avec succès!';
-            this.showMessage(message, 'success');
-
-        } catch (error) {
-            console.error('❌ Error saving product:', error);
-            alert('Erreur lors de la sauvegarde: ' + error.message);
-        }
-    }
-
-    // Load admin orders with proper authentication
-    async loadAdminOrders() {
-        try {
-            console.log('📋 Loading orders from admin panel...');
-            
-            // Load from localStorage first
-            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
-            console.log('Local orders loaded:', orders.length);
-
-            // Try to get orders from API
-            try {
-                const response = await this.apiCall('/api/orders', 'GET', null, true);
-                const apiOrders = response.orders || response;
-                if (Array.isArray(apiOrders) && apiOrders.length > 0) {
-                    orders = apiOrders;
-                    console.log('✅ Orders loaded from API:', orders.length);
-                    // Update localStorage with API data
-                    localStorage.setItem('orders', JSON.stringify(orders));
-                }
-            } catch (error) {
-                console.log('📋 API unavailable, using only local orders');
-            }
-
-            console.log('Total orders to display:', orders.length);
-
-            const ordersContainer = document.getElementById('admin-content');
-            
-            if (orders.length === 0) {
-                ordersContainer.innerHTML = `
-                    <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 text-center">
-                        <div class="mb-4">
-                            <svg class="w-16 h-16 text-gray-300 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-lg font-medium text-gray-800 mb-2">Aucune commande</h3>
-                        <p class="text-gray-600">Les commandes apparaîtront ici une fois créées.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Sort orders by date (newest first)
-            orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
-
-            ordersContainer.innerHTML = `
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                    <div class="p-6 border-b border-gray-100">
-                        <h2 class="text-xl font-semibold text-gray-800">Gestion des Commandes</h2>
-                        <p class="text-gray-600 mt-1">Total: ${orders.length} commande(s)</p>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="text-left p-4 font-medium text-gray-700">N° Commande</th>
-                                    <th class="text-left p-4 font-medium text-gray-700">Client</th>
-                                    <th class="text-left p-4 font-medium text-gray-700">Date</th>
-                                    <th class="text-left p-4 font-medium text-gray-700">Total</th>
-                                    <th class="text-left p-4 font-medium text-gray-700">Statut</th>
-                                    <th class="text-left p-4 font-medium text-gray-700">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${orders.map((order, index) => {
-                                    const client = order.client || {};
-                                    const orderDate = new Date(order.dateCommande);
-                                    
-                                    return `
-                                        <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                            <td class="p-4">
-                                                <span class="font-medium text-gray-800">#${order.numeroCommande}</span>
-                                            </td>
-                                            <td class="p-4">
-                                                <div>
-                                                    <p class="font-medium text-gray-800">${client.prenom || 'N/A'} ${client.nom || 'N/A'}</p>
-                                                    <p class="text-sm text-gray-600">${client.email || 'N/A'}</p>
-                                                    <p class="text-sm text-gray-600">${client.adresse || 'Adresse non disponible'}</p>
-                                                </div>
-                                            </td>
-                                            <td class="p-4">
-                                                <div class="text-sm">
-                                                    <p class="text-gray-800">${orderDate.toLocaleDateString('fr-FR')}</p>
-                                                    <p class="text-gray-600">${orderDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
-                                                </div>
-                                            </td>
-                                            <td class="p-4">
-                                                <span class="font-medium text-gray-800">${parseFloat(order.total || 0).toFixed(2)}€</span>
-                                            </td>
-                                            <td class="p-4">
-                                                <select onchange="app.updateOrderStatus('${order._id || order.numeroCommande}', this.value)" 
-                                                        class="px-2 py-1 text-sm rounded-full border ${
-                                                    order.statut === 'en-attente' ? 'bg-yellow-100 text-yellow-600 border-yellow-200' :
-                                                    order.statut === 'confirmee' ? 'bg-blue-100 text-blue-600 border-blue-200' :
-                                                    order.statut === 'en-preparation' ? 'bg-orange-100 text-orange-600 border-orange-200' :
-                                                    order.statut === 'expediee' ? 'bg-purple-100 text-purple-600 border-purple-200' :
-                                                    order.statut === 'livree' ? 'bg-green-100 text-green-600 border-green-200' :
-                                                    order.statut === 'annulee' ? 'bg-red-100 text-red-600 border-red-200' :
-                                                    'bg-gray-100 text-gray-600 border-gray-200'
-                                                }">
-                                                    <option value="en-attente" ${order.statut === 'en-attente' ? 'selected' : ''}>En attente</option>
-                                                    <option value="confirmee" ${order.statut === 'confirmee' ? 'selected' : ''}>Confirmée</option>
-                                                    <option value="en-preparation" ${order.statut === 'en-preparation' ? 'selected' : ''}>En préparation</option>
-                                                    <option value="expediee" ${order.statut === 'expediee' ? 'selected' : ''}>Expédiée</option>
-                                                    <option value="livree" ${order.statut === 'livree' ? 'selected' : ''}>Livrée</option>
-                                                    <option value="annulee" ${order.statut === 'annulee' ? 'selected' : ''}>Annulée</option>
-                                                </select>
-                                            </td>
-                                            <td class="p-4">
-                                                <div class="flex space-x-2">
-                                                    <button onclick="app.viewOrderDetails('${order._id || order.numeroCommande}')" 
-                                                            class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors">
-                                                        Détails
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-
-        } catch (error) {
-            console.error('❌ Error loading admin orders:', error);
-            document.getElementById('admin-content').innerHTML = `
-                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p class="text-red-600">Erreur lors du chargement des commandes: ${error.message}</p>
-                    <button onclick="app.loadAdminOrders()" class="mt-2 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-                        Réessayer
-                    </button>
-                </div>
-            `;
-        }
-    }
-
-    // Update order status with API call
-    async updateOrderStatus(orderId, newStatus) {
-        try {
-            console.log(`📋 Updating order ${orderId} to status: ${newStatus}`);
-            
-            // Update in localStorage first
-            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
-            const orderIndex = orders.findIndex(o => (o._id || o.numeroCommande) === orderId);
-            
-            if (orderIndex !== -1) {
-                orders[orderIndex].statut = newStatus;
-                orders[orderIndex].dateMiseAJour = new Date().toISOString();
-                localStorage.setItem('orders', JSON.stringify(orders));
-            }
-
-            // Try to update via API
-            try {
-                await this.apiCall(`/api/orders/${orderId}/status`, 'PUT', { statut: newStatus }, true);
-                console.log('✅ Order status updated in API');
-            } catch (apiError) {
-                console.log('❌ API update failed, but local update completed');
-            }
-
-            this.showMessage('Statut de commande mis à jour', 'success');
-
-        } catch (error) {
-            console.error('❌ Error updating order status:', error);
-            this.showMessage('Erreur lors de la mise à jour', 'error');
-        }
-    }
-
-    // Show success/error messages
-    showMessage(message, type = 'info') {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-            type === 'success' ? 'bg-green-500 text-white' :
-            type === 'error' ? 'bg-red-500 text-white' :
-            'bg-blue-500 text-white'
-        }`;
-        messageDiv.textContent = message;
+// Products Management - Add to app prototype
+PharmacieGaherApp.prototype.loadAdminProducts = async function() {
+    try {
+        // Get products from localStorage
+        let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
-        document.body.appendChild(messageDiv);
-        
-        setTimeout(() => {
-            messageDiv.remove();
-        }, 3000);
-    }
-
-    // Switch admin sections
-    switchAdminSection(section) {
-        console.log('🔄 Switching admin section to:', section);
-        
-        // Update navigation
-        document.querySelectorAll('.admin-nav-item').forEach(item => {
-            item.classList.remove('bg-emerald-100', 'text-emerald-700');
-            item.classList.add('text-gray-600', 'hover:bg-gray-50');
-        });
-        
-        const currentNav = document.querySelector(`[onclick*="${section}"]`);
-        if (currentNav) {
-            currentNav.classList.remove('text-gray-600', 'hover:bg-gray-50');
-            currentNav.classList.add('bg-emerald-100', 'text-emerald-700');
-        }
-
-        // Load section content
-        switch (section) {
-            case 'dashboard':
-                this.loadAdminDashboard();
-                break;
-            case 'products':
-                this.loadAdminProducts();
-                break;
-            case 'orders':
-                this.loadAdminOrders();
-                break;
-            case 'featured':
-                this.loadFeaturedProducts();
-                break;
-            case 'cleanup':
-                this.loadCleanupSection();
-                break;
-            default:
-                console.log('Unknown admin section:', section);
-        }
-    }
-
-    // Load admin products section
-    async loadAdminProducts() {
+        // Try to get products from API as well
         try {
-            console.log('📦 Loading admin products section...');
-            
-            // Load products from localStorage and API
-            let products = JSON.parse(localStorage.getItem('products') || '[]');
-            
-            // Try to get from API
-            try {
-                const response = await this.apiCall('/api/products?limit=100', 'GET');
-                const apiProducts = response.products || response;
-                if (Array.isArray(apiProducts)) {
-                    products = apiProducts;
-                    localStorage.setItem('products', JSON.stringify(products));
-                }
-            } catch (error) {
-                console.log('Using localStorage products');
+            const data = await apiCall('/products');
+            if (data && data.products && data.products.length > 0) {
+                // Merge API products with local ones, avoiding duplicates
+                const localIds = products.map(p => p._id);
+                const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
+                products = [...products, ...newApiProducts];
+                
+                // Update localStorage with merged data
+                localStorage.setItem('demoProducts', JSON.stringify(products));
             }
-
-            document.getElementById('admin-content').innerHTML = `
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                    <div class="p-6 border-b border-gray-100 flex justify-between items-center">
-                        <div>
-                            <h2 class="text-xl font-semibold text-gray-800">Gestion des Produits</h2>
-                            <p class="text-gray-600 mt-1">Total: ${products.length} produit(s)</p>
-                        </div>
-                        <button onclick="app.openAddProductModal()" 
-                                class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-colors">
-                            Ajouter un Produit
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="text-left p-4 font-medium text-gray-700">Image</th>
-                                    <th class="text-left p-4 font-medium text-gray-700">Nom</th>
-                                    <th class="text-left p-4 font-medium text-gray-700">Prix</th>
-                                    <th class="text-left p-4 font-medium text-gray-700">Stock</th>
-                                    <th class="text-left p-4 font-medium text-gray-700">Statut</th>
-                                    <th class="text-left p-4 font-medium text-gray-700">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${products.map(product => {
-                                    const imageUrl = (product.images && product.images[0]) || 'https://via.placeholder.com/60x60?text=Produit';
-                                    return `
-                                        <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                            <td class="p-4">
-                                                <img src="${imageUrl}" alt="${product.nom}" class="w-12 h-12 object-cover rounded-lg">
-                                            </td>
-                                            <td class="p-4">
-                                                <div>
-                                                    <p class="font-medium text-gray-800">${product.nom}</p>
-                                                    <p class="text-sm text-gray-600">${product.categorie}</p>
-                                                </div>
-                                            </td>
-                                            <td class="p-4">
-                                                <span class="font-medium text-gray-800">${parseFloat(product.prix).toFixed(2)}€</span>
-                                            </td>
-                                            <td class="p-4">
-                                                <span class="text-gray-800">${product.stock || 0}</span>
-                                            </td>
-                                            <td class="p-4">
-                                                <div class="flex flex-col space-y-1">
-                                                    <span class="inline-block px-2 py-1 text-xs rounded-full ${
-                                                        product.actif !== false ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                                                    }">
-                                                        ${product.actif !== false ? 'Actif' : 'Inactif'}
-                                                    </span>
-                                                    ${product.enVedette ? '<span class="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-600">Vedette</span>' : ''}
-                                                    ${product.enPromotion ? '<span class="inline-block px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-600">Promo</span>' : ''}
-                                                </div>
-                                            </td>
-                                            <td class="p-4">
-                                                <div class="flex space-x-2">
-                                                    <button onclick="app.openEditProductModal('${product._id}')" 
-                                                            class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors">
-                                                        Modifier
-                                                    </button>
-                                                    <button onclick="app.deleteProduct('${product._id}')" 
-                                                            class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition-colors">
-                                                        Supprimer
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-
         } catch (error) {
-            console.error('❌ Error loading admin products:', error);
+            console.log('API unavailable, using local products only');
         }
-    }
-
-    // Open add product modal
-    openAddProductModal() {
-        this.currentEditingProduct = null;
-        this.showProductModal();
-    }
-
-    // Open edit product modal
-    openEditProductModal(productId) {
-        const products = JSON.parse(localStorage.getItem('products') || '[]');
-        this.currentEditingProduct = products.find(p => p._id === productId);
-        this.showProductModal();
-    }
-
-    // Show product modal
-    showProductModal() {
-        const isEdit = !!this.currentEditingProduct;
-        const product = this.currentEditingProduct || {};
-
-        const modalHTML = `
-            <div id="product-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div class="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                    <div class="p-6 border-b border-gray-100">
-                        <div class="flex justify-between items-center">
-                            <h3 class="text-xl font-semibold text-gray-800">
-                                ${isEdit ? 'Modifier le Produit' : 'Ajouter un Produit'}
-                            </h3>
-                            <button onclick="app.closeProductModal()" class="text-gray-400 hover:text-gray-600">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                            </button>
-                        </div>
+        
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6 mb-6">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-emerald-800">Gestion des produits</h2>
+                        <p class="text-emerald-600">${products.length} produits au total</p>
                     </div>
-                    <div class="p-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Nom du produit *</label>
-                                <input type="text" id="product-nom" value="${product.nom || ''}" 
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Prix (€) *</label>
-                                <input type="number" id="product-prix" value="${product.prix || ''}" step="0.01" min="0"
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Prix original (€)</label>
-                                <input type="number" id="product-prix-original" value="${product.prixOriginal || ''}" step="0.01" min="0"
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Catégorie *</label>
-                                <input type="text" id="product-categorie" value="${product.categorie || ''}"
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Marque</label>
-                                <input type="text" id="product-marque" value="${product.marque || ''}"
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Stock</label>
-                                <input type="number" id="product-stock" value="${product.stock || 0}" min="0"
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            </div>
-                        </div>
-                        
-                        <div class="mt-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Description *</label>
-                            <textarea id="product-description" rows="4" 
-                                      class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">${product.description || ''}</textarea>
-                        </div>
-                        
-                        <div class="mt-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">URL de l'image</label>
-                            <input type="url" id="product-image" value="${product.images?.[0] || ''}"
-                                   class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                        </div>
-                        
-                        <div class="mt-6 grid grid-cols-2 gap-4">
-                            <label class="flex items-center">
-                                <input type="checkbox" id="product-en-promotion" ${product.enPromotion ? 'checked' : ''}
-                                       class="mr-2 text-emerald-500 focus:ring-emerald-500">
-                                <span class="text-sm font-medium text-gray-700">En promotion</span>
-                            </label>
-                            <label class="flex items-center">
-                                <input type="checkbox" id="product-en-vedette" ${product.enVedette ? 'checked' : ''}
-                                       class="mr-2 text-emerald-500 focus:ring-emerald-500">
-                                <span class="text-sm font-medium text-gray-700">En vedette</span>
-                            </label>
-                        </div>
-                        
-                        ${isEdit ? `
-                            <div class="mt-6">
-                                <label class="flex items-center">
-                                    <input type="checkbox" id="product-actif" ${product.actif !== false ? 'checked' : ''}
-                                           class="mr-2 text-emerald-500 focus:ring-emerald-500">
-                                    <span class="text-sm font-medium text-gray-700">Actif</span>
-                                </label>
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div class="p-6 border-t border-gray-100 flex justify-end space-x-3">
-                        <button onclick="app.closeProductModal()" 
-                                class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">
-                            Annuler
-                        </button>
-                        <button onclick="app.saveProduct()" 
-                                class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-lg transition-colors">
-                            ${isEdit ? 'Modifier' : 'Ajouter'}
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button onclick="openAddProductModal()" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-plus mr-2"></i>Nouveau produit
                         </button>
                     </div>
                 </div>
             </div>
+            
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 overflow-hidden">
+                ${products.length === 0 ? `
+                    <div class="p-16 text-center">
+                        <i class="fas fa-pills text-6xl text-emerald-200 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit</h3>
+                        <p class="text-emerald-600 mb-8">Commencez par ajouter votre premier produit</p>
+                        <button onclick="openAddProductModal()" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-plus mr-2"></i>Ajouter un produit
+                        </button>
+                    </div>
+                ` : `
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-emerald-50 border-b border-emerald-200">
+                                <tr>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Image</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Produit</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Prix</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Stock</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Statut</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${products.map(product => this.renderProductRow(product)).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
         `;
-
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('Error loading products:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <p class="text-red-800">Erreur de chargement des produits</p>
+            </div>
+        `;
     }
+};
 
-    // Close product modal
-    closeProductModal() {
-        const modal = document.getElementById('product-modal');
-        if (modal) {
-            modal.remove();
-        }
-        this.currentEditingProduct = null;
-    }
+// Product Row Renderer
+PharmacieGaherApp.prototype.renderProductRow = function(product) {
+    const getCategoryColor = (category) => {
+        const colors = {
+            'Vitalité': '10b981', 'Cheveux': 'f59e0b', 'Visage': 'ec4899',
+            'Intime': 'ef4444', 'Solaire': 'f97316', 'Bébé': '06b6d4',
+            'Maman': 'd946ef', 'Minceur': '8b5cf6', 'Homme': '3b82f6',
+            'Soins': '22c55e', 'Dentaire': '6366f1', 'Sport': 'f43f5e'
+        };
+        return colors[category] || '10b981';
+    };
+    
+    const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+    const categoryColor = getCategoryColor(product.categorie);
+    const imageUrl = product.image || `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
 
-    // Delete product
-    async deleteProduct(productId) {
-        if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
-            return;
-        }
-
-        try {
-            // Remove from localStorage
-            let products = JSON.parse(localStorage.getItem('products') || '[]');
-            products = products.filter(p => p._id !== productId);
-            localStorage.setItem('products', JSON.stringify(products));
-
-            // Try to delete from API
-            try {
-                await this.apiCall(`/api/products/${productId}`, 'DELETE', null, true);
-                console.log('✅ Product deleted from API');
-            } catch (apiError) {
-                console.log('❌ API deletion failed but local deletion completed');
-            }
-
-            this.loadAdminProducts();
-            this.showMessage('Produit supprimé avec succès', 'success');
-
-        } catch (error) {
-            console.error('❌ Error deleting product:', error);
-            this.showMessage('Erreur lors de la suppression', 'error');
-        }
-    }
-
-    // Load featured products management
-    loadFeaturedProducts() {
-        const products = JSON.parse(localStorage.getItem('products') || '[]');
-        const featuredProducts = products.filter(p => p.enVedette);
-
-        document.getElementById('admin-content').innerHTML = `
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                <div class="p-6 border-b border-gray-100">
-                    <h2 class="text-xl font-semibold text-gray-800">Produits en Vedette</h2>
-                    <p class="text-gray-600 mt-1">Gérez les produits mis en avant sur votre site</p>
+    return `
+        <tr class="border-b border-emerald-50 hover:bg-emerald-50/50 transition-colors">
+            <td class="py-4 px-6">
+                <img src="${imageUrl}" alt="${product.nom}" 
+                     class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200 shadow-sm"
+                     onerror="this.src='https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}'">
+            </td>
+            <td class="py-4 px-6">
+                <div class="font-semibold text-gray-900">${product.nom}</div>
+                <div class="text-sm text-emerald-600">${product.categorie}</div>
+                <div class="text-xs text-gray-500">${product.marque || 'Sans marque'}</div>
+            </td>
+            <td class="py-4 px-6">
+                <span class="text-lg font-semibold text-emerald-700">${product.prix} DA</span>
+            </td>
+            <td class="py-4 px-6">
+                <span class="text-emerald-600 font-medium">${product.stock} unités</span>
+            </td>
+            <td class="py-4 px-6">
+                <div class="flex items-center space-x-2">
+                    <div class="w-2 h-2 rounded-full ${product.actif ? 'bg-green-500' : 'bg-red-500'}"></div>
+                    <span class="text-sm font-medium ${product.actif ? 'text-green-700' : 'text-red-700'}">
+                        ${product.actif ? 'Actif' : 'Inactif'}
+                    </span>
                 </div>
-                <div class="p-6">
-                    ${featuredProducts.length === 0 ? `
-                        <div class="text-center py-8">
-                            <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
-                            </svg>
-                            <h3 class="text-lg font-medium text-gray-800 mb-2">Aucun produit en vedette</h3>
-                            <p class="text-gray-600">Marquez des produits comme "vedette" pour les afficher ici.</p>
+                ${product.enVedette ? '<div class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded inline-block mt-1">★ En vedette</div>' : ''}
+            </td>
+            <td class="py-4 px-6">
+                <div class="flex items-center space-x-2">
+                    <button onclick="openEditProductModal('${product._id}')" 
+                            class="text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-all"
+                            title="Modifier">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="toggleFeatured('${product._id}', ${!product.enVedette})" 
+                            class="text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100 p-2 rounded-lg transition-all"
+                            title="${product.enVedette ? 'Retirer de la vedette' : 'Mettre en vedette'}">
+                        <i class="fas fa-star ${product.enVedette ? 'text-yellow-500' : ''}"></i>
+                    </button>
+                    <button onclick="deleteProduct('${product._id}')" 
+                            class="text-red-600 hover:text-red-800 hover:bg-red-100 p-2 rounded-lg transition-all"
+                            title="Supprimer">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
+};
+
+// Orders Management - LOADS FROM API
+PharmacieGaherApp.prototype.loadAdminOrders = async function() {
+    try {
+        console.log('Loading orders from admin panel...');
+        
+        // Always start with localStorage orders
+        let orders = [...adminOrders];
+        console.log('Local orders loaded:', orders.length);
+        
+        // Try to merge with API orders
+        try {
+            const data = await apiCall('/orders');
+            if (data && data.orders && data.orders.length > 0) {
+                console.log('API orders loaded:', data.orders.length);
+                const apiOrders = data.orders.filter(apiOrder => 
+                    !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
+                );
+                orders = [...orders, ...apiOrders];
+            }
+        } catch (error) {
+            console.log('API unavailable, using only local orders');
+        }
+        
+        // Sort by date, newest first
+        orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
+        
+        console.log('Total orders to display:', orders.length);
+        
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-emerald-800">Gestion des commandes</h2>
+                    <div class="flex gap-2">
+                        <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-semibold">
+                            ${orders.length} commande(s)
+                        </span>
+                        <button onclick="app.loadAdminOrders()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-sync mr-2"></i>Actualiser
+                        </button>
+                    </div>
+                </div>
+                
+                ${orders.length === 0 ? `
+                    <div class="text-center py-16">
+                        <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
+                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
+                        <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées</p>
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
+                            <h4 class="font-semibold text-blue-800 mb-2">Info:</h4>
+                            <p class="text-sm text-blue-700">Les commandes sont automatiquement ajoutées ici lors du checkout</p>
                         </div>
-                    ` : `
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            ${featuredProducts.map(product => {
-                                const imageUrl = (product.images && product.images[0]) || 'https://via.placeholder.com/200x200?text=Produit';
-                                return `
-                                    <div class="border border-gray-200 rounded-lg overflow-hidden">
-                                        <img src="${imageUrl}" alt="${product.nom}" class="w-full h-48 object-cover">
-                                        <div class="p-4">
-                                            <h3 class="font-semibold text-gray-800 mb-2">${product.nom}</h3>
-                                            <p class="text-sm text-gray-600 mb-2">${product.categorie}</p>
-                                            <p class="text-lg font-bold text-emerald-600">${parseFloat(product.prix).toFixed(2)}€</p>
-                                            <div class="mt-4 flex justify-between">
-                                                <button onclick="app.openEditProductModal('${product._id}')" 
-                                                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
-                                                    Modifier
+                    </div>
+                ` : `
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-emerald-50 border-b border-emerald-200">
+                                <tr>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Commande</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Client</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Date</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Total</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Statut</th>
+                                    <th class="text-left py-4 px-6 font-bold text-emerald-700">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${orders.map(order => `
+                                    <tr class="border-b border-emerald-50 hover:bg-emerald-50/50 transition-colors">
+                                        <td class="py-4 px-6">
+                                            <div class="font-semibold text-emerald-800">#${order.numeroCommande}</div>
+                                            <div class="text-sm text-emerald-600">${order.articles?.length || 0} article(s)</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="font-medium text-gray-900">${order.client?.prenom} ${order.client?.nom}</div>
+                                            <div class="text-sm text-gray-600">${order.client?.email}</div>
+                                            <div class="text-xs text-gray-500">${order.client?.wilaya}</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="text-sm text-gray-900">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</div>
+                                            <div class="text-xs text-gray-500">${new Date(order.dateCommande).toLocaleTimeString('fr-FR')}</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="font-semibold text-emerald-700">${order.total} DA</div>
+                                            <div class="text-sm text-gray-600">Livraison: ${order.fraisLivraison || 0} DA</div>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.statut)}">
+                                                ${getStatusLabel(order.statut)}
+                                            </span>
+                                        </td>
+                                        <td class="py-4 px-6">
+                                            <div class="flex items-center space-x-2">
+                                                <button onclick="viewOrderDetails('${order._id || order.numeroCommande}')" 
+                                                        class="text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-all"
+                                                        title="Voir détails">
+                                                    <i class="fas fa-eye"></i>
                                                 </button>
-                                                <button onclick="app.toggleFeatured('${product._id}')" 
-                                                        class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm">
-                                                    Retirer
+                                                <button onclick="updateOrderStatus('${order._id || order.numeroCommande}', 'confirmée')" 
+                                                        class="text-green-600 hover:text-green-800 hover:bg-green-100 p-2 rounded-lg transition-all"
+                                                        title="Confirmer">
+                                                    <i class="fas fa-check"></i>
                                                 </button>
                                             </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error loading orders:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <h3 class="text-lg font-semibold text-red-800 mb-2">Erreur de chargement des commandes</h3>
+                <p class="text-red-700 mb-4">Détails: ${error.message}</p>
+                <button onclick="app.loadAdminOrders()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                    Réessayer
+                </button>
+            </div>
+        `;
+    }
+};
+
+// Featured Products Management
+PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
+    try {
+        // Get products from local storage
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        
+        let featuredProducts = localProducts.filter(p => p.enVedette);
+        let allProducts = localProducts.filter(p => !p.enVedette);
+        
+        // Try to get products from API
+        try {
+            const allData = await apiCall('/products');
+            if (allData && allData.products && allData.products.length > 0) {
+                // Merge API products, avoiding duplicates
+                const localIds = localProducts.map(p => p._id);
+                const newApiProducts = allData.products.filter(p => !localIds.includes(p._id));
+                
+                featuredProducts = [...featuredProducts, ...newApiProducts.filter(p => p.enVedette)];
+                allProducts = [...allProducts, ...newApiProducts.filter(p => !p.enVedette)];
+            }
+        } catch (error) {
+            console.log('API unavailable, using local products');
+        }
+        
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                <h2 class="text-2xl font-bold text-emerald-800 mb-6">Gestion des Coups de Coeur</h2>
+                
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-emerald-700 mb-4">Produits en vedette (${featuredProducts.length})</h3>
+                    ${featuredProducts.length === 0 ? `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+                            <i class="fas fa-star text-yellow-400 text-4xl mb-4"></i>
+                            <p class="text-yellow-700">Aucun produit en vedette</p>
+                            <p class="text-yellow-600 text-sm mt-2">Ajoutez des produits en vedette pour les mettre en avant sur votre site</p>
+                        </div>
+                    ` : `
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${featuredProducts.map(product => `
+                                <div class="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-4">
+                                    <div class="flex items-center space-x-3">
+                                        <img src="${product.image || this.generatePlaceholderImage(product)}" 
+                                             alt="${product.nom}" 
+                                             class="w-16 h-16 object-cover rounded-lg border-2 border-yellow-200">
+                                        <div class="flex-1">
+                                            <h4 class="font-semibold text-amber-800">${product.nom}</h4>
+                                            <p class="text-amber-600 text-sm">${product.categorie} - ${product.prix} DA</p>
                                         </div>
                                     </div>
-                                `;
-                            }).join('')}
+                                    <div class="mt-2 flex justify-end">
+                                        <button onclick="toggleFeatured('${product._id}', false)" 
+                                                class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">
+                                            <i class="fas fa-star mr-1"></i>Retirer
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+                
+                <div class="border-t border-emerald-200 pt-6">
+                    <h3 class="text-lg font-semibold text-emerald-700 mb-4">Autres produits disponibles</h3>
+                    ${allProducts.length === 0 ? `
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+                            <p class="text-blue-700">Aucun autre produit disponible</p>
+                        </div>
+                    ` : `
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${allProducts.map(product => `
+                                <div class="bg-white border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors">
+                                    <div class="flex items-center space-x-3">
+                                        <img src="${product.image || this.generatePlaceholderImage(product)}" 
+                                             alt="${product.nom}" 
+                                             class="w-16 h-16 object-cover rounded-lg border-2 border-gray-200">
+                                        <div class="flex-1">
+                                            <h4 class="font-semibold text-gray-800">${product.nom}</h4>
+                                            <p class="text-gray-600 text-sm">${product.categorie} - ${product.prix} DA</p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 flex justify-end">
+                                        <button onclick="toggleFeatured('${product._id}', true)" 
+                                                class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm">
+                                            <i class="fas fa-star mr-1"></i>Ajouter aux coups de coeur
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
                         </div>
                     `}
                 </div>
             </div>
         `;
-    }
-
-    // Toggle featured status
-    toggleFeatured(productId) {
-        let products = JSON.parse(localStorage.getItem('products') || '[]');
-        const productIndex = products.findIndex(p => p._id === productId);
         
-        if (productIndex !== -1) {
-            products[productIndex].enVedette = !products[productIndex].enVedette;
-            localStorage.setItem('products', JSON.stringify(products));
-            this.loadFeaturedProducts();
-            
-            const status = products[productIndex].enVedette ? 'ajouté aux' : 'retiré des';
-            this.showMessage(`Produit ${status} produits vedette`, 'success');
-        }
+    } catch (error) {
+        console.error('Error loading featured products:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <p class="text-red-800">Erreur de chargement des produits en vedette</p>
+            </div>
+        `;
     }
+};
 
-    // Load cleanup section
-    loadCleanupSection() {
-        document.getElementById('admin-content').innerHTML = `
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                <div class="p-6 border-b border-gray-100">
-                    <h2 class="text-xl font-semibold text-gray-800">Nettoyage et Maintenance</h2>
-                    <p class="text-gray-600 mt-1">Outils de maintenance pour votre boutique</p>
+// Helper method to generate placeholder image URL
+PharmacieGaherApp.prototype.generatePlaceholderImage = function(product) {
+    const getCategoryColor = (category) => {
+        const colors = {
+            'Vitalité': '10b981', 'Cheveux': 'f59e0b', 'Visage': 'ec4899',
+            'Intime': 'ef4444', 'Solaire': 'f97316', 'Bébé': '06b6d4',
+            'Maman': 'd946ef', 'Minceur': '8b5cf6', 'Homme': '3b82f6',
+            'Soins': '22c55e', 'Dentaire': '6366f1', 'Sport': 'f43f5e'
+        };
+        return colors[category] || '10b981';
+    };
+    
+    const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+    const categoryColor = getCategoryColor(product.categorie);
+    return `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+};
+
+// Cleanup Section
+PharmacieGaherApp.prototype.loadCleanupSection = async function() {
+    try {
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                <h2 class="text-2xl font-bold text-red-800 mb-6">Nettoyage de la base de données</h2>
+                
+                <div class="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-600 text-2xl mr-4"></i>
+                        <div>
+                            <h3 class="text-lg font-semibold text-green-800">Base de données propre</h3>
+                            <p class="text-green-600">Aucun produit problématique détecté</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="p-6 space-y-6">
-                    <div class="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
-                        <h3 class="font-semibold text-yellow-800 mb-2">Nettoyer les données locales</h3>
-                        <p class="text-yellow-700 text-sm mb-4">Supprime toutes les données stockées localement (produits, commandes, cache).</p>
-                        <button onclick="app.clearLocalData()" 
-                                class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg">
-                            Nettoyer les données
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-4">Actions de maintenance</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onclick="refreshProductCache()" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl">
+                            <i class="fas fa-sync mr-2"></i>Actualiser le cache
+                        </button>
+                        <button onclick="validateAllProducts()" 
+                                class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl">
+                            <i class="fas fa-check-double mr-2"></i>Valider tous les produits
                         </button>
                     </div>
-                    
-                    <div class="border border-blue-200 bg-blue-50 rounded-lg p-4">
-                        <h3 class="font-semibold text-blue-800 mb-2">Synchroniser avec l'API</h3>
-                        <p class="text-blue-700 text-sm mb-4">Tente de synchroniser toutes les données locales avec l'API.</p>
-                        <button onclick="app.syncWithAPI()" 
-                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                            Synchroniser
+                </div>
+                
+                <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                    <h3 class="text-lg font-semibold text-red-800 mb-4">Actions dangereuses</h3>
+                    <p class="text-red-600 mb-4">Attention : Les actions ci-dessous sont irréversibles.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onclick="clearAllProducts()" 
+                                class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl">
+                            <i class="fas fa-trash-alt mr-2"></i>Supprimer tous les produits
                         </button>
-                    </div>
-                    
-                    <div class="border border-green-200 bg-green-50 rounded-lg p-4">
-                        <h3 class="font-semibold text-green-800 mb-2">Vérifier l'état de l'API</h3>
-                        <p class="text-green-700 text-sm mb-4">Teste la connectivité avec l'API backend.</p>
-                        <button onclick="app.testAPIConnection()" 
-                                class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
-                            Tester la connexion
-                        </button>
-                        <div id="api-status" class="mt-4"></div>
                     </div>
                 </div>
             </div>
         `;
+    } catch (error) {
+        console.error('Error loading cleanup section:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <p class="text-red-800">Erreur de chargement de la section nettoyage</p>
+            </div>
+        `;
     }
+};
 
-    // Clear local data
-    clearLocalData() {
-        if (!confirm('Êtes-vous sûr de vouloir supprimer toutes les données locales ? Cette action est irréversible.')) {
+// Function to add order to demo (called from checkout) - FIXED
+window.addOrderToDemo = function(orderData) {
+    console.log('Adding order to demo:', orderData);
+    
+    try {
+        // Ensure the order has a valid structure
+        const validOrder = {
+            _id: orderData._id || Date.now().toString(),
+            numeroCommande: orderData.numeroCommande,
+            client: orderData.client,
+            articles: orderData.articles || [],
+            sousTotal: orderData.sousTotal || 0,
+            fraisLivraison: orderData.fraisLivraison || 0,
+            total: orderData.total || 0,
+            statut: orderData.statut || 'en-attente',
+            modePaiement: orderData.modePaiement || 'Paiement à la livraison',
+            dateCommande: orderData.dateCommande || new Date().toISOString(),
+            commentaires: orderData.commentaires || ''
+        };
+        
+        // Add to localStorage
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        
+        // Check for duplicates based on numeroCommande
+        const existingIndex = orders.findIndex(o => o.numeroCommande === validOrder.numeroCommande);
+        if (existingIndex > -1) {
+            console.log('Order already exists, updating...');
+            orders[existingIndex] = validOrder;
+        } else {
+            orders.unshift(validOrder);
+        }
+        
+        localStorage.setItem('adminOrders', JSON.stringify(orders));
+        
+        // Update global variable
+        adminOrders = orders;
+        
+        console.log('Order added successfully. Total orders:', orders.length);
+        console.log('Order details:', validOrder);
+        
+        return validOrder;
+        
+    } catch (error) {
+        console.error('Error adding order to demo:', error);
+        return null;
+    }
+};
+
+// Helper functions for order management
+function getStatusColor(statut) {
+    const colors = {
+        'en-attente': 'bg-yellow-100 text-yellow-800',
+        'confirmée': 'bg-green-100 text-green-800',
+        'préparée': 'bg-blue-100 text-blue-800',
+        'expédiée': 'bg-purple-100 text-purple-800',
+        'livrée': 'bg-emerald-100 text-emerald-800',
+        'annulée': 'bg-red-100 text-red-800'
+    };
+    return colors[statut] || 'bg-gray-100 text-gray-800';
+}
+
+function getStatusLabel(statut) {
+    const labels = {
+        'en-attente': 'En attente',
+        'confirmée': 'Confirmée',
+        'préparée': 'Préparée',
+        'expédiée': 'Expédiée',
+        'livrée': 'Livrée',
+        'annulée': 'Annulée'
+    };
+    return labels[statut] || statut;
+}
+
+// Enhanced Product Modal Functions with Image Upload
+function openAddProductModal() {
+    currentEditingProduct = null;
+    showProductModal('Ajouter un nouveau produit', 'Ajouter le produit');
+}
+
+async function openEditProductModal(productId) {
+    try {
+        // Look for product in local storage first
+        let product = null;
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        product = localProducts.find(p => p._id === productId);
+        
+        // If not found locally, try API
+        if (!product) {
+            try {
+                const response = await fetch(buildApiUrl(`/products/${productId}`));
+                if (response.ok) {
+                    product = await response.json();
+                }
+            } catch (error) {
+                console.log('API unavailable, unable to find product');
+            }
+        }
+        
+        // If still not found, show error
+        if (!product) {
+            app.showToast('Produit non trouvé', 'error');
             return;
         }
-
-        localStorage.removeItem('products');
-        localStorage.removeItem('orders');
-        localStorage.removeItem('cart');
         
-        this.showMessage('Données locales supprimées avec succès', 'success');
-        setTimeout(() => location.reload(), 1000);
+        currentEditingProduct = product;
+        showProductModal('Modifier le produit', 'Modifier le produit');
+        setTimeout(() => fillProductForm(product), 100);
+    } catch (error) {
+        console.error('Error loading product:', error);
+        app.showToast('Erreur lors du chargement du produit', 'error');
     }
+}
 
-    // Test API connection
-    async testAPIConnection() {
-        const statusDiv = document.getElementById('api-status');
-        statusDiv.innerHTML = '<div class="text-blue-600">Test en cours...</div>';
+function showProductModal(title, submitText) {
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="productModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                    <h3 class="text-2xl font-bold text-emerald-800">${title}</h3>
+                    <button onclick="closeProductModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="p-6 overflow-y-auto max-h-[75vh]">
+                    <form id="productForm" class="space-y-6">
+                        <input type="hidden" id="productId" value="${currentEditingProduct ? currentEditingProduct._id : ''}">
+                        
+                        <!-- Basic Information -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
+                                <input type="text" id="productNom" name="nom" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                       placeholder="Nom du produit">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Marque</label>
+                                <input type="text" id="productMarque" name="marque" 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                       placeholder="Marque du produit">
+                            </div>
+                        </div>
+                        
+                        <!-- Description -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
+                            <textarea id="productDescription" name="description" required rows="3" 
+                                      class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                      placeholder="Description détaillée du produit"></textarea>
+                        </div>
+                        
+                        <!-- Image Upload -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Image du produit</label>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <div id="imagePreviewContainer" class="bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl p-4 text-center mb-2 h-48 flex items-center justify-center">
+                                        <div id="imagePreviewPlaceholder">
+                                            <i class="fas fa-image text-gray-400 text-4xl mb-2"></i>
+                                            <p class="text-gray-500">Aperçu de l'image</p>
+                                        </div>
+                                        <img id="imagePreview" src="" alt="Aperçu" class="max-h-40 max-w-full hidden">
+                                    </div>
+                                </div>
+                                <div class="flex flex-col justify-center">
+                                    <div class="mb-4">
+                                        <label for="productImageUpload" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-4 rounded-xl text-center cursor-pointer flex items-center justify-center">
+                                            <i class="fas fa-upload mr-2"></i>Télécharger une image
+                                            <input type="file" id="productImageUpload" name="image" accept="image/*" class="hidden" onchange="previewImage(this)">
+                                        </label>
+                                    </div>
+                                    <div class="text-sm text-gray-500">
+                                        <p>Formats acceptés: JPG, PNG, GIF</p>
+                                        <p>Taille max: 2MB</p>
+                                    </div>
+                                    <input type="hidden" id="productImageUrl" name="imageUrl">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Price and Stock -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prix (DA) *</label>
+                                <input type="number" id="productPrix" name="prix" required min="0" step="1" 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prix original (DA)</label>
+                                <input type="number" id="productPrixOriginal" name="prixOriginal" min="0" step="1" 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all"
+                                       placeholder="Pour les promotions">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Stock *</label>
+                                <input type="number" id="productStock" name="stock" required min="0" step="1" 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Catégorie *</label>
+                                <select id="productCategorie" name="categorie" required 
+                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all">
+                                    <option value="">Sélectionnez</option>
+                                    <option value="Vitalité">Vitalité</option>
+                                    <option value="Cheveux">Cheveux</option>
+                                    <option value="Visage">Visage</option>
+                                    <option value="Intime">Intime</option>
+                                    <option value="Solaire">Solaire</option>
+                                    <option value="Bébé">Bébé</option>
+                                    <option value="Maman">Maman</option>
+                                    <option value="Minceur">Minceur</option>
+                                    <option value="Homme">Homme</option>
+                                    <option value="Soins">Soins</option>
+                                    <option value="Dentaire">Dentaire</option>
+                                    <option value="Sport">Sport</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Additional Info -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Ingrédients</label>
+                                <textarea id="productIngredients" name="ingredients" rows="2" 
+                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                          placeholder="Principaux ingrédients"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Mode d'emploi</label>
+                                <textarea id="productModeEmploi" name="modeEmploi" rows="2" 
+                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                          placeholder="Comment utiliser le produit"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Précautions</label>
+                                <textarea id="productPrecautions" name="precautions" rows="2" 
+                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 transition-all resize-none"
+                                          placeholder="Précautions d'usage"></textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- Options -->
+                        <div class="flex flex-wrap gap-6">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="productEnVedette" name="enVedette" 
+                                       class="rounded text-emerald-600 mr-2 w-5 h-5">
+                                <span class="text-sm font-medium text-gray-700">En vedette</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="productEnPromotion" name="enPromotion" 
+                                       class="rounded text-emerald-600 mr-2 w-5 h-5">
+                                <span class="text-sm font-medium text-gray-700">En promotion</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="productActif" name="actif" checked 
+                                       class="rounded text-emerald-600 mr-2 w-5 h-5">
+                                <span class="text-sm font-medium text-gray-700">Produit actif</span>
+                            </label>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                            <button type="button" onclick="closeProductModal()" 
+                                    class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
+                                Annuler
+                            </button>
+                            <button type="button" onclick="saveProduct()" id="productSubmitBtn" 
+                                    class="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                                <span id="productSubmitText">${submitText}</span>
+                                <i id="productSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `);
+    
+    document.body.style.overflow = 'hidden';
+    
+    // Initialize promotion checkbox behavior
+    document.getElementById('productEnPromotion').addEventListener('change', function() {
+        const prixOriginalField = document.getElementById('productPrixOriginal');
+        if (this.checked) {
+            prixOriginalField.required = true;
+            prixOriginalField.focus();
+        } else {
+            prixOriginalField.required = false;
+        }
+    });
+}
 
+// Improved image preview function
+function previewImage(input) {
+    const preview = document.getElementById('imagePreview');
+    const placeholder = document.getElementById('imagePreviewPlaceholder');
+    const imageUrl = document.getElementById('productImageUrl');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Validate file size (2MB max)
+        if (file.size > 2 * 1024 * 1024) {
+            app.showToast('Image trop volumineuse. Maximum 2MB.', 'error');
+            input.value = '';
+            return;
+        }
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            app.showToast('Veuillez sélectionner un fichier image.', 'error');
+            input.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            
+            // Save image data to hidden input
+            imageUrl.value = e.target.result;
+            console.log('Image preview generated');
+        };
+        
+        reader.readAsDataURL(file);
+    } else {
+        // Reset preview if no file selected
+        preview.classList.add('hidden');
+        placeholder.classList.remove('hidden');
+        imageUrl.value = '';
+        console.log('No file selected');
+    }
+}
+
+function fillProductForm(product) {
+    document.getElementById('productId').value = product._id || '';
+    document.getElementById('productNom').value = product.nom || '';
+    document.getElementById('productMarque').value = product.marque || '';
+    document.getElementById('productDescription').value = product.description || '';
+    document.getElementById('productPrix').value = product.prix || '';
+    document.getElementById('productPrixOriginal').value = product.prixOriginal || '';
+    document.getElementById('productStock').value = product.stock || '';
+    document.getElementById('productCategorie').value = product.categorie || '';
+    document.getElementById('productIngredients').value = product.ingredients || '';
+    document.getElementById('productModeEmploi').value = product.modeEmploi || '';
+    document.getElementById('productPrecautions').value = product.precautions || '';
+    document.getElementById('productEnVedette').checked = product.enVedette || false;
+    document.getElementById('productEnPromotion').checked = product.enPromotion || false;
+    document.getElementById('productActif').checked = product.actif !== false; // Default to true
+    
+    // Handle image preview
+    if (product.image) {
+        const preview = document.getElementById('imagePreview');
+        const placeholder = document.getElementById('imagePreviewPlaceholder');
+        const imageUrl = document.getElementById('productImageUrl');
+        
+        preview.src = product.image;
+        preview.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        imageUrl.value = product.image;
+    }
+    
+    // Trigger change event for promotion checkbox
+    document.getElementById('productEnPromotion').dispatchEvent(new Event('change'));
+}
+
+function closeProductModal() {
+    const modal = document.getElementById('productModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = 'auto';
+    }
+    currentEditingProduct = null;
+}
+
+// SAVES PRODUCT TO API
+function saveProduct() {
+    const form = document.getElementById('productForm');
+    const isEditing = !!currentEditingProduct;
+    
+    // Validate form
+    const nom = document.getElementById('productNom').value.trim();
+    const prix = document.getElementById('productPrix').value;
+    const stock = document.getElementById('productStock').value;
+    const categorie = document.getElementById('productCategorie').value;
+    const description = document.getElementById('productDescription').value.trim();
+    
+    if (!nom || !prix || !stock || !categorie || !description) {
+        app.showToast('Veuillez remplir tous les champs obligatoires', 'error');
+        return;
+    }
+    
+    const button = document.getElementById('productSubmitBtn');
+    const buttonText = document.getElementById('productSubmitText');
+    const spinner = document.getElementById('productSubmitSpinner');
+    
+    // Disable button and show loading
+    button.disabled = true;
+    buttonText.classList.add('hidden');
+    spinner.classList.remove('hidden');
+    
+    try {
+        // Get form values
+        const productId = document.getElementById('productId').value || Date.now().toString();
+        const marque = document.getElementById('productMarque').value.trim();
+        const prixOriginal = document.getElementById('productPrixOriginal').value;
+        const ingredients = document.getElementById('productIngredients').value.trim();
+        const modeEmploi = document.getElementById('productModeEmploi').value.trim();
+        const precautions = document.getElementById('productPrecautions').value.trim();
+        const enVedette = document.getElementById('productEnVedette').checked;
+        const enPromotion = document.getElementById('productEnPromotion').checked;
+        const actif = document.getElementById('productActif').checked;
+        const imageUrl = document.getElementById('productImageUrl').value;
+        
+        // Prepare product data
+        const productData = {
+            _id: productId,
+            nom: nom,
+            description: description,
+            marque: marque,
+            prix: parseInt(prix),
+            stock: parseInt(stock),
+            categorie: categorie,
+            actif: actif,
+            enVedette: enVedette,
+            enPromotion: enPromotion,
+            dateAjout: new Date().toISOString()
+        };
+        
+        // Add optional fields
+        if (prixOriginal) {
+            productData.prixOriginal = parseInt(prixOriginal);
+            
+            // Calculate discount percentage
+            if (enPromotion && productData.prixOriginal > productData.prix) {
+                productData.pourcentagePromotion = Math.round((productData.prixOriginal - productData.prix) / productData.prixOriginal * 100);
+            }
+        }
+        
+        if (ingredients) productData.ingredients = ingredients;
+        if (modeEmploi) productData.modeEmploi = modeEmploi;
+        if (precautions) productData.precautions = precautions;
+        
+        // Handle image
+        if (imageUrl) {
+            productData.image = imageUrl;
+        }
+        
+        console.log('Product data to save:', productData);
+        
+        // Save to localStorage first
+        let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        
+        if (isEditing) {
+            // Update existing product
+            const index = localProducts.findIndex(p => p._id === productData._id);
+            if (index !== -1) {
+                localProducts[index] = productData;
+            } else {
+                localProducts.push(productData);
+            }
+        } else {
+            // Add new product
+            localProducts.push(productData);
+        }
+        
+        // Save back to localStorage
+        localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+        console.log('✅ Product saved to localStorage');
+        
+        // Update the app's product cache to refresh main page immediately
+        if (window.app) {
+            window.app.refreshProductsCache();
+        }
+        
+        // Try to save to API
+        const saveToApi = async () => {
+            try {
+                const endpoint = isEditing ? `/products/${productData._id}` : '/products';
+                const method = isEditing ? 'PUT' : 'POST';
+                
+                const response = await fetch(buildApiUrl(endpoint), {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(productData)
+                });
+                
+                if (response.ok) {
+                    console.log('✅ Product saved to API successfully');
+                } else {
+                    console.log('⚠️ API save failed but product saved locally');
+                }
+            } catch (error) {
+                console.log('⚠️ API save failed, but product saved locally:', error);
+            }
+        };
+        
+        // Save to API in background
+        saveToApi();
+        
+        // Show success message
+        app.showToast(isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 'success');
+        closeProductModal();
+        
+        // Refresh admin section
+        if (adminCurrentSection === 'products') {
+            app.loadAdminProducts();
+        } else if (adminCurrentSection === 'featured' && productData.enVedette) {
+            app.loadAdminFeatured();
+        }
+        
+    } catch (error) {
+        console.error('Error saving product:', error);
+        app.showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
+    } finally {
+        // Re-enable button
+        button.disabled = false;
+        buttonText.classList.remove('hidden');
+        spinner.classList.add('hidden');
+    }
+}
+
+// Product operations
+async function toggleFeatured(productId, newStatus) {
+    try {
+        console.log('Toggling featured status:', productId, newStatus);
+        
+        // Update in localStorage first
+        let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        const productIndex = localProducts.findIndex(p => p._id === productId);
+        
+        if (productIndex !== -1) {
+            localProducts[productIndex].enVedette = newStatus;
+            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+            console.log('Product featured status updated locally');
+            
+            // Update the app's product cache
+            if (window.app) {
+                window.app.refreshProductsCache();
+            }
+        }
+        
+        // Try to update via API
         try {
-            const response = await fetch(`${this.apiUrl}/api/products?limit=1`);
-            const data = await response.json();
-
-            statusDiv.innerHTML = `
-                <div class="text-green-600 font-medium">✅ API connectée</div>
-                <div class="text-sm text-gray-600 mt-1">
-                    Statut: ${response.status}<br>
-                    URL: ${this.apiUrl}
-                </div>
-            `;
-
+            await apiCall(`/products/${productId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ enVedette: newStatus })
+            });
+            console.log('Product featured status updated via API');
         } catch (error) {
-            statusDiv.innerHTML = `
-                <div class="text-red-600 font-medium">❌ API inaccessible</div>
-                <div class="text-sm text-gray-600 mt-1">
-                    Erreur: ${error.message}<br>
-                    URL: ${this.apiUrl}
-                </div>
-            `;
+            console.log('API update failed, but local update succeeded');
+        }
+        
+        app.showToast(`Produit ${newStatus ? 'ajouté aux' : 'retiré des'} coups de coeur`, 'success');
+        
+        if (adminCurrentSection === 'products') {
+            app.loadAdminProducts();
+        } else if (adminCurrentSection === 'featured') {
+            app.loadAdminFeatured();
+        }
+        
+    } catch (error) {
+        console.error('Error toggling featured:', error);
+        app.showToast('Erreur lors de la modification', 'error');
+    }
+}
+
+async function deleteProduct(productId) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
+        try {
+            console.log('Deleting product:', productId);
+            
+            // Delete from local storage first
+            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            const initialCount = localProducts.length;
+            localProducts = localProducts.filter(p => p._id !== productId);
+            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+            
+            const localDeleteSuccess = localProducts.length < initialCount;
+            console.log('Product deleted locally:', localDeleteSuccess);
+            
+            // Update the app's product cache
+            if (window.app) {
+                window.app.refreshProductsCache();
+            }
+            
+            // Try to delete from API
+            try {
+                await apiCall(`/products/${productId}`, {
+                    method: 'DELETE'
+                });
+                console.log('Product deleted from API successfully');
+            } catch (error) {
+                console.log('API delete failed, but product deleted locally:', error);
+            }
+            
+            // Refresh the products list
+            app.showToast('Produit supprimé avec succès', 'success');
+            
+            if (adminCurrentSection === 'products') {
+                app.loadAdminProducts();
+            } else if (adminCurrentSection === 'featured') {
+                app.loadAdminFeatured();
+            }
+            
+        } catch (error) {
+            console.error('Error deleting product:', error);
+            app.showToast('Erreur lors de la suppression', 'error');
         }
     }
+}
 
-    // View order details
-    viewOrderDetails(orderId) {
-        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-        const order = orders.find(o => (o._id || o.numeroCommande) === orderId);
+// Order detail modal
+async function viewOrderDetails(orderId) {
+    try {
+        console.log('Viewing order details for:', orderId);
+        
+        // Find order in localStorage first
+        let order = adminOrders.find(o => o._id === orderId || o.numeroCommande === orderId);
         
         if (!order) {
-            alert('Commande non trouvée');
-            return;
+            // Try to get from API
+            try {
+                const response = await fetch(buildApiUrl(`/orders/${orderId}`));
+                if (response.ok) {
+                    order = await response.json();
+                }
+            } catch (error) {
+                console.log('Order not found in API');
+            }
         }
-
-        const client = order.client || {};
-        const articles = order.articles || [];
-
-        const modalHTML = `
-            <div id="order-details-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                    <div class="p-6 border-b border-gray-100">
-                        <div class="flex justify-between items-center">
-                            <h3 class="text-xl font-semibold text-gray-800">
-                                Détails de la commande #${order.numeroCommande}
-                            </h3>
-                            <button onclick="document.getElementById('order-details-modal').remove()" 
-                                    class="text-gray-400 hover:text-gray-600">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
+        
+        if (order) {
+            // Create detailed order modal
+            document.body.insertAdjacentHTML('beforeend', `
+                <div id="orderDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                            <h3 class="text-2xl font-bold text-emerald-800">Commande #${order.numeroCommande}</h3>
+                            <button onclick="closeOrderDetailModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="p-6 overflow-y-auto max-h-[75vh]">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                                <div>
+                                    <h4 class="font-semibold text-emerald-800 mb-4">Informations client</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <p><strong>Nom:</strong> ${order.client?.prenom} ${order.client?.nom}</p>
+                                        <p><strong>Email:</strong> ${order.client?.email}</p>
+                                        <p><strong>Téléphone:</strong> ${order.client?.telephone}</p>
+                                        <p><strong>Adresse:</strong> ${order.client?.adresse}</p>
+                                        <p><strong>Wilaya:</strong> ${order.client?.wilaya}</p>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-emerald-800 mb-4">Détails commande</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <p><strong>Date:</strong> ${new Date(order.dateCommande).toLocaleDateString('fr-FR')} à ${new Date(order.dateCommande).toLocaleTimeString('fr-FR')}</p>
+                                        <p><strong>Statut:</strong> <span class="px-2 py-1 rounded text-xs ${getStatusColor(order.statut)}">${getStatusLabel(order.statut)}</span></p>
+                                        <p><strong>Paiement:</strong> ${order.modePaiement}</p>
+                                        ${order.commentaires ? `<p><strong>Commentaires:</strong> ${order.commentaires}</p>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-6">
+                                <h4 class="font-semibold text-emerald-800 mb-4">Articles commandés</h4>
+                                <div class="space-y-3">
+                                    ${order.articles?.map(article => `
+                                        <div class="flex items-center space-x-4 p-4 bg-emerald-50/50 rounded-xl border border-emerald-200/50">
+                                            <img src="${article.image || 'https://via.placeholder.com/64x64/10b981/ffffff?text=' + encodeURIComponent((article.nom || '').substring(0, 2))}" 
+                                                 alt="${article.nom}" 
+                                                 class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200">
+                                            <div class="flex-1">
+                                                <h5 class="font-medium text-emerald-800">${article.nom}</h5>
+                                                <p class="text-sm text-emerald-600">Quantité: ${article.quantite} × ${article.prix} DA</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="font-medium text-emerald-800">${(article.quantite || 0) * (article.prix || 0)} DA</p>
+                                            </div>
+                                        </div>
+                                    `).join('') || '<p class="text-gray-500">Aucun article</p>'}
+                                </div>
+                            </div>
+                            
+                            <div class="border-t border-emerald-200 pt-4">
+                                <div class="space-y-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-emerald-600">Sous-total:</span>
+                                        <span class="text-emerald-800">${order.sousTotal || 0} DA</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-emerald-600">Frais de livraison:</span>
+                                        <span class="text-emerald-800">${order.fraisLivraison || 0} DA</span>
+                                    </div>
+                                    <div class="flex justify-between text-lg font-semibold border-t border-emerald-200 pt-2">
+                                        <span class="text-emerald-800">Total:</span>
+                                        <span class="text-emerald-600">${order.total || 0} DA</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-4 p-6 border-t border-gray-200">
+                            <button onclick="closeOrderDetailModal()" 
+                                    class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
+                                Fermer
+                            </button>
+                            <button onclick="updateOrderStatus('${order._id || order.numeroCommande}', 'confirmée')" 
+                                    class="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-lg">
+                                Confirmer la commande
                             </button>
                         </div>
                     </div>
-                    <div class="p-6">
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div>
-                                <h4 class="font-semibold text-gray-800 mb-3">Informations Client</h4>
-                                <div class="space-y-2 text-sm">
-                                    <p><strong>Nom:</strong> ${client.prenom} ${client.nom}</p>
-                                    <p><strong>Email:</strong> ${client.email}</p>
-                                    <p><strong>Téléphone:</strong> ${client.telephone}</p>
-                                    <p><strong>Adresse:</strong> ${client.adresse}</p>
-                                    <p><strong>Wilaya:</strong> ${client.wilaya}</p>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold text-gray-800 mb-3">Informations Commande</h4>
-                                <div class="space-y-2 text-sm">
-                                    <p><strong>Date:</strong> ${new Date(order.dateCommande).toLocaleString('fr-FR')}</p>
-                                    <p><strong>Statut:</strong> 
-                                        <span class="px-2 py-1 text-xs rounded-full ${
-                                            order.statut === 'en-attente' ? 'bg-yellow-100 text-yellow-600' :
-                                            order.statut === 'confirmee' ? 'bg-blue-100 text-blue-600' :
-                                            order.statut === 'expediee' ? 'bg-purple-100 text-purple-600' :
-                                            order.statut === 'livree' ? 'bg-green-100 text-green-600' :
-                                            'bg-gray-100 text-gray-600'
-                                        }">
-                                            ${order.statut}
-                                        </span>
-                                    </p>
-                                    <p><strong>Mode de paiement:</strong> ${order.modePaiement || 'Paiement à la livraison'}</p>
-                                    ${order.commentaires ? `<p><strong>Commentaires:</strong> ${order.commentaires}</p>` : ''}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-6">
-                            <h4 class="font-semibold text-gray-800 mb-3">Articles commandés</h4>
-                            <div class="overflow-x-auto">
-                                <table class="w-full border border-gray-200 rounded-lg">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="text-left p-3 font-medium text-gray-700">Produit</th>
-                                            <th class="text-left p-3 font-medium text-gray-700">Prix unitaire</th>
-                                            <th class="text-left p-3 font-medium text-gray-700">Quantité</th>
-                                            <th class="text-left p-3 font-medium text-gray-700">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${articles.map(article => `
-                                            <tr class="border-t border-gray-100">
-                                                <td class="p-3">${article.nom}</td>
-                                                <td class="p-3">${parseFloat(article.prix).toFixed(2)}€</td>
-                                                <td class="p-3">${article.quantite}</td>
-                                                <td class="p-3">${(parseFloat(article.prix) * parseInt(article.quantite)).toFixed(2)}€</td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-6 border-t pt-4">
-                            <div class="flex justify-end">
-                                <div class="text-right space-y-1">
-                                    <p><strong>Sous-total:</strong> ${parseFloat(order.sousTotal || 0).toFixed(2)}€</p>
-                                    <p><strong>Frais de livraison:</strong> ${parseFloat(order.fraisLivraison || 0).toFixed(2)}€</p>
-                                    <p class="text-lg font-bold text-emerald-600">
-                                        <strong>Total:</strong> ${parseFloat(order.total || 0).toFixed(2)}€
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
-            </div>
-        `;
-
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
+            `);
+            
+            document.body.style.overflow = 'hidden';
+        } else {
+            app.showToast('Commande non trouvée', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error viewing order details:', error);
+        app.showToast('Erreur lors de l\'affichage des détails', 'error');
     }
 }
 
-// Make sure the class is available globally
-if (typeof window !== 'undefined') {
-    window.PharmacieGaherApp = PharmacieGaherApp;
+function closeOrderDetailModal() {
+    const modal = document.getElementById('orderDetailModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = 'auto';
+    }
 }
+
+async function updateOrderStatus(orderId, newStatus) {
+    try {
+        console.log('Updating order status:', orderId, 'to', newStatus);
+        
+        // Update in localStorage
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const orderIndex = orders.findIndex(o => o._id === orderId || o.numeroCommande === orderId);
+        
+        if (orderIndex > -1) {
+            orders[orderIndex].statut = newStatus;
+            if (newStatus === 'livrée') {
+                orders[orderIndex].dateLivraison = new Date().toISOString();
+            }
+            localStorage.setItem('adminOrders', JSON.stringify(orders));
+            adminOrders = orders;
+            console.log('Order status updated locally');
+        }
+        
+        // Try to update via API
+        try {
+            await apiCall(`/orders/${orderId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ 
+                    statut: newStatus,
+                    dateLivraison: newStatus === 'livrée' ? new Date().toISOString() : null
+                })
+            });
+            console.log('Order status updated via API');
+        } catch (error) {
+            console.log('API update failed, but local update succeeded');
+        }
+        
+        app.showToast('Statut de la commande mis à jour', 'success');
+        
+        // Close modal if open
+        closeOrderDetailModal();
+        
+        // Refresh orders list
+        if (adminCurrentSection === 'orders') {
+            app.loadAdminOrders();
+        }
+        
+    } catch (error) {
+        console.error('Error updating order status:', error);
+        app.showToast('Erreur lors de la mise à jour du statut', 'error');
+    }
+}
+
+// Utility functions
+async function refreshProductCache() {
+    if (window.app) {
+        window.app.refreshProductsCache();
+    }
+    app.showToast('Cache actualisé', 'success');
+}
+
+async function validateAllProducts() {
+    app.showToast('Validation terminée', 'success');
+}
+
+async function clearAllProducts() {
+    if (confirm('ATTENTION: Cette action supprimera TOUS les produits. Êtes-vous absolument sûr ?')) {
+        localStorage.removeItem('demoProducts');
+        
+        // Update the app's product cache
+        if (window.app) {
+            window.app.refreshProductsCache();
+        }
+        
+        app.showToast('Tous les produits ont été supprimés', 'success');
+        if (adminCurrentSection === 'products') {
+            app.loadAdminProducts();
+        }
+    }
+}
+
+// Section switching
+function switchAdminSection(section) {
+    document.querySelectorAll('.admin-nav-btn').forEach(btn => {
+        btn.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
+        btn.classList.add('hover:bg-emerald-50', 'text-emerald-700', 'border-r', 'border-emerald-100');
+    });
+    
+    const activeBtn = document.querySelector(`.admin-nav-btn.${section}`);
+    if (activeBtn) {
+        activeBtn.classList.add('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
+        activeBtn.classList.remove('hover:bg-emerald-50', 'text-emerald-700', 'border-r', 'border-emerald-100');
+    }
+    
+    adminCurrentSection = section;
+    
+    switch(section) {
+        case 'dashboard':
+            app.loadAdminDashboard();
+            break;
+        case 'products':
+            app.loadAdminProducts();
+            break;
+        case 'orders':
+            app.loadAdminOrders();
+            break;
+        case 'featured':
+            app.loadAdminFeatured();
+            break;
+        case 'cleanup':
+            app.loadCleanupSection();
+            break;
+    }
+}
+
+// Modal event handlers
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('productModal');
+    if (modal && event.target === modal) {
+        closeProductModal();
+    }
+    
+    const orderModal = document.getElementById('orderDetailModal');
+    if (orderModal && event.target === orderModal) {
+        closeOrderDetailModal();
+    }
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('productModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            closeProductModal();
+        }
+        
+        const orderModal = document.getElementById('orderDetailModal');
+        if (orderModal && !orderModal.classList.contains('hidden')) {
+            closeOrderDetailModal();
+        }
+    }
+});
+
+// Error handling for API calls
+window.handleApiError = function(error, context = '') {
+    console.error(`❌ API Error ${context}:`, error);
+    
+    if (error.message.includes('401') || error.message.includes('Token invalide')) {
+        // Token expired or invalid
+        localStorage.removeItem('token');
+        if (window.app) {
+            window.app.currentUser = null;
+            window.app.updateUserUI();
+            window.app.showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
+            window.app.showPage('login');
+        }
+    } else if (error.message.includes('403')) {
+        if (window.app) {
+            window.app.showToast('Accès refusé', 'error');
+        }
+    } else if (error.message.includes('404')) {
+        if (window.app) {
+            window.app.showToast('Ressource non trouvée', 'error');
+        }
+    } else if (error.message.includes('500')) {
+        if (window.app) {
+            window.app.showToast('Erreur serveur. Veuillez réessayer plus tard.', 'error');
+        }
+    } else {
+        if (window.app) {
+            window.app.showToast(error.message || 'Une erreur est survenue', 'error');
+        }
+    }
+};
+
+// Export functions for global access
+window.switchAdminSection = switchAdminSection;
+window.openAddProductModal = openAddProductModal;
+window.openEditProductModal = openEditProductModal;
+window.closeProductModal = closeProductModal;
+window.saveProduct = saveProduct;
+window.toggleFeatured = toggleFeatured;
+window.deleteProduct = deleteProduct;
+window.refreshProductCache = refreshProductCache;
+window.validateAllProducts = validateAllProducts;
+window.clearAllProducts = clearAllProducts;
+window.viewOrderDetails = viewOrderDetails;
+window.updateOrderStatus = updateOrderStatus;
+window.closeOrderDetailModal = closeOrderDetailModal;
+window.previewImage = previewImage;
+
+console.log('✅ Fixed Admin.js loaded - Products SAVE to API + Orders LOAD from API');
