@@ -1,9 +1,9 @@
-// COMPLETE PharmacieGaherApp - WITH ALL METHODS
+// Complete PharmacieGaherApp - Full File with All Pages
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
         this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        this.allProducts = []; // Cache for all products
+        this.allProducts = [];
         this.settings = {
             couleurPrimaire: '#10b981',
             couleurSecondaire: '#059669',
@@ -13,14 +13,13 @@ class PharmacieGaherApp {
             livraisonGratuite: 5000
         };
         this.currentPage = 'home';
-        
         this.init();
     }
     
     async init() {
         try {
             await this.checkAuth();
-            await this.loadProductsCache(); // Load products from localStorage/API
+            await this.loadProductsCache();
             this.initUI();
             await this.showPage('home');
             this.updateCartUI();
@@ -31,30 +30,21 @@ class PharmacieGaherApp {
         }
     }
     
-    // New method to load and cache products
     async loadProductsCache() {
         try {
             console.log('Loading products cache...');
-            
-            // Start with localStorage products
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             this.allProducts = [...localProducts];
             
-            // Try to load from API and merge
             try {
-                const response = await fetch(buildApiUrl('/products'));
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.products && data.products.length > 0) {
-                        // Merge API products with local ones, avoiding duplicates
-                        const localIds = localProducts.map(p => p._id);
-                        const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
-                        
-                        if (newApiProducts.length > 0) {
-                            this.allProducts = [...localProducts, ...newApiProducts];
-                            // Update localStorage with merged data
-                            localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
-                        }
+                const response = await apiCall('/products');
+                if (response && response.products && response.products.length > 0) {
+                    const localIds = localProducts.map(p => p._id);
+                    const newApiProducts = response.products.filter(p => !localIds.includes(p._id));
+                    
+                    if (newApiProducts.length > 0) {
+                        this.allProducts = [...localProducts, ...newApiProducts];
+                        localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
                     }
                 }
             } catch (error) {
@@ -62,39 +52,28 @@ class PharmacieGaherApp {
             }
             
             console.log(`Products cache loaded: ${this.allProducts.length} products`);
-            
         } catch (error) {
             console.error('Error loading products cache:', error);
             this.allProducts = [];
         }
     }
     
-    // New method to refresh products cache (called from admin when products are modified)
     refreshProductsCache() {
         console.log('Refreshing products cache...');
-        
-        // Reload from localStorage
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         this.allProducts = [...localProducts];
-        
         console.log(`Products cache refreshed: ${this.allProducts.length} products`);
         
-        // If we're on the home page, refresh the displayed products
         if (this.currentPage === 'home') {
             this.refreshHomePage();
         } else if (this.currentPage === 'products') {
-            // Refresh products page if we're on it
             this.showPage('products');
         }
     }
     
-    // New method to refresh home page content
     refreshHomePage() {
         console.log('Refreshing home page content...');
-        
-        // Refresh featured products
         this.loadFeaturedProducts();
-        // Refresh promotion products  
         this.loadPromotionProducts();
     }
     
@@ -102,15 +81,10 @@ class PharmacieGaherApp {
         const token = localStorage.getItem('token');
         if (token) {
             try {
-                const response = await fetch(buildApiUrl('/auth/profile'), {
-                    headers: { 'x-auth-token': token }
-                });
-                
-                if (response.ok) {
-                    this.currentUser = await response.json();
+                const response = await apiCall('/auth/profile');
+                if (response) {
+                    this.currentUser = response;
                     this.updateUserUI();
-                } else {
-                    localStorage.removeItem('token');
                 }
             } catch (error) {
                 console.error('Erreur vérification auth:', error);
@@ -130,7 +104,7 @@ class PharmacieGaherApp {
         }
         
         this.updateCartUI();
-        window.app = this; // Critical: Make globally available
+        window.app = this;
     }
     
     updateUserUI() {
@@ -241,42 +215,33 @@ class PharmacieGaherApp {
                 <div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-50 to-transparent"></div>
             </section>
             
-            <!-- Categories Section -->
             <section class="py-16 bg-gradient-to-br from-green-50 to-emerald-100">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
                         <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Catégories</h2>
                         <p class="text-xl text-emerald-600">Découvrez notre gamme complète de produits</p>
                     </div>
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="categoriesGrid">
-                        <!-- Categories will be loaded here -->
-                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="categoriesGrid"></div>
                 </div>
             </section>
             
-            <!-- Featured Products -->
             <section class="py-16 bg-white">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
                         <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Coups de Cœur</h2>
                         <p class="text-xl text-emerald-600">Produits sélectionnés pour vous</p>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="featuredProducts">
-                        <!-- Featured products will be loaded here -->
-                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="featuredProducts"></div>
                 </div>
             </section>
             
-            <!-- Promotions -->
             <section class="py-16 bg-gradient-to-br from-red-50 to-pink-100">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
                         <h2 class="text-4xl font-bold text-red-800 mb-4">Promotions</h2>
                         <p class="text-xl text-red-600">Offres spéciales et réductions</p>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="promotionProducts">
-                        <!-- Promotion products will be loaded here -->
-                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="promotionProducts"></div>
                 </div>
             </section>
         `;
@@ -287,7 +252,6 @@ class PharmacieGaherApp {
     }
     
     async loadCategories() {
-        // Show all 10 categories with Vitalité first
         const mainPageCategories = [
             { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
             { nom: 'Sport', description: 'Nutrition sportive', icon: 'fa-dumbbell' },
@@ -318,13 +282,7 @@ class PharmacieGaherApp {
     }
     
     async loadFeaturedProducts() {
-        console.log('Loading featured products...');
-        
-        // Use cached products and filter for featured products
         const featuredProducts = this.allProducts.filter(p => p.enVedette && p.actif !== false);
-        
-        console.log(`Found ${featuredProducts.length} featured products`);
-        
         const container = document.getElementById('featuredProducts');
         if (container) {
             if (featuredProducts.length === 0) {
@@ -333,11 +291,6 @@ class PharmacieGaherApp {
                         <i class="fas fa-star text-6xl text-emerald-200 mb-6"></i>
                         <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit en vedette</h3>
                         <p class="text-emerald-600 mb-8">Ajoutez des produits en vedette depuis l'administration</p>
-                        ${this.currentUser && this.currentUser.role === 'admin' ? `
-                        <button onclick="app.showPage('admin')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                            <i class="fas fa-cog mr-2"></i>Aller à l'administration
-                        </button>
-                        ` : ''}
                     </div>
                 `;
             } else {
@@ -347,13 +300,7 @@ class PharmacieGaherApp {
     }
     
     async loadPromotionProducts() {
-        console.log('Loading promotion products...');
-        
-        // Use cached products and filter for promotion products
         const promotionProducts = this.allProducts.filter(p => p.enPromotion && p.actif !== false);
-        
-        console.log(`Found ${promotionProducts.length} promotion products`);
-        
         const container = document.getElementById('promotionProducts');
         if (container) {
             if (promotionProducts.length === 0) {
@@ -379,8 +326,6 @@ class PharmacieGaherApp {
             imageUrl = product.image;
         } else if (product.image && product.image.startsWith('data:image')) {
             imageUrl = product.image;
-        } else if (product.image) {
-            imageUrl = `./images/products/${product.image}`;
         } else {
             const getCategoryColor = (category) => {
                 const colors = {
@@ -407,8 +352,7 @@ class PharmacieGaherApp {
                 
                 <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden relative">
                     <img src="${imageUrl}" alt="${product.nom}" 
-                         class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                         onerror="this.src='https://via.placeholder.com/300x300/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
+                         class="w-full h-full object-cover hover:scale-105 transition-transform duration-500">
                 </div>
                 
                 <div class="p-6">
@@ -441,435 +385,6 @@ class PharmacieGaherApp {
             </div>
         `;
     }
-
-    // MISSING METHODS START HERE
-
-    async loadProductsPage(params = {}) {
-        console.log('Loading products page with params:', params);
-        
-        let filteredProducts = [...this.allProducts];
-        
-        // Filter by category
-        if (params.categorie) {
-            filteredProducts = filteredProducts.filter(p => p.categorie === params.categorie);
-        }
-        
-        // Filter by search
-        if (params.search) {
-            const searchLower = params.search.toLowerCase();
-            filteredProducts = filteredProducts.filter(p => 
-                p.nom.toLowerCase().includes(searchLower) ||
-                (p.description && p.description.toLowerCase().includes(searchLower)) ||
-                (p.marque && p.marque.toLowerCase().includes(searchLower))
-            );
-        }
-        
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="mb-8">
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">
-                        ${params.categorie ? `Catégorie: ${params.categorie}` : params.search ? `Résultats pour "${params.search}"` : 'Tous nos produits'}
-                    </h1>
-                    <p class="text-emerald-600 text-lg">${filteredProducts.length} produit(s) trouvé(s)</p>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    ${filteredProducts.map(product => this.createProductCard(product)).join('')}
-                </div>
-                
-                ${filteredProducts.length === 0 ? `
-                    <div class="text-center py-16">
-                        <i class="fas fa-search text-6xl text-emerald-200 mb-6"></i>
-                        <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit trouvé</h3>
-                        <button onclick="app.showPage('home')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                            <i class="fas fa-home mr-2"></i>Retour à l'accueil
-                        </button>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    }
-
-    async loadProductPage(productId) {
-        console.log('Loading product page for ID:', productId);
-        
-        const product = this.allProducts.find(p => p._id === productId);
-        
-        if (!product) {
-            this.showToast('Produit non trouvé', 'error');
-            this.showPage('products');
-            return;
-        }
-        
-        let imageUrl;
-        if (product.image && product.image.startsWith('http')) {
-            imageUrl = product.image;
-        } else if (product.image && product.image.startsWith('data:image')) {
-            imageUrl = product.image;
-        } else {
-            const getCategoryColor = (category) => {
-                const colors = {
-                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
-                    'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
-                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
-                    'Dentaire': '6366f1'
-                };
-                return colors[product.categorie] || '10b981';
-            };
-            
-            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
-            const categoryColor = getCategoryColor(product.categorie);
-            imageUrl = `https://via.placeholder.com/500x500/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
-        }
-        
-        const isOutOfStock = product.stock === 0;
-        const hasPromotion = product.enPromotion && product.prixOriginal;
-        
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <button onclick="history.back()" class="text-emerald-600 hover:text-emerald-800 mb-6 flex items-center">
-                    <i class="fas fa-arrow-left mr-2"></i>Retour
-                </button>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    <div>
-                        <img src="${imageUrl}" alt="${product.nom}" class="w-full rounded-2xl shadow-2xl" 
-                             onerror="this.src='https://via.placeholder.com/500x500/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
-                    </div>
-                    
-                    <div>
-                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">${product.nom}</h1>
-                        <p class="text-emerald-600 mb-4">${product.marque || ''}</p>
-                        
-                        <div class="flex items-center space-x-4 mb-6">
-                            ${hasPromotion ? `
-                                <span class="text-2xl text-gray-400 line-through">${product.prixOriginal} DA</span>
-                                <span class="text-4xl font-bold text-red-600">${product.prix} DA</span>
-                                <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-semibold">
-                                    -${Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%
-                                </span>
-                            ` : `
-                                <span class="text-4xl font-bold text-emerald-700">${product.prix} DA</span>
-                            `}
-                        </div>
-                        
-                        <p class="text-gray-700 mb-6">${product.description || 'Aucune description disponible'}</p>
-                        
-                        <div class="bg-emerald-50 p-4 rounded-xl mb-6">
-                            <p class="text-emerald-700">
-                                <i class="fas fa-warehouse mr-2"></i>
-                                Stock: <strong>${product.stock} unités</strong>
-                            </p>
-                        </div>
-                        
-                        ${!isOutOfStock ? `
-                            <div class="flex items-center space-x-4 mb-6">
-                                <label class="text-gray-700 font-semibold">Quantité:</label>
-                                <div class="quantity-selector">
-                                    <button onclick="updateProductQuantity('minus')">-</button>
-                                    <input type="number" id="productQuantity" value="1" min="1" max="${product.stock}">
-                                    <button onclick="updateProductQuantity('plus')">+</button>
-                                </div>
-                            </div>
-                            
-                            <button onclick="addProductToCart('${product._id}')" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg text-lg">
-                                <i class="fas fa-shopping-cart mr-2"></i>Ajouter au panier
-                            </button>
-                        ` : `
-                            <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-                                <i class="fas fa-exclamation-circle text-red-600 text-3xl mb-2"></i>
-                                <p class="text-red-800 font-semibold">Produit en rupture de stock</p>
-                            </div>
-                        `}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    async loadCheckoutPage() {
-        if (this.cart.length === 0) {
-            this.showToast('Votre panier est vide', 'warning');
-            this.showPage('products');
-            return;
-        }
-        
-        const sousTotal = this.getCartTotal();
-        
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <h1 class="text-4xl font-bold text-emerald-800 mb-8">Finaliser la commande</h1>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div class="lg:col-span-2">
-                        <div class="bg-white rounded-2xl shadow-xl p-8">
-                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Informations de livraison</h2>
-                            
-                            <form id="checkoutForm" class="space-y-6">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
-                                        <input type="text" id="checkoutPrenom" required class="form-input">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
-                                        <input type="text" id="checkoutNom" required class="form-input">
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                                    <input type="email" id="checkoutEmail" required class="form-input">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
-                                    <input type="tel" id="checkoutTelephone" required class="form-input" placeholder="+213 XXX XXX XXX">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Adresse complète *</label>
-                                    <textarea id="checkoutAdresse" required rows="3" class="form-input"></textarea>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
-                                    <select id="checkoutWilaya" required class="form-input">
-                                        <option value="">Sélectionnez une wilaya</option>
-                                        <option value="Alger">Alger</option>
-                                        <option value="Blida">Blida</option>
-                                        <option value="Boumerdès">Boumerdès</option>
-                                        <option value="Tipaza">Tipaza</option>
-                                        <option value="Médéa">Médéa</option>
-                                    </select>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Commentaires (optionnel)</label>
-                                    <textarea id="checkoutCommentaires" rows="3" class="form-input" placeholder="Instructions spéciales pour la livraison"></textarea>
-                                </div>
-                                
-                                <div>
-                                    <h3 class="text-lg font-semibold text-gray-700 mb-4">Mode de paiement</h3>
-                                    <div class="space-y-3">
-                                        <label class="flex items-center p-4 border-2 border-emerald-200 rounded-xl cursor-pointer hover:bg-emerald-50">
-                                            <input type="radio" name="modePaiement" value="Paiement à la livraison" checked class="mr-3">
-                                            <div>
-                                                <p class="font-semibold">Paiement à la livraison</p>
-                                                <p class="text-sm text-gray-600">Payez en espèces lors de la réception</p>
-                                            </div>
-                                        </label>
-                                    </div>
-                                    <div id="paymentMethodInfo"></div>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    
-                    <div class="lg:col-span-1">
-                        <div class="bg-white rounded-2xl shadow-xl p-8 sticky top-4">
-                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Récapitulatif</h2>
-                            
-                            <div class="space-y-4 mb-6">
-                                ${this.cart.map(item => `
-                                    <div class="flex items-center space-x-3 pb-3 border-b">
-                                        <img src="${item.image}" alt="${item.nom}" class="w-16 h-16 object-cover rounded-lg">
-                                        <div class="flex-1">
-                                            <p class="font-semibold text-sm">${item.nom}</p>
-                                            <p class="text-xs text-gray-600">${item.quantite} × ${item.prix} DA</p>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            
-                            <div class="space-y-3 mb-6">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Sous-total:</span>
-                                    <span id="checkoutSousTotal" class="font-semibold">${sousTotal} DA</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Frais de livraison:</span>
-                                    <span id="checkoutFraisLivraison" class="font-semibold">${sousTotal >= 5000 ? 0 : 300} DA</span>
-                                </div>
-                                <div class="flex justify-between text-lg font-bold border-t pt-3">
-                                    <span class="text-emerald-800">Total:</span>
-                                    <span id="checkoutTotal" class="text-emerald-600">${sousTotal + (sousTotal >= 5000 ? 0 : 300)} DA</span>
-                                </div>
-                            </div>
-                            
-                            <div id="shippingMessage"></div>
-                            
-                            <button onclick="app.processOrder()" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg text-lg">
-                                <i class="fas fa-check mr-2"></i>Confirmer la commande
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Initialize checkout system
-        if (window.initCheckout) {
-            window.initCheckout();
-        }
-    }
-
-    async processOrder() {
-        if (window.checkoutSystem && window.checkoutSystem.processOrder) {
-            return window.checkoutSystem.processOrder();
-        }
-    }
-
-    async loadLoginPage() {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-16 max-w-md">
-                <div class="bg-white rounded-2xl shadow-2xl p-8">
-                    <h1 class="text-3xl font-bold text-emerald-800 mb-2 text-center">Connexion</h1>
-                    <p class="text-emerald-600 mb-8 text-center">Accédez à votre compte</p>
-                    
-                    <form onsubmit="handleLogin(event)" class="space-y-6">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
-                            <input type="email" id="loginEmail" required class="form-input">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe</label>
-                            <input type="password" id="loginPassword" required class="form-input">
-                        </div>
-                        
-                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                            Se connecter
-                        </button>
-                    </form>
-                    
-                    <p class="mt-6 text-center text-gray-600">
-                        Pas encore de compte ? 
-                        <a href="#" onclick="app.showPage('register')" class="text-emerald-600 hover:text-emerald-800 font-semibold">S'inscrire</a>
-                    </p>
-                </div>
-            </div>
-        `;
-    }
-
-    async loadRegisterPage() {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-16 max-w-md">
-                <div class="bg-white rounded-2xl shadow-2xl p-8">
-                    <h1 class="text-3xl font-bold text-emerald-800 mb-2 text-center">Inscription</h1>
-                    <p class="text-emerald-600 mb-8 text-center">Créez votre compte</p>
-                    
-                    <form onsubmit="handleRegister(event)" class="space-y-6">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prénom</label>
-                                <input type="text" id="registerPrenom" required class="form-input">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom</label>
-                                <input type="text" id="registerNom" required class="form-input">
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
-                            <input type="email" id="registerEmail" required class="form-input">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe</label>
-                            <input type="password" id="registerPassword" required class="form-input" minlength="6">
-                        </div>
-                        
-                        <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                            S'inscrire
-                        </button>
-                    </form>
-                    
-                    <p class="mt-6 text-center text-gray-600">
-                        Déjà un compte ? 
-                        <a href="#" onclick="app.showPage('login')" class="text-emerald-600 hover:text-emerald-800 font-semibold">Se connecter</a>
-                    </p>
-                </div>
-            </div>
-        `;
-    }
-
-    async loadProfilePage() {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <h1 class="text-4xl font-bold text-emerald-800 mb-8">Mon Profil</h1>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div class="bg-white rounded-2xl shadow-xl p-8">
-                        <div class="text-center mb-6">
-                            <div class="w-24 h-24 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full mx-auto flex items-center justify-center text-white text-3xl font-bold mb-4">
-                                ${this.currentUser.prenom[0]}${this.currentUser.nom[0]}
-                            </div>
-                            <h2 class="text-2xl font-bold text-emerald-800">${this.currentUser.prenom} ${this.currentUser.nom}</h2>
-                            <p class="text-emerald-600">${this.currentUser.email}</p>
-                        </div>
-                    </div>
-                    
-                    <div class="lg:col-span-2 bg-white rounded-2xl shadow-xl p-8">
-                        <h3 class="text-2xl font-bold text-emerald-800 mb-6">Informations</h3>
-                        <div class="space-y-4">
-                            <div>
-                                <label class="text-sm font-semibold text-gray-600">Nom complet</label>
-                                <p class="text-lg">${this.currentUser.prenom} ${this.currentUser.nom}</p>
-                            </div>
-                            <div>
-                                <label class="text-sm font-semibold text-gray-600">Email</label>
-                                <p class="text-lg">${this.currentUser.email}</p>
-                            </div>
-                            <div>
-                                <label class="text-sm font-semibold text-gray-600">Rôle</label>
-                                <p class="text-lg capitalize">${this.currentUser.role}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    async loadOrderConfirmationPage(orderNumber) {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-16 max-w-2xl text-center">
-                <div class="bg-white rounded-2xl shadow-2xl p-12">
-                    <div class="w-24 h-24 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full mx-auto flex items-center justify-center mb-6">
-                        <i class="fas fa-check text-white text-4xl"></i>
-                    </div>
-                    
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
-                    <p class="text-xl text-emerald-600 mb-8">Merci pour votre commande</p>
-                    
-                    <div class="bg-emerald-50 rounded-xl p-6 mb-8">
-                        <p class="text-sm text-emerald-600 mb-2">Numéro de commande</p>
-                        <p class="text-3xl font-bold text-emerald-800">${orderNumber}</p>
-                    </div>
-                    
-                    <p class="text-gray-600 mb-8">
-                        Nous avons bien reçu votre commande et nous la préparons avec soin.
-                        Vous recevrez bientôt un email de confirmation.
-                    </p>
-                    
-                    <div class="flex gap-4 justify-center">
-                        <button onclick="app.showPage('home')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
-                            Retour à l'accueil
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
     
     async filterByCategory(category) {
         await this.showPage('products', { categorie: category });
@@ -897,12 +412,8 @@ class PharmacieGaherApp {
         }
     }
     
-    // ADD TO CART FUNCTIONALITY - FIXED
     async addToCart(productId, quantity = 1) {
         try {
-            console.log('Adding to cart:', productId, quantity);
-            
-            // Find product in our cached products
             const product = this.allProducts.find(p => p._id === productId);
             
             if (!product) {
@@ -919,7 +430,6 @@ class PharmacieGaherApp {
                 return;
             }
             
-            // Generate image URL
             const getCategoryColor = (category) => {
                 const colors = {
                     'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
@@ -942,7 +452,6 @@ class PharmacieGaherApp {
                 imageUrl = `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
             }
             
-            // Check if product already in cart
             const existingIndex = this.cart.findIndex(item => item.id === productId);
             
             if (existingIndex > -1) {
@@ -1092,7 +601,6 @@ class PharmacieGaherApp {
         this.cart = [];
         this.saveCart();
         this.updateCartUI();
-        this.showToast('Panier vidé', 'success');
     }
     
     saveCart() {
@@ -1107,17 +615,412 @@ class PharmacieGaherApp {
         return this.cart.reduce((count, item) => count + item.quantite, 0);
     }
     
-    logout() {
-        localStorage.removeItem('token');
-        this.currentUser = null;
-        this.updateUserUI();
-        this.showToast('Déconnexion réussie', 'success');
-        this.showPage('home');
+    async loadLoginPage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-12">
+                <div class="max-w-md mx-auto">
+                    <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 overflow-hidden">
+                        <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-8 text-white text-center">
+                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/30">
+                                <i class="fas fa-user text-4xl"></i>
+                            </div>
+                            <h2 class="text-3xl font-bold mb-2">Connexion</h2>
+                            <p class="text-emerald-100">Accédez à votre compte</p>
+                        </div>
+                        
+                        <form id="loginForm" onsubmit="handleLogin(event)" class="p-8 space-y-6">
+                            <div>
+                                <label for="loginEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                                <input type="email" id="loginEmail" name="email" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                       placeholder="votre@email.com">
+                            </div>
+                            
+                            <div>
+                                <label for="loginPassword" class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe</label>
+                                <input type="password" id="loginPassword" name="password" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                       placeholder="Votre mot de passe">
+                            </div>
+                            
+                            <button type="submit" id="loginSubmitBtn" 
+                                    class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold">
+                                <span id="loginSubmitText">Se connecter</span>
+                                <i id="loginSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                            </button>
+                        </form>
+                        
+                        <div class="px-8 pb-8 text-center">
+                            <p class="text-gray-600">
+                                Pas encore de compte ? 
+                                <a href="#" onclick="app.showPage('register')" class="text-emerald-600 font-semibold hover:text-emerald-700">
+                                    Inscrivez-vous
+                                </a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    async loadRegisterPage() {
+        const mainContent = document.getElementById('mainContent');
+        const wilayas = ['Adrar', 'Chlef', 'Laghouat', 'Oum El Bouaghi', 'Batna', 'Béjaïa', 'Biskra', 'Béchar', 'Blida', 'Bouira', 'Tamanrasset', 'Tébessa', 'Tlemcen', 'Tiaret', 'Tizi Ouzou', 'Alger', 'Djelfa', 'Jijel', 'Sétif', 'Saïda', 'Skikda', 'Sidi Bel Abbès', 'Annaba', 'Guelma', 'Constantine', 'Médéa', 'Mostaganem', 'M\'Sila', 'Mascara', 'Ouargla', 'Oran', 'El Bayadh', 'Illizi', 'Bordj Bou Arreridj', 'Boumerdès', 'El Tarf', 'Tindouf', 'Tissemsilt', 'El Oued', 'Khenchela', 'Souk Ahras', 'Tipaza', 'Mila', 'Aïn Defla', 'Naâma', 'Aïn Témouchent', 'Ghardaïa', 'Relizane'];
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-12">
+                <div class="max-w-2xl mx-auto">
+                    <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 overflow-hidden">
+                        <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-8 text-white text-center">
+                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/30">
+                                <i class="fas fa-user-plus text-4xl"></i>
+                            </div>
+                            <h2 class="text-3xl font-bold mb-2">Inscription</h2>
+                            <p class="text-emerald-100">Créez votre compte</p>
+                        </div>
+                        
+                        <form id="registerForm" onsubmit="handleRegister(event)" class="p-8 space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="registerPrenom" class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
+                                    <input type="text" id="registerPrenom" name="prenom" required 
+                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                           placeholder="Votre prénom">
+                                </div>
+                                
+                                <div>
+                                    <label for="registerNom" class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
+                                    <input type="text" id="registerNom" name="nom" required 
+                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                           placeholder="Votre nom">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label for="registerEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
+                                <input type="email" id="registerEmail" name="email" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                       placeholder="votre@email.com">
+                            </div>
+                            
+                            <div>
+                                <label for="registerTelephone" class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
+                                <input type="tel" id="registerTelephone" name="telephone" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                       placeholder="0555123456">
+                            </div>
+                            
+                            <div>
+                                <label for="registerPassword" class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe *</label>
+                                <input type="password" id="registerPassword" name="password" required 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                       placeholder="Min. 6 caractères"
+                                       minlength="6">
+                            </div>
+                            
+                            <div>
+                                <label for="registerAdresse" class="block text-sm font-semibold text-gray-700 mb-2">Adresse</label>
+                                <input type="text" id="registerAdresse" name="adresse" 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                       placeholder="Votre adresse complète">
+                            </div>
+                            
+                            <div>
+                                <label for="registerWilaya" class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
+                                <select id="registerWilaya" name="wilaya" required 
+                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all">
+                                    <option value="">Sélectionner une wilaya</option>
+                                    ${wilayas.map(w => `<option value="${w}">${w}</option>`).join('')}
+                                </select>
+                            </div>
+                            
+                            <button type="submit" id="registerSubmitBtn" 
+                                    class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold">
+                                <span id="registerSubmitText">S'inscrire</span>
+                                <i id="registerSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                            </button>
+                        </form>
+                        
+                        <div class="px-8 pb-8 text-center">
+                            <p class="text-gray-600">
+                                Déjà un compte ? 
+                                <a href="#" onclick="app.showPage('login')" class="text-emerald-600 font-semibold hover:text-emerald-700">
+                                    Connectez-vous
+                                </a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    async loadCheckoutPage() {
+        if (!this.cart || this.cart.length === 0) {
+            this.showToast('Votre panier est vide', 'warning');
+            this.showPage('products');
+            return;
+        }
+        
+        const mainContent = document.getElementById('mainContent');
+        const sousTotal = this.getCartTotal();
+        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
+        const total = sousTotal + fraisLivraison;
+        
+        const wilayas = ['Adrar', 'Chlef', 'Laghouat', 'Oum El Bouaghi', 'Batna', 'Béjaïa', 'Biskra', 'Béchar', 'Blida', 'Bouira', 'Tamanrasset', 'Tébessa', 'Tlemcen', 'Tiaret', 'Tizi Ouzou', 'Alger', 'Djelfa', 'Jijel', 'Sétif', 'Saïda', 'Skikda', 'Sidi Bel Abbès', 'Annaba', 'Guelma', 'Constantine', 'Médéa', 'Mostaganem', 'M\'Sila', 'Mascara', 'Ouargla', 'Oran', 'El Bayadh', 'Illizi', 'Bordj Bou Arreridj', 'Boumerdès', 'El Tarf', 'Tindouf', 'Tissemsilt', 'El Oued', 'Khenchela', 'Souk Ahras', 'Tipaza', 'Mila', 'Aïn Defla', 'Naâma', 'Aïn Témouchent', 'Ghardaïa', 'Relizane'];
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-6xl mx-auto">
+                    <h1 class="text-4xl font-bold text-emerald-800 mb-8 text-center">Finaliser votre commande</h1>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-2 space-y-6">
+                            <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6">
+                                <h2 class="text-2xl font-bold text-emerald-800 mb-6">
+                                    <i class="fas fa-user mr-2"></i>Informations personnelles
+                                </h2>
+                                
+                                <form id="checkoutForm" class="space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="checkoutPrenom" class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
+                                            <input type="text" id="checkoutPrenom" required 
+                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none"
+                                                   placeholder="Votre prénom"
+                                                   value="${this.currentUser?.prenom || ''}">
+                                        </div>
+                                        <div>
+                                            <label for="checkoutNom" class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
+                                            <input type="text" id="checkoutNom" required 
+                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none"
+                                                   placeholder="Votre nom"
+                                                   value="${this.currentUser?.nom || ''}">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="checkoutEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                                            <input type="email" id="checkoutEmail" required 
+                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none"
+                                                   placeholder="votre@email.com"
+                                                   value="${this.currentUser?.email || ''}">
+                                        </div>
+                                        <div>
+                                            <label for="checkoutTelephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
+                                            <input type="tel" id="checkoutTelephone" required 
+                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none"
+                                                   placeholder="0555123456"
+                                                   value="${this.currentUser?.telephone || ''}">
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="checkoutAdresse" class="block text-sm font-medium text-gray-700 mb-2">Adresse complète *</label>
+                                        <input type="text" id="checkoutAdresse" required 
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none"
+                                               placeholder="Rue, numéro, bâtiment..."
+                                               value="${this.currentUser?.adresse || ''}">
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="checkoutWilaya" class="block text-sm font-medium text-gray-700 mb-2">Wilaya *</label>
+                                        <select id="checkoutWilaya" required onchange="if(window.checkoutSystem) window.checkoutSystem.calculateShipping()"
+                                                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none">
+                                            <option value="">Sélectionner une wilaya</option>
+                                            ${wilayas.map(w => `<option value="${w}" ${this.currentUser?.wilaya === w ? 'selected' : ''}>${w}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="checkoutCommentaires" class="block text-sm font-medium text-gray-700 mb-2">Commentaires (optionnel)</label>
+                                        <textarea id="checkoutCommentaires" rows="3" 
+                                                  class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none resize-none"
+                                                  placeholder="Instructions spéciales pour la livraison..."></textarea>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6">
+                                <h2 class="text-2xl font-bold text-emerald-800 mb-6">
+                                    <i class="fas fa-credit-card mr-2"></i>Mode de paiement
+                                </h2>
+                                
+                                <div class="space-y-3">
+                                    <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-emerald-400 transition-all">
+                                        <input type="radio" name="modePaiement" value="Paiement à la livraison" checked 
+                                               class="text-emerald-600 focus:ring-emerald-500">
+                                        <span class="ml-3 flex-1">
+                                            <span class="block font-medium text-gray-900">Paiement à la livraison</span>
+                                            <span class="block text-sm text-gray-500">Payez en espèces lors de la réception</span>
+                                        </span>
+                                        <i class="fas fa-money-bill-wave text-2xl text-emerald-600"></i>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="lg:col-span-1">
+                            <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6 sticky top-4">
+                                <h2 class="text-2xl font-bold text-emerald-800 mb-6">
+                                    <i class="fas fa-shopping-bag mr-2"></i>Récapitulatif
+                                </h2>
+                                
+                                <div class="space-y-3 mb-6 max-h-64 overflow-y-auto">
+                                    ${this.cart.map(item => `
+                                        <div class="flex items-center space-x-3 p-3 bg-emerald-50/50 rounded-lg">
+                                            <img src="${item.image}" alt="${item.nom}" 
+                                                 class="w-12 h-12 object-cover rounded-lg border-2 border-emerald-200">
+                                            <div class="flex-1 min-w-0">
+                                                <p class="font-medium text-sm text-emerald-800 truncate">${item.nom}</p>
+                                                <p class="text-xs text-emerald-600">${item.quantite} × ${item.prix} DA</p>
+                                            </div>
+                                            <p class="font-bold text-emerald-700">${item.prix * item.quantite} DA</p>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                
+                                <div class="border-t-2 border-emerald-200 pt-4 space-y-3">
+                                    <div class="flex justify-between text-gray-700">
+                                        <span>Sous-total</span>
+                                        <span id="checkoutSousTotal" class="font-medium">${sousTotal} DA</span>
+                                    </div>
+                                    <div class="flex justify-between text-gray-700">
+                                        <span>Frais de livraison</span>
+                                        <span id="checkoutFraisLivraison" class="font-medium ${fraisLivraison === 0 ? 'text-green-600' : ''}">${fraisLivraison === 0 ? 'GRATUIT' : fraisLivraison + ' DA'}</span>
+                                    </div>
+                                    <div class="flex justify-between text-xl font-bold text-emerald-800 border-t-2 border-emerald-200 pt-3">
+                                        <span>Total</span>
+                                        <span id="checkoutTotal">${total} DA</span>
+                                    </div>
+                                </div>
+                                
+                                ${sousTotal >= 5000 ? `
+                                    <div class="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
+                                        <p class="text-green-700 text-sm font-medium">
+                                            <i class="fas fa-truck mr-2"></i>Livraison gratuite !
+                                        </p>
+                                    </div>
+                                ` : `
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                                        <p class="text-blue-700 text-sm">
+                                            <i class="fas fa-info-circle mr-2"></i>
+                                            Plus que ${5000 - sousTotal} DA pour la livraison gratuite
+                                        </p>
+                                    </div>
+                                `}
+                                
+                                <button onclick="window.processCheckoutOrder()" 
+                                        class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg mt-6">
+                                    <i class="fas fa-check mr-2"></i>Confirmer la commande
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        if (window.initCheckout) {
+            window.initCheckout();
+        }
+    }
+    
+    async loadOrderConfirmationPage(orderNumber) {
+        const mainContent = document.getElementById('mainContent');
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-12">
+                <div class="max-w-2xl mx-auto text-center">
+                    <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-12">
+                        <div class="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+                            <i class="fas fa-check text-white text-5xl"></i>
+                        </div>
+                        
+                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
+                        <p class="text-xl text-emerald-600 mb-8">Merci pour votre commande</p>
+                        
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-8">
+                            <p class="text-gray-700 mb-2">Numéro de commande</p>
+                            <p class="text-2xl font-bold text-emerald-800">${orderNumber}</p>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-8">
+                            Nous avons bien reçu votre commande. Vous recevrez un email de confirmation à l'adresse indiquée.
+                            Notre équipe va traiter votre commande dans les plus brefs délais.
+                        </p>
+                        
+                        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button onclick="app.showPage('home')" 
+                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-8 py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg font-bold">
+                                <i class="fas fa-home mr-2"></i>Retour à l'accueil
+                            </button>
+                            <button onclick="app.showPage('products')" 
+                                    class="bg-white text-emerald-600 border-2 border-emerald-600 px-8 py-3 rounded-xl hover:bg-emerald-50 transition-all font-bold">
+                                <i class="fas fa-shopping-bag mr-2"></i>Continuer mes achats
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    async loadProfilePage() {
+        if (!this.currentUser) {
+            this.showToast('Veuillez vous connecter', 'warning');
+            this.showPage('login');
+            return;
+        }
+        
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-12">
+                <div class="max-w-4xl mx-auto">
+                    <h1 class="text-4xl font-bold text-emerald-800 mb-8">Mon Profil</h1>
+                    
+                    <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Prénom</label>
+                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.prenom}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Nom</label>
+                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.nom}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.email}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
+                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.telephone || 'Non renseigné'}</p>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Adresse</label>
+                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.adresse || 'Non renseignée'}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Wilaya</label>
+                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.wilaya || 'Non renseignée'}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Rôle</label>
+                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.role === 'admin' ? 'Administrateur' : 'Client'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
     
     async loadContactPage() {
         const mainContent = document.getElementById('mainContent');
-        
         mainContent.innerHTML = `
             <div class="container mx-auto px-4 py-8 max-w-6xl">
                 <div class="text-center mb-12">
@@ -1197,7 +1100,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ADMIN METHODS - These need to be part of the main app class
     async loadAdminPage() {
         if (!this.currentUser || this.currentUser.role !== 'admin') {
             this.showToast('Accès refusé - Droits administrateur requis', 'error');
@@ -1206,10 +1108,8 @@ class PharmacieGaherApp {
         }
 
         const mainContent = document.getElementById('mainContent');
-        
         mainContent.innerHTML = `
             <div class="container mx-auto px-4 py-8">
-                <!-- Admin Header -->
                 <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                         <div>
@@ -1229,7 +1129,6 @@ class PharmacieGaherApp {
                     </div>
                 </div>
                 
-                <!-- Navigation Admin -->
                 <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 mb-8 overflow-hidden">
                     <nav class="flex flex-wrap">
                         <button onclick="switchAdminSection('dashboard')" 
@@ -1255,10 +1154,7 @@ class PharmacieGaherApp {
                     </nav>
                 </div>
                 
-                <!-- Admin Content -->
-                <div id="adminContent" class="min-h-96">
-                    <!-- Content will be loaded here -->
-                </div>
+                <div id="adminContent" class="min-h-96"></div>
             </div>
         `;
         
@@ -1267,7 +1163,6 @@ class PharmacieGaherApp {
     
     async loadAdminDashboard() {
         try {
-            // Get stats from localStorage and cached products
             const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
             const products = this.allProducts;
             
@@ -1289,7 +1184,6 @@ class PharmacieGaherApp {
             }
             
             document.getElementById('adminContent').innerHTML = `
-                <!-- Statistics -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-6 shadow-lg">
                         <div class="flex items-center justify-between">
@@ -1344,7 +1238,6 @@ class PharmacieGaherApp {
                     </div>
                 </div>
                 
-                <!-- Quick Actions -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('products')">
                         <i class="fas fa-plus-circle text-4xl mb-4"></i>
@@ -1382,6 +1275,14 @@ class PharmacieGaherApp {
         }
     }
     
+    logout() {
+        localStorage.removeItem('token');
+        this.currentUser = null;
+        this.updateUserUI();
+        this.showToast('Déconnexion réussie', 'success');
+        this.showPage('home');
+    }
+    
     showLoading() {
         const spinner = document.getElementById('loadingSpinner');
         if (spinner) {
@@ -1416,14 +1317,8 @@ class PharmacieGaherApp {
         const container = document.getElementById('toastContainer');
         if (container) {
             container.appendChild(toast);
-            
             setTimeout(() => toast.classList.add('show'), 100);
-            
-            setTimeout(() => {
-                if (toast.parentElement) {
-                    toast.remove();
-                }
-            }, 5000);
+            setTimeout(() => { if (toast.parentElement) toast.remove(); }, 5000);
         }
     }
     
@@ -1438,35 +1333,9 @@ class PharmacieGaherApp {
     }
 }
 
-// Global functions - CRITICAL FIXES
+// Global functions
 function addToCartFromCard(productId, quantity = 1) {
-    console.log('Add to cart from card called:', productId);
     if (window.app && typeof window.app.addToCart === 'function') {
-        window.app.addToCart(productId, quantity);
-    } else {
-        console.error('App not available');
-    }
-}
-
-// Helper function for product page
-function updateProductQuantity(action) {
-    const input = document.getElementById('productQuantity');
-    if (!input) return;
-    
-    let value = parseInt(input.value);
-    if (action === 'plus') {
-        value = Math.min(value + 1, parseInt(input.max));
-    } else if (action === 'minus') {
-        value = Math.max(value - 1, 1);
-    }
-    input.value = value;
-}
-
-function addProductToCart(productId) {
-    const quantityInput = document.getElementById('productQuantity');
-    const quantity = quantityInput ? parseInt(quantityInput.value) : 1;
-    
-    if (window.app) {
         window.app.addToCart(productId, quantity);
     }
 }
@@ -1506,7 +1375,6 @@ function proceedToCheckout() {
             window.app.showToast('Votre panier est vide', 'warning');
             return;
         }
-        
         toggleCart();
         window.app.showPage('checkout');
     }
@@ -1514,7 +1382,6 @@ function proceedToCheckout() {
 
 function handleContactForm(event) {
     event.preventDefault();
-    
     const submitBtn = document.getElementById('contactSubmitBtn');
     const submitText = document.getElementById('contactSubmitText');
     const submitSpinner = document.getElementById('contactSubmitSpinner');
@@ -1527,9 +1394,7 @@ function handleContactForm(event) {
         submitBtn.disabled = false;
         submitText.textContent = 'Envoyer le message';
         submitSpinner.classList.add('hidden');
-        
         event.target.reset();
-        
         if (window.app) {
             window.app.showToast('Message envoyé avec succès !', 'success');
         }
@@ -1551,4 +1416,4 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('App initialized and made globally available');
 });
 
-console.log('✅ COMPLETE app.js loaded with ALL methods + API integration');
+console.log('✅ Complete app.js loaded');
