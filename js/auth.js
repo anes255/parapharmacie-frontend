@@ -1,392 +1,364 @@
-// Fixed Authentication System for Shifa Parapharmacie
+// ==========================================
+// 🌿 Authentication Management - Enhanced
+// ==========================================
 
-class AuthenticationSystem {
-    constructor() {
-        this.currentUser = null;
-        this.token = localStorage.getItem('token');
-        this.init();
-    }
-
-    async init() {
-        if (this.token) {
-            await this.validateToken();
-        }
-    }
-
-    // Validate token on app startup
-    async validateToken() {
-        try {
-            const response = await apiCall('/auth/profile');
-            if (response) {
-                this.currentUser = response;
-                return true;
-            }
-        } catch (error) {
-            console.log('Token validation failed:', error.message);
-            this.logout();
-        }
-        return false;
-    }
-
-    // Login method - FIXED
-    async login(email, password) {
-        try {
-            console.log('🔐 Attempting login for:', email);
-            
-            if (!email || !password) {
-                throw new Error('Email et mot de passe requis');
-            }
-
-            // Validate email format
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                throw new Error('Format d\'email invalide');
-            }
-
-            const response = await apiCall('/auth/login', {
-                method: 'POST',
-                body: JSON.stringify({
-                    email: email.toLowerCase().trim(),
-                    password: password
-                })
-            });
-
-            if (response.token && response.user) {
-                this.token = response.token;
-                this.currentUser = response.user;
-                
-                localStorage.setItem('token', this.token);
-                
-                console.log('✅ Login successful for:', response.user.email);
-                
-                return {
-                    success: true,
-                    user: response.user,
-                    message: response.message || 'Connexion réussie'
-                };
-            } else {
-                throw new Error('Réponse de connexion invalide');
-            }
-
-        } catch (error) {
-            console.error('❌ Login error:', error);
-            throw new Error(error.message || 'Erreur de connexion');
-        }
-    }
-
-    // Register method - FIXED
-    async register(userData) {
-        try {
-            console.log('📝 Attempting registration for:', userData.email);
-            
-            // Validation
-            const required = ['nom', 'prenom', 'email', 'password', 'telephone', 'wilaya'];
-            for (let field of required) {
-                if (!userData[field] || userData[field].trim() === '') {
-                    throw new Error(`Le champ ${field} est requis`);
-                }
-            }
-
-            // Email validation
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(userData.email)) {
-                throw new Error('Format d\'email invalide');
-            }
-
-            // Password validation
-            if (userData.password.length < 6) {
-                throw new Error('Le mot de passe doit contenir au moins 6 caractères');
-            }
-
-            // Phone validation (Algerian format)
-            const phoneRegex = /^(\+213|0)[5-9]\d{8}$/;
-            if (!phoneRegex.test(userData.telephone.replace(/\s+/g, ''))) {
-                throw new Error('Format de téléphone invalide (numéro algérien requis)');
-            }
-
-            const response = await apiCall('/auth/register', {
-                method: 'POST',
-                body: JSON.stringify({
-                    nom: userData.nom.trim(),
-                    prenom: userData.prenom.trim(),
-                    email: userData.email.toLowerCase().trim(),
-                    password: userData.password,
-                    telephone: userData.telephone.replace(/\s+/g, ''),
-                    adresse: userData.adresse ? userData.adresse.trim() : '',
-                    ville: userData.ville ? userData.ville.trim() : '',
-                    wilaya: userData.wilaya,
-                    codePostal: userData.codePostal ? userData.codePostal.trim() : ''
-                })
-            });
-
-            if (response.token && response.user) {
-                this.token = response.token;
-                this.currentUser = response.user;
-                
-                localStorage.setItem('token', this.token);
-                
-                console.log('✅ Registration successful for:', response.user.email);
-                
-                return {
-                    success: true,
-                    user: response.user,
-                    message: response.message || 'Inscription réussie'
-                };
-            } else {
-                throw new Error('Réponse d\'inscription invalide');
-            }
-
-        } catch (error) {
-            console.error('❌ Registration error:', error);
-            throw new Error(error.message || 'Erreur lors de l\'inscription');
-        }
-    }
-
-    // Get current user profile
-    async getProfile() {
-        try {
-            if (!this.token) {
-                throw new Error('Non connecté');
-            }
-
-            const response = await apiCall('/auth/profile');
-            if (response) {
-                this.currentUser = response;
-                return response;
-            }
-        } catch (error) {
-            console.error('Error getting profile:', error);
-            throw error;
-        }
-    }
-
-    // Update user profile
-    async updateProfile(updateData) {
-        try {
-            if (!this.token) {
-                throw new Error('Non connecté');
-            }
-
-            const response = await apiCall('/auth/profile', {
-                method: 'PUT',
-                body: JSON.stringify(updateData)
-            });
-
-            if (response.user) {
-                this.currentUser = response.user;
-                return response;
-            }
-
-            return response;
-
-        } catch (error) {
-            console.error('Error updating profile:', error);
-            throw error;
-        }
-    }
-
-    // Change password
-    async changePassword(currentPassword, newPassword) {
-        try {
-            if (!this.token) {
-                throw new Error('Non connecté');
-            }
-
-            if (!currentPassword || !newPassword) {
-                throw new Error('Mot de passe actuel et nouveau mot de passe requis');
-            }
-
-            if (newPassword.length < 6) {
-                throw new Error('Le nouveau mot de passe doit contenir au moins 6 caractères');
-            }
-
-            const response = await apiCall('/auth/change-password', {
-                method: 'POST',
-                body: JSON.stringify({
-                    currentPassword,
-                    newPassword
-                })
-            });
-
-            return response;
-
-        } catch (error) {
-            console.error('Error changing password:', error);
-            throw error;
-        }
-    }
-
-    // Logout
-    logout() {
-        console.log('🚪 Logging out user');
-        
-        this.token = null;
-        this.currentUser = null;
-        
-        localStorage.removeItem('token');
-        
-        // Update UI if app is available
-        if (window.app) {
-            window.app.currentUser = null;
-            window.app.updateUserUI();
-        }
-    }
-
-    // Check if user is authenticated
-    isAuthenticated() {
-        return !!(this.token && this.currentUser);
-    }
-
-    // Check if user is admin
-    isAdmin() {
-        return this.isAuthenticated() && this.currentUser.role === 'admin';
-    }
-
-    // Get user role
-    getRole() {
-        return this.currentUser ? this.currentUser.role : null;
-    }
-
-    // Get user info
-    getUser() {
-        return this.currentUser;
-    }
-
-    // Get token
-    getToken() {
-        return this.token;
-    }
+/**
+ * Load login page
+ */
+async function loadLoginPage() {
+    const mainContent = document.getElementById('mainContent');
+    
+    mainContent.innerHTML = `
+        <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+            <div class="max-w-md w-full">
+                <div class="bg-white rounded-3xl shadow-2xl p-8">
+                    <!-- Logo -->
+                    <div class="text-center mb-8">
+                        <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl mb-4 shadow-lg">
+                            <i class="fas fa-seedling text-white text-3xl"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold text-emerald-900">Connexion</h2>
+                        <p class="text-gray-600 mt-2">Connectez-vous à votre compte</p>
+                    </div>
+                    
+                    <!-- Login Form -->
+                    <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-6">
+                        <div>
+                            <label for="loginEmail" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-envelope text-emerald-500 mr-2"></i>Email
+                            </label>
+                            <input type="email" id="loginEmail" name="email" required 
+                                   class="form-input"
+                                   placeholder="votre@email.com"
+                                   autocomplete="email">
+                        </div>
+                        
+                        <div>
+                            <label for="loginPassword" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-lock text-emerald-500 mr-2"></i>Mot de passe
+                            </label>
+                            <div class="relative">
+                                <input type="password" id="loginPassword" name="password" required 
+                                       class="form-input pr-12"
+                                       placeholder="••••••••"
+                                       autocomplete="current-password">
+                                <button type="button" onclick="togglePasswordVisibility('loginPassword')"
+                                        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-eye" id="loginPasswordIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="w-full btn-primary py-3" id="loginBtn">
+                            <span id="loginBtnText">Se connecter</span>
+                            <i id="loginBtnSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                        </button>
+                    </form>
+                    
+                    <!-- Links -->
+                    <div class="mt-6 text-center space-y-3">
+                        <p class="text-sm text-gray-600">
+                            Pas encore de compte?
+                            <a href="#" onclick="window.app.showPage('register')" class="font-semibold text-emerald-600 hover:text-emerald-700">
+                                S'inscrire
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
-// CRITICAL FIX: Define global functions IMMEDIATELY, not in DOMContentLoaded
+/**
+ * Load registration page
+ */
+async function loadRegisterPage() {
+    const mainContent = document.getElementById('mainContent');
+    
+    mainContent.innerHTML = `
+        <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+            <div class="max-w-2xl w-full">
+                <div class="bg-white rounded-3xl shadow-2xl p-8">
+                    <!-- Logo -->
+                    <div class="text-center mb-8">
+                        <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl mb-4 shadow-lg">
+                            <i class="fas fa-user-plus text-white text-3xl"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold text-emerald-900">Inscription</h2>
+                        <p class="text-gray-600 mt-2">Créez votre compte Shifa</p>
+                    </div>
+                    
+                    <!-- Registration Form -->
+                    <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="registerNom" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-user text-emerald-500 mr-2"></i>Nom *
+                                </label>
+                                <input type="text" id="registerNom" name="nom" required 
+                                       class="form-input"
+                                       placeholder="Votre nom">
+                            </div>
+                            
+                            <div>
+                                <label for="registerPrenom" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-user text-emerald-500 mr-2"></i>Prénom *
+                                </label>
+                                <input type="text" id="registerPrenom" name="prenom" required 
+                                       class="form-input"
+                                       placeholder="Votre prénom">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="registerEmail" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-envelope text-emerald-500 mr-2"></i>Email *
+                            </label>
+                            <input type="email" id="registerEmail" name="email" required 
+                                   class="form-input"
+                                   placeholder="votre@email.com">
+                        </div>
+                        
+                        <div>
+                            <label for="registerTelephone" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-phone text-emerald-500 mr-2"></i>Téléphone *
+                            </label>
+                            <input type="tel" id="registerTelephone" name="telephone" required 
+                                   class="form-input"
+                                   placeholder="+213 555 123 456">
+                        </div>
+                        
+                        <div>
+                            <label for="registerWilaya" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-map-marker-alt text-emerald-500 mr-2"></i>Wilaya *
+                            </label>
+                            <select id="registerWilaya" name="wilaya" required class="form-select">
+                                <option value="">Sélectionnez votre wilaya</option>
+                                ${CONFIG.WILAYAS.map(w => `<option value="${w}">${w}</option>`).join('')}
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="registerAdresse" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-home text-emerald-500 mr-2"></i>Adresse complète *
+                            </label>
+                            <textarea id="registerAdresse" name="adresse" required 
+                                      class="form-textarea"
+                                      rows="3"
+                                      placeholder="Rue, numéro, quartier..."></textarea>
+                        </div>
+                        
+                        <div>
+                            <label for="registerPassword" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-lock text-emerald-500 mr-2"></i>Mot de passe *
+                            </label>
+                            <div class="relative">
+                                <input type="password" id="registerPassword" name="password" required 
+                                       class="form-input pr-12"
+                                       placeholder="••••••••"
+                                       minlength="6">
+                                <button type="button" onclick="togglePasswordVisibility('registerPassword')"
+                                        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-eye" id="registerPasswordIcon"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Minimum 6 caractères</p>
+                        </div>
+                        
+                        <div>
+                            <label for="registerConfirmPassword" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-lock text-emerald-500 mr-2"></i>Confirmer le mot de passe *
+                            </label>
+                            <div class="relative">
+                                <input type="password" id="registerConfirmPassword" name="confirmPassword" required 
+                                       class="form-input pr-12"
+                                       placeholder="••••••••"
+                                       minlength="6">
+                                <button type="button" onclick="togglePasswordVisibility('registerConfirmPassword')"
+                                        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-eye" id="registerConfirmPasswordIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="w-full btn-primary py-3" id="registerBtn">
+                            <span id="registerBtnText">Créer mon compte</span>
+                            <i id="registerBtnSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                        </button>
+                    </form>
+                    
+                    <!-- Links -->
+                    <div class="mt-6 text-center">
+                        <p class="text-sm text-gray-600">
+                            Vous avez déjà un compte?
+                            <a href="#" onclick="window.app.showPage('login')" class="font-semibold text-emerald-600 hover:text-emerald-700">
+                                Se connecter
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Handle login
+ */
 async function handleLogin(event) {
     event.preventDefault();
     
-    const email = document.getElementById('loginEmail')?.value.trim();
-    const password = document.getElementById('loginPassword')?.value;
-    
-    if (!email || !password) {
-        if (window.app) {
-            window.app.showToast('Veuillez remplir tous les champs', 'error');
-        }
-        return;
-    }
+    const btn = document.getElementById('loginBtn');
+    const btnText = document.getElementById('loginBtnText');
+    const btnSpinner = document.getElementById('loginBtnSpinner');
     
     try {
-        const result = await authSystem.login(email, password);
+        // Disable button
+        btn.disabled = true;
+        btnText.textContent = 'Connexion...';
+        btnSpinner.classList.remove('hidden');
         
-        if (result.success) {
-            if (window.app) {
-                window.app.currentUser = result.user;
-                window.app.updateUserUI();
-                window.app.showToast(result.message, 'success');
+        const formData = new FormData(event.target);
+        const data = {
+            email: formData.get('email'),
+            password: formData.get('password')
+        };
+        
+        log('Login attempt', { email: data.email });
+        
+        // Call API
+        const response = await apiCall('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        if (response.token) {
+            // Save token
+            localStorage.setItem('token', response.token);
+            
+            // Update app state
+            window.app.currentUser = response.user;
+            window.app.updateUserUI();
+            
+            window.app.showToast('Connexion réussie!', 'success');
+            
+            // Redirect
+            setTimeout(() => {
                 window.app.showPage('home');
-            }
+            }, 1000);
         }
+        
     } catch (error) {
         console.error('Login error:', error);
-        if (window.app) {
-            window.app.showToast(error.message, 'error');
-        }
+        window.app.showToast(error.message || 'Erreur de connexion', 'error');
+    } finally {
+        // Re-enable button
+        btn.disabled = false;
+        btnText.textContent = 'Se connecter';
+        btnSpinner.classList.add('hidden');
     }
 }
 
+/**
+ * Handle registration
+ */
 async function handleRegister(event) {
     event.preventDefault();
     
-    const formData = {
-        prenom: document.getElementById('registerPrenom')?.value.trim(),
-        nom: document.getElementById('registerNom')?.value.trim(),
-        email: document.getElementById('registerEmail')?.value.trim(),
-        telephone: document.getElementById('registerTelephone')?.value.trim(),
-        password: document.getElementById('registerPassword')?.value,
-        adresse: document.getElementById('registerAdresse')?.value.trim(),
-        wilaya: document.getElementById('registerWilaya')?.value
-    };
+    const btn = document.getElementById('registerBtn');
+    const btnText = document.getElementById('registerBtnText');
+    const btnSpinner = document.getElementById('registerBtnSpinner');
     
     try {
-        const result = await authSystem.register(formData);
+        // Disable button
+        btn.disabled = true;
+        btnText.textContent = 'Création en cours...';
+        btnSpinner.classList.remove('hidden');
         
-        if (result.success) {
-            if (window.app) {
-                window.app.currentUser = result.user;
-                window.app.updateUserUI();
-                window.app.showToast(result.message, 'success');
-                window.app.showPage('home');
-            }
+        const formData = new FormData(event.target);
+        const data = {
+            nom: formData.get('nom'),
+            prenom: formData.get('prenom'),
+            email: formData.get('email'),
+            telephone: formData.get('telephone'),
+            wilaya: formData.get('wilaya'),
+            adresse: formData.get('adresse'),
+            password: formData.get('password')
+        };
+        
+        const confirmPassword = formData.get('confirmPassword');
+        
+        // Validate
+        if (!isValidEmail(data.email)) {
+            throw new Error('Email invalide');
         }
+        
+        if (!isValidPhone(data.telephone)) {
+            throw new Error('Numéro de téléphone invalide (format: +213 5XX XXX XXX)');
+        }
+        
+        if (data.password.length < 6) {
+            throw new Error('Le mot de passe doit contenir au moins 6 caractères');
+        }
+        
+        if (data.password !== confirmPassword) {
+            throw new Error('Les mots de passe ne correspondent pas');
+        }
+        
+        log('Registration attempt', { email: data.email });
+        
+        // Call API
+        const response = await apiCall('/auth/register', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        if (response.token) {
+            // Save token
+            localStorage.setItem('token', response.token);
+            
+            // Update app state
+            window.app.currentUser = response.user;
+            window.app.updateUserUI();
+            
+            window.app.showToast('Compte créé avec succès!', 'success');
+            
+            // Redirect
+            setTimeout(() => {
+                window.app.showPage('home');
+            }, 1000);
+        }
+        
     } catch (error) {
         console.error('Registration error:', error);
-        if (window.app) {
-            window.app.showToast(error.message, 'error');
-        }
+        window.app.showToast(error.message || 'Erreur d\'inscription', 'error');
+    } finally {
+        // Re-enable button
+        btn.disabled = false;
+        btnText.textContent = 'Créer mon compte';
+        btnSpinner.classList.add('hidden');
     }
 }
 
-// Global logout function
-function logout() {
-    if (authSystem) {
-        authSystem.logout();
-    }
+/**
+ * Toggle password visibility
+ */
+function togglePasswordVisibility(inputId) {
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(inputId + 'Icon');
     
-    if (window.app) {
-        window.app.showToast('Déconnexion réussie', 'success');
-        window.app.showPage('home');
+    if (!input || !icon) return;
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
     }
 }
 
-// Password validation helper
-function validatePassword(password) {
-    const errors = [];
-    
-    if (password.length < 6) {
-        errors.push('Le mot de passe doit contenir au moins 6 caractères');
-    }
-    
-    if (!/[A-Z]/.test(password)) {
-        errors.push('Le mot de passe doit contenir au moins une majuscule');
-    }
-    
-    if (!/[a-z]/.test(password)) {
-        errors.push('Le mot de passe doit contenir au moins une minuscule');
-    }
-    
-    if (!/[0-9]/.test(password)) {
-        errors.push('Le mot de passe doit contenir au moins un chiffre');
-    }
-    
-    return {
-        isValid: errors.length === 0,
-        errors
-    };
-}
-
-// Email validation helper
-function validateEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-}
-
-// Phone validation helper (Algerian format)
-function validatePhone(phone) {
-    const phoneRegex = /^(\+213|0)[5-9]\d{8}$/;
-    return phoneRegex.test(phone.replace(/\s+/g, ''));
-}
-
-// CRITICAL: Export functions IMMEDIATELY to window
-window.handleLogin = handleLogin;
-window.handleRegister = handleRegister;
-window.logout = logout;
-window.validatePassword = validatePassword;
-window.validateEmail = validateEmail;
-window.validatePhone = validatePhone;
-
-// Initialize authentication system
-let authSystem;
-document.addEventListener('DOMContentLoaded', () => {
-    authSystem = new AuthenticationSystem();
-    window.authSystem = authSystem;
-    console.log('✅ Authentication system initialized');
-});
-
-console.log('✅ Auth.js loaded successfully - Global functions ready');
+console.log('✅ Auth.js loaded successfully');
