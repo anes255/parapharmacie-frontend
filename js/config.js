@@ -1,16 +1,10 @@
-// Complete Configuration for Shifa Parapharmacie - Production API
-
-// FORCE PRODUCTION MODE - Always use Render API
+// Fixed Configuration for Shifa Parapharmacie Frontend-Backend Connection
 const API_CONFIG = {
-    // PRODUCTION API URL - DO NOT CHANGE
     BASE_URL: 'https://parapharmacie-gaher.onrender.com/api',
-    
-    // Request configuration
     TIMEOUT: 30000, // 30 seconds for Render cold starts
     RETRY_ATTEMPTS: 3,
     RETRY_DELAY: 2000, // 2 seconds
     
-    // Endpoints
     ENDPOINTS: {
         AUTH: {
             LOGIN: '/auth/login',
@@ -40,13 +34,12 @@ const API_CONFIG = {
 
 // Helper function to build API URLs
 function buildApiUrl(endpoint) {
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
-    const url = API_CONFIG.BASE_URL + cleanEndpoint;
-    console.log(`🌐 Building API URL: ${url}`);
+    const url = API_CONFIG.BASE_URL + endpoint;
+    console.log(`🌐 API URL: ${url}`);
     return url;
 }
 
-// Enhanced API call function with better error handling
+// Enhanced API call function with improved error handling
 async function apiCall(endpoint, options = {}) {
     const url = buildApiUrl(endpoint);
     
@@ -56,8 +49,7 @@ async function apiCall(endpoint, options = {}) {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         },
-        mode: 'cors',
-        credentials: 'omit'
+        mode: 'cors'
     };
     
     // Add auth token if available
@@ -76,24 +68,13 @@ async function apiCall(endpoint, options = {}) {
         }
     };
     
-    console.log(`📤 API Request: ${finalOptions.method} ${url}`);
-    if (finalOptions.body) {
-        try {
-            const bodyData = JSON.parse(finalOptions.body);
-            console.log('📦 Request body:', bodyData);
-        } catch (e) {
-            console.log('📦 Request body (raw):', finalOptions.body);
-        }
-    }
-    
     // Retry logic for Render cold starts and network issues
     for (let attempt = 1; attempt <= API_CONFIG.RETRY_ATTEMPTS; attempt++) {
         try {
-            console.log(`🔄 Attempt ${attempt}/${API_CONFIG.RETRY_ATTEMPTS}`);
+            console.log(`🔄 Attempt ${attempt}/${API_CONFIG.RETRY_ATTEMPTS}: ${finalOptions.method} ${url}`);
             
             const controller = new AbortController();
             const timeoutId = setTimeout(() => {
-                console.log('⏱️ Request timeout, aborting...');
                 controller.abort();
             }, API_CONFIG.TIMEOUT);
             
@@ -106,7 +87,6 @@ async function apiCall(endpoint, options = {}) {
             
             console.log(`📡 Response received: ${response.status} ${response.statusText}`);
             
-            // Handle response
             const contentType = response.headers.get('content-type');
             let data;
             
@@ -115,7 +95,6 @@ async function apiCall(endpoint, options = {}) {
                 console.log('📥 Response data:', data);
             } else {
                 const text = await response.text();
-                console.log('📄 Response text:', text);
                 try {
                     data = JSON.parse(text);
                 } catch {
@@ -123,25 +102,25 @@ async function apiCall(endpoint, options = {}) {
                 }
             }
             
-            // Handle HTTP errors
             if (!response.ok) {
                 console.error(`❌ HTTP Error ${response.status}:`, data);
                 
-                // For 401 Unauthorized, clear token
+                // Handle 401 Unauthorized errors
                 if (response.status === 401) {
                     console.log('🚪 Unauthorized - clearing token');
-                    localStorage.removeItem('token');
-                    throw new Error(data.message || 'Session expirée. Veuillez vous reconnecter.');
+                    // Only clear token and redirect for certain 401 errors
+                    // Let the calling code decide what to do
+                    throw new Error(data.message || 'Token invalide, utilisateur non trouvé');
                 }
                 
-                // Don't retry on client errors (4xx)
-                if (response.status >= 400 && response.status < 500) {
-                    throw new Error(data.message || `Erreur: ${response.status}`);
+                // Don't retry on client errors (400-499) except 408 (timeout)
+                if (response.status >= 400 && response.status < 500 && response.status !== 408) {
+                    throw new Error(data.message || `Erreur HTTP: ${response.status}`);
                 }
                 
-                // Retry on server errors (5xx) if we have attempts left
+                // Retry on server errors if we have attempts left
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🔄 Server error, retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
+                    console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
                     continue;
                 }
@@ -149,42 +128,36 @@ async function apiCall(endpoint, options = {}) {
                 throw new Error(data.message || `Erreur serveur: ${response.status}`);
             }
             
-            console.log('✅ API call successful');
+            console.log('✅ API Call Success');
             return data;
             
         } catch (error) {
-            console.error(`💥 Error on attempt ${attempt}:`, error);
+            console.error(`💥 Error on attempt ${attempt}:`, error.message);
             
-            // Handle abort/timeout
             if (error.name === 'AbortError') {
-                console.log('⏱️ Request timed out');
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
+                    console.log(`⏱️ Timeout - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
                     continue;
                 } else {
-                    throw new Error('Le serveur met trop de temps à répondre. Veuillez réessayer.');
+                    throw new Error('Le serveur met trop de temps à répondre. Réessayez plus tard.');
                 }
-            }
-            
-            // Handle network errors
-            if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                console.log('🌐 Network error detected');
+            } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
-                    console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
+                    console.log(`🌐 Network error - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
                     continue;
                 } else {
-                    throw new Error('Impossible de contacter le serveur. Vérifiez votre connexion internet.');
+                    throw new Error('Impossible de contacter le serveur. Vérifiez votre connexion.');
                 }
             }
             
-            // If this is the last attempt, throw the error
+            // If this was the last attempt, throw the error
             if (attempt === API_CONFIG.RETRY_ATTEMPTS) {
                 throw error;
             }
             
-            // Otherwise, retry after delay
+            // Otherwise, retry
             console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
             await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
         }
@@ -211,4 +184,3 @@ window.apiCall = apiCall;
 window.testBackendConnection = testBackendConnection;
 
 console.log('✅ Config loaded - Backend URL:', API_CONFIG.BASE_URL);
-console.log('🚀 Using PRODUCTION API on Render');
