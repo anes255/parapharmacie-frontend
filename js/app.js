@@ -1,9 +1,9 @@
-// Complete PharmacieGaherApp - Full File with All Pages
+// Clean PharmacieGaherApp - Updated with proper admin integration and auth handling
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
         this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        this.allProducts = [];
+        this.allProducts = []; // Cache for all products
         this.settings = {
             couleurPrimaire: '#10b981',
             couleurSecondaire: '#059669',
@@ -13,6 +13,7 @@ class PharmacieGaherApp {
             livraisonGratuite: 5000
         };
         this.currentPage = 'home';
+        
         this.init();
     }
     
@@ -26,44 +27,60 @@ class PharmacieGaherApp {
             this.initSearch();
         } catch (error) {
             console.error('Erreur initialisation app:', error);
-            this.showToast('Erreur de chargement de l\'application', 'error');
+            // Don't show error toast on init - just continue
+            console.log('⚠️ Continuing with limited functionality...');
         }
     }
     
+    // New method to load and cache products
     async loadProductsCache() {
         try {
             console.log('Loading products cache...');
+            
+            // Start with localStorage products
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             this.allProducts = [...localProducts];
             
+            // Try to load from API and merge
             try {
-                const response = await apiCall('/products');
-                if (response && response.products && response.products.length > 0) {
-                    const localIds = localProducts.map(p => p._id);
-                    const newApiProducts = response.products.filter(p => !localIds.includes(p._id));
-                    
-                    if (newApiProducts.length > 0) {
-                        this.allProducts = [...localProducts, ...newApiProducts];
-                        localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
+                const response = await fetch(buildApiUrl('/products'));
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.products && data.products.length > 0) {
+                        // Merge API products with local ones, avoiding duplicates
+                        const localIds = localProducts.map(p => p._id);
+                        const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
+                        
+                        if (newApiProducts.length > 0) {
+                            this.allProducts = [...localProducts, ...newApiProducts];
+                            // Update localStorage with merged data
+                            localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
+                        }
                     }
                 }
             } catch (error) {
-                console.log('API unavailable, using local products only:', error.message);
+                console.log('⚠️ API unavailable, using local products only');
             }
             
             console.log(`Products cache loaded: ${this.allProducts.length} products`);
+            
         } catch (error) {
             console.error('Error loading products cache:', error);
             this.allProducts = [];
         }
     }
     
+    // Method to refresh products cache
     refreshProductsCache() {
         console.log('Refreshing products cache...');
+        
+        // Reload from localStorage
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         this.allProducts = [...localProducts];
+        
         console.log(`Products cache refreshed: ${this.allProducts.length} products`);
         
+        // If we're on the home page, refresh the displayed products
         if (this.currentPage === 'home') {
             this.refreshHomePage();
         } else if (this.currentPage === 'products') {
@@ -71,25 +88,50 @@ class PharmacieGaherApp {
         }
     }
     
+    // Method to refresh home page content
     refreshHomePage() {
         console.log('Refreshing home page content...');
         this.loadFeaturedProducts();
         this.loadPromotionProducts();
     }
     
+    // FIXED: Graceful authentication check
     async checkAuth() {
         const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                const response = await apiCall('/auth/profile');
-                if (response) {
-                    this.currentUser = response;
-                    this.updateUserUI();
+        
+        if (!token) {
+            console.log('No token found - user not authenticated');
+            this.currentUser = null;
+            this.updateUserUI();
+            return;
+        }
+        
+        try {
+            console.log('🔍 Checking authentication...');
+            const response = await fetch(buildApiUrl('/auth/profile'), {
+                headers: { 
+                    'x-auth-token': token,
+                    'Accept': 'application/json'
                 }
-            } catch (error) {
-                console.error('Erreur vérification auth:', error);
+            });
+            
+            if (response.ok) {
+                this.currentUser = await response.json();
+                console.log('✅ User authenticated:', this.currentUser.email);
+                this.updateUserUI();
+            } else {
+                // Token is invalid - clear it silently
+                console.log('⚠️ Token invalid - clearing');
                 localStorage.removeItem('token');
+                this.currentUser = null;
+                this.updateUserUI();
             }
+        } catch (error) {
+            // Network error or other issue - clear token and continue
+            console.log('⚠️ Auth check failed - clearing token');
+            localStorage.removeItem('token');
+            this.currentUser = null;
+            this.updateUserUI();
         }
     }
     
@@ -104,7 +146,7 @@ class PharmacieGaherApp {
         }
         
         this.updateCartUI();
-        window.app = this;
+        window.app = this; // Critical: Make globally available
     }
     
     updateUserUI() {
@@ -215,33 +257,42 @@ class PharmacieGaherApp {
                 <div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-50 to-transparent"></div>
             </section>
             
+            <!-- Categories Section -->
             <section class="py-16 bg-gradient-to-br from-green-50 to-emerald-100">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
                         <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Catégories</h2>
                         <p class="text-xl text-emerald-600">Découvrez notre gamme complète de produits</p>
                     </div>
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="categoriesGrid"></div>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="categoriesGrid">
+                        <!-- Categories will be loaded here -->
+                    </div>
                 </div>
             </section>
             
+            <!-- Featured Products -->
             <section class="py-16 bg-white">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
                         <h2 class="text-4xl font-bold text-emerald-800 mb-4">Nos Coups de Cœur</h2>
                         <p class="text-xl text-emerald-600">Produits sélectionnés pour vous</p>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="featuredProducts"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="featuredProducts">
+                        <!-- Featured products will be loaded here -->
+                    </div>
                 </div>
             </section>
             
+            <!-- Promotions -->
             <section class="py-16 bg-gradient-to-br from-red-50 to-pink-100">
                 <div class="container mx-auto px-4">
                     <div class="text-center mb-12">
                         <h2 class="text-4xl font-bold text-red-800 mb-4">Promotions</h2>
                         <p class="text-xl text-red-600">Offres spéciales et réductions</p>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="promotionProducts"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="promotionProducts">
+                        <!-- Promotion products will be loaded here -->
+                    </div>
                 </div>
             </section>
         `;
@@ -282,7 +333,12 @@ class PharmacieGaherApp {
     }
     
     async loadFeaturedProducts() {
+        console.log('Loading featured products...');
+        
         const featuredProducts = this.allProducts.filter(p => p.enVedette && p.actif !== false);
+        
+        console.log(`Found ${featuredProducts.length} featured products`);
+        
         const container = document.getElementById('featuredProducts');
         if (container) {
             if (featuredProducts.length === 0) {
@@ -291,6 +347,11 @@ class PharmacieGaherApp {
                         <i class="fas fa-star text-6xl text-emerald-200 mb-6"></i>
                         <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucun produit en vedette</h3>
                         <p class="text-emerald-600 mb-8">Ajoutez des produits en vedette depuis l'administration</p>
+                        ${this.currentUser && this.currentUser.role === 'admin' ? `
+                        <button onclick="app.showPage('admin')" class="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 px-8 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg">
+                            <i class="fas fa-cog mr-2"></i>Aller à l'administration
+                        </button>
+                        ` : ''}
                     </div>
                 `;
             } else {
@@ -300,7 +361,12 @@ class PharmacieGaherApp {
     }
     
     async loadPromotionProducts() {
+        console.log('Loading promotion products...');
+        
         const promotionProducts = this.allProducts.filter(p => p.enPromotion && p.actif !== false);
+        
+        console.log(`Found ${promotionProducts.length} promotion products`);
+        
         const container = document.getElementById('promotionProducts');
         if (container) {
             if (promotionProducts.length === 0) {
@@ -326,6 +392,8 @@ class PharmacieGaherApp {
             imageUrl = product.image;
         } else if (product.image && product.image.startsWith('data:image')) {
             imageUrl = product.image;
+        } else if (product.image) {
+            imageUrl = `./images/products/${product.image}`;
         } else {
             const getCategoryColor = (category) => {
                 const colors = {
@@ -352,7 +420,8 @@ class PharmacieGaherApp {
                 
                 <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden relative">
                     <img src="${imageUrl}" alt="${product.nom}" 
-                         class="w-full h-full object-cover hover:scale-105 transition-transform duration-500">
+                         class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                         onerror="this.src='https://via.placeholder.com/300x300/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
                 </div>
                 
                 <div class="p-6">
@@ -412,8 +481,11 @@ class PharmacieGaherApp {
         }
     }
     
+    // ADD TO CART FUNCTIONALITY
     async addToCart(productId, quantity = 1) {
         try {
+            console.log('Adding to cart:', productId, quantity);
+            
             const product = this.allProducts.find(p => p._id === productId);
             
             if (!product) {
@@ -601,6 +673,7 @@ class PharmacieGaherApp {
         this.cart = [];
         this.saveCart();
         this.updateCartUI();
+        this.showToast('Panier vidé', 'success');
     }
     
     saveCart() {
@@ -615,412 +688,17 @@ class PharmacieGaherApp {
         return this.cart.reduce((count, item) => count + item.quantite, 0);
     }
     
-    async loadLoginPage() {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-12">
-                <div class="max-w-md mx-auto">
-                    <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 overflow-hidden">
-                        <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-8 text-white text-center">
-                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/30">
-                                <i class="fas fa-user text-4xl"></i>
-                            </div>
-                            <h2 class="text-3xl font-bold mb-2">Connexion</h2>
-                            <p class="text-emerald-100">Accédez à votre compte</p>
-                        </div>
-                        
-                        <form id="loginForm" onsubmit="handleLogin(event)" class="p-8 space-y-6">
-                            <div>
-                                <label for="loginEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
-                                <input type="email" id="loginEmail" name="email" required 
-                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                       placeholder="votre@email.com">
-                            </div>
-                            
-                            <div>
-                                <label for="loginPassword" class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe</label>
-                                <input type="password" id="loginPassword" name="password" required 
-                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                       placeholder="Votre mot de passe">
-                            </div>
-                            
-                            <button type="submit" id="loginSubmitBtn" 
-                                    class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold">
-                                <span id="loginSubmitText">Se connecter</span>
-                                <i id="loginSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
-                            </button>
-                        </form>
-                        
-                        <div class="px-8 pb-8 text-center">
-                            <p class="text-gray-600">
-                                Pas encore de compte ? 
-                                <a href="#" onclick="app.showPage('register')" class="text-emerald-600 font-semibold hover:text-emerald-700">
-                                    Inscrivez-vous
-                                </a>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadRegisterPage() {
-        const mainContent = document.getElementById('mainContent');
-        const wilayas = ['Adrar', 'Chlef', 'Laghouat', 'Oum El Bouaghi', 'Batna', 'Béjaïa', 'Biskra', 'Béchar', 'Blida', 'Bouira', 'Tamanrasset', 'Tébessa', 'Tlemcen', 'Tiaret', 'Tizi Ouzou', 'Alger', 'Djelfa', 'Jijel', 'Sétif', 'Saïda', 'Skikda', 'Sidi Bel Abbès', 'Annaba', 'Guelma', 'Constantine', 'Médéa', 'Mostaganem', 'M\'Sila', 'Mascara', 'Ouargla', 'Oran', 'El Bayadh', 'Illizi', 'Bordj Bou Arreridj', 'Boumerdès', 'El Tarf', 'Tindouf', 'Tissemsilt', 'El Oued', 'Khenchela', 'Souk Ahras', 'Tipaza', 'Mila', 'Aïn Defla', 'Naâma', 'Aïn Témouchent', 'Ghardaïa', 'Relizane'];
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-12">
-                <div class="max-w-2xl mx-auto">
-                    <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 overflow-hidden">
-                        <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-8 text-white text-center">
-                            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/30">
-                                <i class="fas fa-user-plus text-4xl"></i>
-                            </div>
-                            <h2 class="text-3xl font-bold mb-2">Inscription</h2>
-                            <p class="text-emerald-100">Créez votre compte</p>
-                        </div>
-                        
-                        <form id="registerForm" onsubmit="handleRegister(event)" class="p-8 space-y-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="registerPrenom" class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
-                                    <input type="text" id="registerPrenom" name="prenom" required 
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                           placeholder="Votre prénom">
-                                </div>
-                                
-                                <div>
-                                    <label for="registerNom" class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
-                                    <input type="text" id="registerNom" name="nom" required 
-                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                           placeholder="Votre nom">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label for="registerEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                                <input type="email" id="registerEmail" name="email" required 
-                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                       placeholder="votre@email.com">
-                            </div>
-                            
-                            <div>
-                                <label for="registerTelephone" class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
-                                <input type="tel" id="registerTelephone" name="telephone" required 
-                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                       placeholder="0555123456">
-                            </div>
-                            
-                            <div>
-                                <label for="registerPassword" class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe *</label>
-                                <input type="password" id="registerPassword" name="password" required 
-                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                       placeholder="Min. 6 caractères"
-                                       minlength="6">
-                            </div>
-                            
-                            <div>
-                                <label for="registerAdresse" class="block text-sm font-semibold text-gray-700 mb-2">Adresse</label>
-                                <input type="text" id="registerAdresse" name="adresse" 
-                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                       placeholder="Votre adresse complète">
-                            </div>
-                            
-                            <div>
-                                <label for="registerWilaya" class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
-                                <select id="registerWilaya" name="wilaya" required 
-                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all">
-                                    <option value="">Sélectionner une wilaya</option>
-                                    ${wilayas.map(w => `<option value="${w}">${w}</option>`).join('')}
-                                </select>
-                            </div>
-                            
-                            <button type="submit" id="registerSubmitBtn" 
-                                    class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold">
-                                <span id="registerSubmitText">S'inscrire</span>
-                                <i id="registerSubmitSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
-                            </button>
-                        </form>
-                        
-                        <div class="px-8 pb-8 text-center">
-                            <p class="text-gray-600">
-                                Déjà un compte ? 
-                                <a href="#" onclick="app.showPage('login')" class="text-emerald-600 font-semibold hover:text-emerald-700">
-                                    Connectez-vous
-                                </a>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadCheckoutPage() {
-        if (!this.cart || this.cart.length === 0) {
-            this.showToast('Votre panier est vide', 'warning');
-            this.showPage('products');
-            return;
-        }
-        
-        const mainContent = document.getElementById('mainContent');
-        const sousTotal = this.getCartTotal();
-        const fraisLivraison = sousTotal >= 5000 ? 0 : 300;
-        const total = sousTotal + fraisLivraison;
-        
-        const wilayas = ['Adrar', 'Chlef', 'Laghouat', 'Oum El Bouaghi', 'Batna', 'Béjaïa', 'Biskra', 'Béchar', 'Blida', 'Bouira', 'Tamanrasset', 'Tébessa', 'Tlemcen', 'Tiaret', 'Tizi Ouzou', 'Alger', 'Djelfa', 'Jijel', 'Sétif', 'Saïda', 'Skikda', 'Sidi Bel Abbès', 'Annaba', 'Guelma', 'Constantine', 'Médéa', 'Mostaganem', 'M\'Sila', 'Mascara', 'Ouargla', 'Oran', 'El Bayadh', 'Illizi', 'Bordj Bou Arreridj', 'Boumerdès', 'El Tarf', 'Tindouf', 'Tissemsilt', 'El Oued', 'Khenchela', 'Souk Ahras', 'Tipaza', 'Mila', 'Aïn Defla', 'Naâma', 'Aïn Témouchent', 'Ghardaïa', 'Relizane'];
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="max-w-6xl mx-auto">
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-8 text-center">Finaliser votre commande</h1>
-                    
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div class="lg:col-span-2 space-y-6">
-                            <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6">
-                                <h2 class="text-2xl font-bold text-emerald-800 mb-6">
-                                    <i class="fas fa-user mr-2"></i>Informations personnelles
-                                </h2>
-                                
-                                <form id="checkoutForm" class="space-y-4">
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label for="checkoutPrenom" class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
-                                            <input type="text" id="checkoutPrenom" required 
-                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none"
-                                                   placeholder="Votre prénom"
-                                                   value="${this.currentUser?.prenom || ''}">
-                                        </div>
-                                        <div>
-                                            <label for="checkoutNom" class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
-                                            <input type="text" id="checkoutNom" required 
-                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none"
-                                                   placeholder="Votre nom"
-                                                   value="${this.currentUser?.nom || ''}">
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label for="checkoutEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                                            <input type="email" id="checkoutEmail" required 
-                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none"
-                                                   placeholder="votre@email.com"
-                                                   value="${this.currentUser?.email || ''}">
-                                        </div>
-                                        <div>
-                                            <label for="checkoutTelephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
-                                            <input type="tel" id="checkoutTelephone" required 
-                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none"
-                                                   placeholder="0555123456"
-                                                   value="${this.currentUser?.telephone || ''}">
-                                        </div>
-                                    </div>
-                                    
-                                    <div>
-                                        <label for="checkoutAdresse" class="block text-sm font-medium text-gray-700 mb-2">Adresse complète *</label>
-                                        <input type="text" id="checkoutAdresse" required 
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none"
-                                               placeholder="Rue, numéro, bâtiment..."
-                                               value="${this.currentUser?.adresse || ''}">
-                                    </div>
-                                    
-                                    <div>
-                                        <label for="checkoutWilaya" class="block text-sm font-medium text-gray-700 mb-2">Wilaya *</label>
-                                        <select id="checkoutWilaya" required onchange="if(window.checkoutSystem) window.checkoutSystem.calculateShipping()"
-                                                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none">
-                                            <option value="">Sélectionner une wilaya</option>
-                                            ${wilayas.map(w => `<option value="${w}" ${this.currentUser?.wilaya === w ? 'selected' : ''}>${w}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                    
-                                    <div>
-                                        <label for="checkoutCommentaires" class="block text-sm font-medium text-gray-700 mb-2">Commentaires (optionnel)</label>
-                                        <textarea id="checkoutCommentaires" rows="3" 
-                                                  class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none resize-none"
-                                                  placeholder="Instructions spéciales pour la livraison..."></textarea>
-                                    </div>
-                                </form>
-                            </div>
-                            
-                            <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6">
-                                <h2 class="text-2xl font-bold text-emerald-800 mb-6">
-                                    <i class="fas fa-credit-card mr-2"></i>Mode de paiement
-                                </h2>
-                                
-                                <div class="space-y-3">
-                                    <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-emerald-400 transition-all">
-                                        <input type="radio" name="modePaiement" value="Paiement à la livraison" checked 
-                                               class="text-emerald-600 focus:ring-emerald-500">
-                                        <span class="ml-3 flex-1">
-                                            <span class="block font-medium text-gray-900">Paiement à la livraison</span>
-                                            <span class="block text-sm text-gray-500">Payez en espèces lors de la réception</span>
-                                        </span>
-                                        <i class="fas fa-money-bill-wave text-2xl text-emerald-600"></i>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="lg:col-span-1">
-                            <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-6 sticky top-4">
-                                <h2 class="text-2xl font-bold text-emerald-800 mb-6">
-                                    <i class="fas fa-shopping-bag mr-2"></i>Récapitulatif
-                                </h2>
-                                
-                                <div class="space-y-3 mb-6 max-h-64 overflow-y-auto">
-                                    ${this.cart.map(item => `
-                                        <div class="flex items-center space-x-3 p-3 bg-emerald-50/50 rounded-lg">
-                                            <img src="${item.image}" alt="${item.nom}" 
-                                                 class="w-12 h-12 object-cover rounded-lg border-2 border-emerald-200">
-                                            <div class="flex-1 min-w-0">
-                                                <p class="font-medium text-sm text-emerald-800 truncate">${item.nom}</p>
-                                                <p class="text-xs text-emerald-600">${item.quantite} × ${item.prix} DA</p>
-                                            </div>
-                                            <p class="font-bold text-emerald-700">${item.prix * item.quantite} DA</p>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                                
-                                <div class="border-t-2 border-emerald-200 pt-4 space-y-3">
-                                    <div class="flex justify-between text-gray-700">
-                                        <span>Sous-total</span>
-                                        <span id="checkoutSousTotal" class="font-medium">${sousTotal} DA</span>
-                                    </div>
-                                    <div class="flex justify-between text-gray-700">
-                                        <span>Frais de livraison</span>
-                                        <span id="checkoutFraisLivraison" class="font-medium ${fraisLivraison === 0 ? 'text-green-600' : ''}">${fraisLivraison === 0 ? 'GRATUIT' : fraisLivraison + ' DA'}</span>
-                                    </div>
-                                    <div class="flex justify-between text-xl font-bold text-emerald-800 border-t-2 border-emerald-200 pt-3">
-                                        <span>Total</span>
-                                        <span id="checkoutTotal">${total} DA</span>
-                                    </div>
-                                </div>
-                                
-                                ${sousTotal >= 5000 ? `
-                                    <div class="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
-                                        <p class="text-green-700 text-sm font-medium">
-                                            <i class="fas fa-truck mr-2"></i>Livraison gratuite !
-                                        </p>
-                                    </div>
-                                ` : `
-                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-                                        <p class="text-blue-700 text-sm">
-                                            <i class="fas fa-info-circle mr-2"></i>
-                                            Plus que ${5000 - sousTotal} DA pour la livraison gratuite
-                                        </p>
-                                    </div>
-                                `}
-                                
-                                <button onclick="window.processCheckoutOrder()" 
-                                        class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg mt-6">
-                                    <i class="fas fa-check mr-2"></i>Confirmer la commande
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        if (window.initCheckout) {
-            window.initCheckout();
-        }
-    }
-    
-    async loadOrderConfirmationPage(orderNumber) {
-        const mainContent = document.getElementById('mainContent');
-        
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-12">
-                <div class="max-w-2xl mx-auto text-center">
-                    <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-12">
-                        <div class="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
-                            <i class="fas fa-check text-white text-5xl"></i>
-                        </div>
-                        
-                        <h1 class="text-4xl font-bold text-emerald-800 mb-4">Commande confirmée !</h1>
-                        <p class="text-xl text-emerald-600 mb-8">Merci pour votre commande</p>
-                        
-                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-8">
-                            <p class="text-gray-700 mb-2">Numéro de commande</p>
-                            <p class="text-2xl font-bold text-emerald-800">${orderNumber}</p>
-                        </div>
-                        
-                        <p class="text-gray-600 mb-8">
-                            Nous avons bien reçu votre commande. Vous recevrez un email de confirmation à l'adresse indiquée.
-                            Notre équipe va traiter votre commande dans les plus brefs délais.
-                        </p>
-                        
-                        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                            <button onclick="app.showPage('home')" 
-                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-8 py-3 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg font-bold">
-                                <i class="fas fa-home mr-2"></i>Retour à l'accueil
-                            </button>
-                            <button onclick="app.showPage('products')" 
-                                    class="bg-white text-emerald-600 border-2 border-emerald-600 px-8 py-3 rounded-xl hover:bg-emerald-50 transition-all font-bold">
-                                <i class="fas fa-shopping-bag mr-2"></i>Continuer mes achats
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    async loadProfilePage() {
-        if (!this.currentUser) {
-            this.showToast('Veuillez vous connecter', 'warning');
-            this.showPage('login');
-            return;
-        }
-        
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-12">
-                <div class="max-w-4xl mx-auto">
-                    <h1 class="text-4xl font-bold text-emerald-800 mb-8">Mon Profil</h1>
-                    
-                    <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Prénom</label>
-                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.prenom}</p>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Nom</label>
-                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.nom}</p>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.email}</p>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
-                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.telephone || 'Non renseigné'}</p>
-                            </div>
-                            <div class="md:col-span-2">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Adresse</label>
-                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.adresse || 'Non renseignée'}</p>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Wilaya</label>
-                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.wilaya || 'Non renseignée'}</p>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Rôle</label>
-                                <p class="text-lg text-emerald-800 font-medium">${this.currentUser.role === 'admin' ? 'Administrateur' : 'Client'}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
+    logout() {
+        localStorage.removeItem('token');
+        this.currentUser = null;
+        this.updateUserUI();
+        this.showToast('Déconnexion réussie', 'success');
+        this.showPage('home');
     }
     
     async loadContactPage() {
         const mainContent = document.getElementById('mainContent');
+        
         mainContent.innerHTML = `
             <div class="container mx-auto px-4 py-8 max-w-6xl">
                 <div class="text-center mb-12">
@@ -1100,6 +778,7 @@ class PharmacieGaherApp {
         `;
     }
     
+    // ADMIN METHODS
     async loadAdminPage() {
         if (!this.currentUser || this.currentUser.role !== 'admin') {
             this.showToast('Accès refusé - Droits administrateur requis', 'error');
@@ -1108,8 +787,10 @@ class PharmacieGaherApp {
         }
 
         const mainContent = document.getElementById('mainContent');
+        
         mainContent.innerHTML = `
             <div class="container mx-auto px-4 py-8">
+                <!-- Admin Header -->
                 <div class="bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-emerald-200/50 p-8 mb-8">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                         <div>
@@ -1129,6 +810,7 @@ class PharmacieGaherApp {
                     </div>
                 </div>
                 
+                <!-- Navigation Admin -->
                 <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 mb-8 overflow-hidden">
                     <nav class="flex flex-wrap">
                         <button onclick="switchAdminSection('dashboard')" 
@@ -1154,7 +836,10 @@ class PharmacieGaherApp {
                     </nav>
                 </div>
                 
-                <div id="adminContent" class="min-h-96"></div>
+                <!-- Admin Content -->
+                <div id="adminContent" class="min-h-96">
+                    <!-- Content will be loaded here -->
+                </div>
             </div>
         `;
         
@@ -1180,10 +865,11 @@ class PharmacieGaherApp {
                     stats = { ...stats, ...data.stats };
                 }
             } catch (error) {
-                console.log('API unavailable, using local stats');
+                console.log('⚠️ API unavailable, using local stats');
             }
             
             document.getElementById('adminContent').innerHTML = `
+                <!-- Statistics -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-6 shadow-lg">
                         <div class="flex items-center justify-between">
@@ -1238,6 +924,7 @@ class PharmacieGaherApp {
                     </div>
                 </div>
                 
+                <!-- Quick Actions -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105" onclick="switchAdminSection('products')">
                         <i class="fas fa-plus-circle text-4xl mb-4"></i>
@@ -1275,14 +962,6 @@ class PharmacieGaherApp {
         }
     }
     
-    logout() {
-        localStorage.removeItem('token');
-        this.currentUser = null;
-        this.updateUserUI();
-        this.showToast('Déconnexion réussie', 'success');
-        this.showPage('home');
-    }
-    
     showLoading() {
         const spinner = document.getElementById('loadingSpinner');
         if (spinner) {
@@ -1317,8 +996,14 @@ class PharmacieGaherApp {
         const container = document.getElementById('toastContainer');
         if (container) {
             container.appendChild(toast);
+            
             setTimeout(() => toast.classList.add('show'), 100);
-            setTimeout(() => { if (toast.parentElement) toast.remove(); }, 5000);
+            
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 5000);
         }
     }
     
@@ -1330,6 +1015,24 @@ class PharmacieGaherApp {
             'warning': 'fa-exclamation-triangle'
         };
         return icons[type] || icons.info;
+    }
+    
+    requireAuth() {
+        if (!this.currentUser) {
+            this.showToast('Veuillez vous connecter pour continuer', 'warning');
+            this.showPage('login');
+            return false;
+        }
+        return true;
+    }
+    
+    requireAdmin() {
+        if (!this.currentUser || this.currentUser.role !== 'admin') {
+            this.showToast('Accès administrateur requis', 'error');
+            this.showPage('home');
+            return false;
+        }
+        return true;
     }
 }
 
@@ -1375,6 +1078,7 @@ function proceedToCheckout() {
             window.app.showToast('Votre panier est vide', 'warning');
             return;
         }
+        
         toggleCart();
         window.app.showPage('checkout');
     }
@@ -1382,6 +1086,7 @@ function proceedToCheckout() {
 
 function handleContactForm(event) {
     event.preventDefault();
+    
     const submitBtn = document.getElementById('contactSubmitBtn');
     const submitText = document.getElementById('contactSubmitText');
     const submitSpinner = document.getElementById('contactSubmitSpinner');
@@ -1394,7 +1099,9 @@ function handleContactForm(event) {
         submitBtn.disabled = false;
         submitText.textContent = 'Envoyer le message';
         submitSpinner.classList.add('hidden');
+        
         event.target.reset();
+        
         if (window.app) {
             window.app.showToast('Message envoyé avec succès !', 'success');
         }
@@ -1413,7 +1120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing app...');
     app = new PharmacieGaherApp();
     window.app = app;
-    console.log('App initialized and made globally available');
+    console.log('✅ App initialized successfully');
 });
 
-console.log('✅ Complete app.js loaded');
+console.log('✅ Fixed app.js loaded with graceful auth handling');
