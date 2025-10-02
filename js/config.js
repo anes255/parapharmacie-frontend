@@ -68,6 +68,9 @@ async function apiCall(endpoint, options = {}) {
         }
     };
     
+    // Track if we should clear token (only on last attempt)
+    let shouldClearToken = false;
+    
     // Retry logic for Render cold starts and network issues
     for (let attempt = 1; attempt <= API_CONFIG.RETRY_ATTEMPTS; attempt++) {
         try {
@@ -105,11 +108,13 @@ async function apiCall(endpoint, options = {}) {
             if (!response.ok) {
                 console.error(`❌ HTTP Error ${response.status}:`, data);
                 
-                // Handle 401 Unauthorized errors
+                // Handle 401 Unauthorized errors - ONLY clear token on final attempt
                 if (response.status === 401) {
-                    console.log('🚪 Unauthorized - clearing token');
-                    // Only clear token and redirect for certain 401 errors
-                    // Let the calling code decide what to do
+                    if (attempt === API_CONFIG.RETRY_ATTEMPTS) {
+                        console.log('🚪 Unauthorized on final attempt - will clear token after error is thrown');
+                        shouldClearToken = true;
+                    }
+                    // Don't retry 401 errors - they won't get better with retries
                     throw new Error(data.message || 'Token invalide, utilisateur non trouvé');
                 }
                 
@@ -134,6 +139,7 @@ async function apiCall(endpoint, options = {}) {
         } catch (error) {
             console.error(`💥 Error on attempt ${attempt}:`, error.message);
             
+            // Handle timeout
             if (error.name === 'AbortError') {
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
                     console.log(`⏱️ Timeout - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
@@ -142,7 +148,9 @@ async function apiCall(endpoint, options = {}) {
                 } else {
                     throw new Error('Le serveur met trop de temps à répondre. Réessayez plus tard.');
                 }
-            } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            } 
+            // Handle network errors
+            else if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 if (attempt < API_CONFIG.RETRY_ATTEMPTS) {
                     console.log(`🌐 Network error - retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
                     await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
@@ -151,13 +159,26 @@ async function apiCall(endpoint, options = {}) {
                     throw new Error('Impossible de contacter le serveur. Vérifiez votre connexion.');
                 }
             }
+            // For 401 errors, don't retry
+            else if (error.message.includes('Token invalide') || error.message.includes('401')) {
+                // Clear token if this is the final attempt
+                if (shouldClearToken) {
+                    console.log('🗑️ Clearing invalid token');
+                    localStorage.removeItem('token');
+                    if (window.app) {
+                        window.app.currentUser = null;
+                        window.app.updateUserUI();
+                    }
+                }
+                throw error;
+            }
             
             // If this was the last attempt, throw the error
             if (attempt === API_CONFIG.RETRY_ATTEMPTS) {
                 throw error;
             }
             
-            // Otherwise, retry
+            // Otherwise, retry for other errors
             console.log(`🔄 Retrying in ${API_CONFIG.RETRY_DELAY}ms...`);
             await new Promise(resolve => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
         }
