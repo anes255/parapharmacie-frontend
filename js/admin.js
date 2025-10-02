@@ -14,18 +14,17 @@ async function adminApiCall(endpoint, options = {}) {
         console.error('Admin API call failed:', error);
         
         // Check if it's a 401 error (authentication issue)
-        if (error.message && error.message.includes('401')) {
-            console.log('🚪 Unauthorized - Token invalid or user not found');
-            // Don't clear token immediately, let the app handle it
+        if (error.message && error.message.includes('Token invalide')) {
+            console.log('🚪 Authentication failed - user needs to re-login');
         }
         
         throw error;
     }
 }
 
-// Section switching - FIX FOR LINE 9 ERROR
+// Section switching - FIXED
 function switchAdminSection(section) {
-    console.log('Switching to section:', section); // FIXED: was "log" instead of "console.log"
+    console.log('Switching to section:', section);
     
     document.querySelectorAll('.admin-nav-btn').forEach(btn => {
         btn.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
@@ -76,9 +75,10 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
                 
                 // Update localStorage with merged data
                 localStorage.setItem('demoProducts', JSON.stringify(products));
+                console.log('✅ Products synced with API');
             }
         } catch (error) {
-            console.log('API unavailable, using local products only');
+            console.log('⚠️ API unavailable, using local products only');
         }
         
         document.getElementById('adminContent').innerHTML = `
@@ -204,7 +204,7 @@ PharmacieGaherApp.prototype.renderProductRow = function(product) {
     `;
 };
 
-// Orders Management
+// Orders Management - FIXED WITH DELETE FUNCTIONALITY
 PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
         console.log('Loading orders from admin panel...');
@@ -217,14 +217,14 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
         try {
             const data = await adminApiCall('/orders');
             if (data && data.orders && data.orders.length > 0) {
-                console.log('API orders loaded:', data.orders.length);
+                console.log('✅ API orders loaded:', data.orders.length);
                 const apiOrders = data.orders.filter(apiOrder => 
                     !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
                 );
                 orders = [...orders, ...apiOrders];
             }
         } catch (error) {
-            console.log('API unavailable, using only local orders');
+            console.log('⚠️ API unavailable, using only local orders');
         }
         
         // Sort by date, newest first
@@ -306,6 +306,11 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                                                         title="Confirmer">
                                                     <i class="fas fa-check"></i>
                                                 </button>
+                                                <button onclick="deleteOrder('${order._id || order.numeroCommande}')" 
+                                                        class="text-red-600 hover:text-red-800 hover:bg-red-100 p-2 rounded-lg transition-all"
+                                                        title="Supprimer">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -331,6 +336,48 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     }
 };
 
+// DELETE ORDER FUNCTION - NEW
+async function deleteOrder(orderId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ? Cette action est irréversible.')) {
+        return;
+    }
+    
+    try {
+        console.log('Deleting order:', orderId);
+        
+        // Delete from localStorage
+        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        const initialCount = orders.length;
+        orders = orders.filter(o => o._id !== orderId && o.numeroCommande !== orderId);
+        localStorage.setItem('adminOrders', JSON.stringify(orders));
+        adminOrders = orders;
+        
+        const localDeleteSuccess = orders.length < initialCount;
+        console.log('Order deleted locally:', localDeleteSuccess);
+        
+        // Try to delete from API
+        try {
+            await adminApiCall(`/orders/${orderId}`, {
+                method: 'DELETE'
+            });
+            console.log('✅ Order deleted from API successfully');
+        } catch (error) {
+            console.log('⚠️ API delete failed, but order deleted locally:', error);
+        }
+        
+        app.showToast('Commande supprimée avec succès', 'success');
+        
+        // Refresh orders list
+        if (adminCurrentSection === 'orders') {
+            app.loadAdminOrders();
+        }
+        
+    } catch (error) {
+        console.error('Error deleting order:', error);
+        app.showToast('Erreur lors de la suppression de la commande', 'error');
+    }
+}
+
 // Featured Products Management
 PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
     try {
@@ -350,9 +397,10 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
                 
                 featuredProducts = [...featuredProducts, ...newApiProducts.filter(p => p.enVedette)];
                 allProducts = [...allProducts, ...newApiProducts.filter(p => !p.enVedette)];
+                console.log('✅ Featured products synced with API');
             }
         } catch (error) {
-            console.log('API unavailable, using local products');
+            console.log('⚠️ API unavailable, using local products');
         }
         
         document.getElementById('adminContent').innerHTML = `
@@ -490,6 +538,10 @@ PharmacieGaherApp.prototype.loadCleanupSection = async function() {
                         <button onclick="clearAllProducts()" 
                                 class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl">
                             <i class="fas fa-trash-alt mr-2"></i>Supprimer tous les produits
+                        </button>
+                        <button onclick="clearAllOrders()" 
+                                class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl">
+                            <i class="fas fa-trash-alt mr-2"></i>Supprimer toutes les commandes
                         </button>
                     </div>
                 </div>
@@ -958,10 +1010,10 @@ function saveProduct() {
                 });
                 
                 if (response.ok) {
-                    console.log('Product saved to API successfully');
+                    console.log('✅ Product saved to API successfully');
                 }
             } catch (error) {
-                console.log('API save failed, but product saved locally:', error);
+                console.log('⚠️ API save failed, but product saved locally:', error);
             }
         };
         
@@ -1005,8 +1057,9 @@ async function toggleFeatured(productId, newStatus) {
                 method: 'PUT',
                 body: JSON.stringify({ enVedette: newStatus })
             });
+            console.log('✅ Featured status updated in API');
         } catch (error) {
-            console.log('API update failed, but local update succeeded');
+            console.log('⚠️ API update failed, but local update succeeded');
         }
         
         app.showToast(`Produit ${newStatus ? 'ajouté aux' : 'retiré des'} coups de coeur`, 'success');
@@ -1041,8 +1094,9 @@ async function deleteProduct(productId) {
                 await adminApiCall(`/products/${productId}`, {
                     method: 'DELETE'
                 });
+                console.log('✅ Product deleted from API');
             } catch (error) {
-                console.log('API delete failed, but product deleted locally:', error);
+                console.log('⚠️ API delete failed, but product deleted locally:', error);
             }
             
             app.showToast('Produit supprimé avec succès', 'success');
@@ -1203,8 +1257,9 @@ async function updateOrderStatus(orderId, newStatus) {
                     dateLivraison: newStatus === 'livrée' ? new Date().toISOString() : null
                 })
             });
+            console.log('✅ Order status updated in API');
         } catch (error) {
-            console.log('API update failed, but local update succeeded');
+            console.log('⚠️ API update failed, but local update succeeded');
         }
         
         app.showToast('Statut de la commande mis à jour', 'success');
@@ -1247,6 +1302,18 @@ async function clearAllProducts() {
     }
 }
 
+async function clearAllOrders() {
+    if (confirm('ATTENTION: Cette action supprimera TOUTES les commandes. Êtes-vous absolument sûr ?')) {
+        localStorage.removeItem('adminOrders');
+        adminOrders = [];
+        
+        app.showToast('Toutes les commandes ont été supprimées', 'success');
+        if (adminCurrentSection === 'orders') {
+            app.loadAdminOrders();
+        }
+    }
+}
+
 document.addEventListener('click', function(event) {
     const modal = document.getElementById('productModal');
     if (modal && event.target === modal) {
@@ -1281,12 +1348,14 @@ window.closeProductModal = closeProductModal;
 window.saveProduct = saveProduct;
 window.toggleFeatured = toggleFeatured;
 window.deleteProduct = deleteProduct;
+window.deleteOrder = deleteOrder;
 window.refreshProductCache = refreshProductCache;
 window.validateAllProducts = validateAllProducts;
 window.clearAllProducts = clearAllProducts;
+window.clearAllOrders = clearAllOrders;
 window.viewOrderDetails = viewOrderDetails;
 window.updateOrderStatus = updateOrderStatus;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
-console.log('✅ Fixed Admin.js loaded with proper app integration');
+console.log('✅ Fixed Admin.js loaded with DELETE ORDER functionality and proper API integration');
