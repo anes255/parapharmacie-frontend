@@ -1,4 +1,204 @@
-// Complete PharmacieGaherApp - FULL VERSION with all methods
+// ============================================
+// COMPLETE PharmacieGaherApp - ALL FUNCTIONS
+// ============================================
+
+// Backend Wake-up Checker with Loading Screen
+class BackendWakeUpChecker {
+    constructor() {
+        this.maxRetries = 10;
+        this.retryDelay = 3000;
+        this.isAwake = false;
+    }
+
+    async checkBackend() {
+        console.log('🔍 Checking if backend is awake...');
+        
+        for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+            try {
+                console.log(`⏳ Attempt ${attempt}/${this.maxRetries}...`);
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(buildApiUrl('/health'), {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    console.log('✅ Backend is awake!');
+                    this.isAwake = true;
+                    return true;
+                }
+            } catch (error) {
+                console.log(`⚠️ Attempt ${attempt} failed: ${error.message}`);
+                
+                if (attempt < this.maxRetries) {
+                    console.log(`⏳ Waiting ${this.retryDelay/1000}s before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+                }
+            }
+        }
+        
+        console.log('⚠️ Backend did not respond after max retries - continuing with local data');
+        return false;
+    }
+
+    showLoadingScreen() {
+        const loadingHTML = `
+            <div id="backendLoadingScreen" class="fixed inset-0 bg-gradient-to-br from-emerald-500 via-green-600 to-teal-700 z-50 flex items-center justify-center">
+                <div class="text-center text-white">
+                    <div class="mb-8">
+                        <div class="w-32 h-32 mx-auto bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center shadow-2xl border-2 border-white/30 animate-pulse">
+                            <i class="fas fa-seedling text-6xl text-white drop-shadow-lg"></i>
+                        </div>
+                    </div>
+                    <h1 class="text-4xl font-bold mb-4">Shifa - Parapharmacie</h1>
+                    <p class="text-xl mb-8 opacity-90">Préparation de votre espace bien-être...</p>
+                    <div class="flex items-center justify-center space-x-2">
+                        <div class="w-3 h-3 bg-white rounded-full animate-bounce" style="animation-delay: 0s"></div>
+                        <div class="w-3 h-3 bg-white rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                        <div class="w-3 h-3 bg-white rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                    </div>
+                    <p class="text-sm mt-8 opacity-75" id="loadingMessage">Réveil du serveur en cours...</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', loadingHTML);
+    }
+
+    updateLoadingMessage(message) {
+        const msgElement = document.getElementById('loadingMessage');
+        if (msgElement) {
+            msgElement.textContent = message;
+        }
+    }
+
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('backendLoadingScreen');
+        if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            loadingScreen.style.transition = 'opacity 0.5s';
+            setTimeout(() => loadingScreen.remove(), 500);
+        }
+    }
+}
+
+// ============================================
+// AUTHENTICATION FUNCTIONS (Built-in)
+// ============================================
+
+async function loginUser(email, password) {
+    try {
+        console.log('🔐 Attempting login for:', email);
+        
+        const response = await fetch(buildApiUrl('/auth/login'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || 'Erreur de connexion');
+        }
+        
+        localStorage.setItem('token', data.token);
+        console.log('✅ Login successful, token stored');
+        
+        return data;
+        
+    } catch (error) {
+        console.error('❌ Login error:', error);
+        throw error;
+    }
+}
+
+async function registerUser(userData) {
+    try {
+        console.log('📝 Attempting registration for:', userData.email);
+        
+        const response = await fetch(buildApiUrl('/auth/register'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(userData)
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || 'Erreur d\'inscription');
+        }
+        
+        localStorage.setItem('token', data.token);
+        console.log('✅ Registration successful, token stored');
+        
+        return data;
+        
+    } catch (error) {
+        console.error('❌ Registration error:', error);
+        throw error;
+    }
+}
+
+async function checkUserAuth() {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+        console.log('No token found');
+        return null;
+    }
+    
+    try {
+        console.log('🔍 Validating token...');
+        const response = await fetch(buildApiUrl('/auth/profile'), {
+            headers: { 
+                'x-auth-token': token,
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const user = await response.json();
+            console.log('✅ Token valid, user authenticated:', user.email);
+            return user;
+        } else {
+            console.log('❌ Token invalid - removing');
+            localStorage.removeItem('token');
+            return null;
+        }
+    } catch (error) {
+        console.error('Token validation error:', error);
+        localStorage.removeItem('token');
+        return null;
+    }
+}
+
+function logoutUser() {
+    console.log('🚪 Logging out user');
+    localStorage.removeItem('token');
+    
+    if (window.app) {
+        window.app.currentUser = null;
+        window.app.updateUserUI();
+        window.app.showPage('home');
+        window.app.showToast('Déconnexion réussie', 'success');
+    }
+}
+
+// ============================================
+// MAIN APP CLASS
+// ============================================
+
 class PharmacieGaherApp {
     constructor() {
         this.currentUser = null;
@@ -13,21 +213,43 @@ class PharmacieGaherApp {
             livraisonGratuite: 5000
         };
         this.currentPage = 'home';
-        
-        this.init();
+        this.backendChecker = new BackendWakeUpChecker();
     }
     
     async init() {
         try {
+            // Show loading screen
+            this.backendChecker.showLoadingScreen();
+            
+            // Check backend
+            this.backendChecker.updateLoadingMessage('Connexion au serveur...');
+            await this.backendChecker.checkBackend();
+            
+            this.backendChecker.updateLoadingMessage('Vérification de l\'authentification...');
             await this.checkAuth();
+            
+            this.backendChecker.updateLoadingMessage('Chargement des produits...');
             await this.loadProductsCache();
+            
+            this.backendChecker.updateLoadingMessage('Initialisation de l\'interface...');
             this.initUI();
+            
+            this.backendChecker.updateLoadingMessage('Finalisation...');
             await this.showPage('home');
             this.updateCartUI();
             this.initSearch();
+            
+            // Hide loading screen
+            setTimeout(() => {
+                this.backendChecker.hideLoadingScreen();
+            }, 500);
+            
         } catch (error) {
             console.error('Erreur initialisation app:', error);
-            console.log('⚠️ Continuing with limited functionality...');
+            this.backendChecker.updateLoadingMessage('Erreur - Chargement en mode hors-ligne...');
+            setTimeout(() => {
+                this.backendChecker.hideLoadingScreen();
+            }, 1000);
         }
     }
     
@@ -38,22 +260,24 @@ class PharmacieGaherApp {
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             this.allProducts = [...localProducts];
             
-            try {
-                const response = await fetch(buildApiUrl('/products'));
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.products && data.products.length > 0) {
-                        const localIds = localProducts.map(p => p._id);
-                        const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
-                        
-                        if (newApiProducts.length > 0) {
-                            this.allProducts = [...localProducts, ...newApiProducts];
-                            localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
+            if (this.backendChecker.isAwake) {
+                try {
+                    const response = await fetch(buildApiUrl('/products'));
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data && data.products && data.products.length > 0) {
+                            const localIds = localProducts.map(p => p._id);
+                            const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
+                            
+                            if (newApiProducts.length > 0) {
+                                this.allProducts = [...localProducts, ...newApiProducts];
+                                localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
+                            }
                         }
                     }
+                } catch (error) {
+                    console.log('⚠️ API unavailable, using local products only');
                 }
-            } catch (error) {
-                console.log('⚠️ API unavailable, using local products only');
             }
             
             console.log(`Products cache loaded: ${this.allProducts.length} products`);
@@ -331,23 +555,45 @@ class PharmacieGaherApp {
             return;
         }
         
+        const getCategoryColor = (category) => {
+            const colors = {
+                'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
+                'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                'Dentaire': '6366f1'
+            };
+            return colors[category] || '10b981';
+        };
+        
+        const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+        const categoryColor = getCategoryColor(product.categorie);
+        const imageUrl = product.image || `https://via.placeholder.com/500/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+        
         const mainContent = document.getElementById('mainContent');
         mainContent.innerHTML = `
             <div class="container mx-auto px-4 py-8">
                 <div class="max-w-6xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
                         <div>
-                            <img src="${product.image || 'https://via.placeholder.com/500'}" 
+                            <img src="${imageUrl}" 
                                  alt="${product.nom}" 
-                                 class="w-full h-auto rounded-xl">
+                                 class="w-full h-auto rounded-xl border-2 border-emerald-200">
                         </div>
                         <div>
                             <h1 class="text-3xl font-bold text-emerald-800 mb-4">${product.nom}</h1>
                             <p class="text-emerald-600 mb-4">${product.description}</p>
+                            ${product.marque ? `<p class="text-gray-600 mb-4"><strong>Marque:</strong> ${product.marque}</p>` : ''}
                             <div class="text-3xl font-bold text-emerald-700 mb-6">${product.prix} DA</div>
-                            <button onclick="app.addToCart('${product._id}')" class="btn-primary w-full py-4 text-lg">
-                                <i class="fas fa-cart-plus mr-2"></i>Ajouter au panier
-                            </button>
+                            ${product.stock > 0 ? `
+                                <button onclick="app.addToCart('${product._id}')" class="btn-primary w-full py-4 text-lg">
+                                    <i class="fas fa-cart-plus mr-2"></i>Ajouter au panier
+                                </button>
+                                <p class="text-sm text-emerald-600 mt-2">Stock disponible: ${product.stock}</p>
+                            ` : `
+                                <button disabled class="btn-primary w-full py-4 text-lg opacity-50 cursor-not-allowed">
+                                    Rupture de stock
+                                </button>
+                            `}
                         </div>
                     </div>
                 </div>
@@ -364,13 +610,22 @@ class PharmacieGaherApp {
                     <form id="loginForm" class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                            <input type="email" id="loginEmail" required class="form-input w-full" placeholder="votre@email.com">
+                            <input type="email" id="loginEmail" required class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400" placeholder="votre@email.com">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
-                            <input type="password" id="loginPassword" required class="form-input w-full" placeholder="••••••••">
+                            <input type="password" id="loginPassword" required class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400" placeholder="••••••••">
                         </div>
-                        <button type="submit" class="btn-primary w-full">Se connecter</button>
+                        <button type="submit" class="btn-primary w-full py-3 text-lg" id="loginBtn">
+                            <span id="loginBtnText">Se connecter</span>
+                            <i id="loginBtnSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                        </button>
+                        <p class="text-center text-sm text-gray-600 mt-4">
+                            Pas encore de compte? 
+                            <a href="#" onclick="app.showPage('register'); return false;" class="text-emerald-600 hover:text-emerald-700 font-semibold">
+                                S'inscrire
+                            </a>
+                        </p>
                     </form>
                 </div>
             </div>
@@ -378,8 +633,16 @@ class PharmacieGaherApp {
         
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('loginBtn');
+            const btnText = document.getElementById('loginBtnText');
+            const btnSpinner = document.getElementById('loginBtnSpinner');
+            
+            btn.disabled = true;
+            btnText.classList.add('hidden');
+            btnSpinner.classList.remove('hidden');
             
             try {
                 const data = await loginUser(email, password);
@@ -389,6 +652,9 @@ class PharmacieGaherApp {
                 this.showPage('home');
             } catch (error) {
                 this.showToast(error.message, 'error');
+                btn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
             }
         });
     }
@@ -402,27 +668,36 @@ class PharmacieGaherApp {
                     <form id="registerForm" class="space-y-4">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Prénom</label>
-                                <input type="text" id="registerPrenom" required class="form-input w-full">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
+                                <input type="text" id="registerPrenom" required class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Nom</label>
-                                <input type="text" id="registerNom" required class="form-input w-full">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
+                                <input type="text" id="registerNom" required class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400">
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                            <input type="email" id="registerEmail" required class="form-input w-full">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                            <input type="email" id="registerEmail" required class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
-                            <input type="tel" id="registerTelephone" required class="form-input w-full">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
+                            <input type="tel" id="registerTelephone" required class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
-                            <input type="password" id="registerPassword" required class="form-input w-full">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe *</label>
+                            <input type="password" id="registerPassword" required class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400">
                         </div>
-                        <button type="submit" class="btn-primary w-full">S'inscrire</button>
+                        <button type="submit" class="btn-primary w-full py-3 text-lg" id="registerBtn">
+                            <span id="registerBtnText">S'inscrire</span>
+                            <i id="registerBtnSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                        </button>
+                        <p class="text-center text-sm text-gray-600 mt-4">
+                            Déjà un compte? 
+                            <a href="#" onclick="app.showPage('login'); return false;" class="text-emerald-600 hover:text-emerald-700 font-semibold">
+                                Se connecter
+                            </a>
+                        </p>
                     </form>
                 </div>
             </div>
@@ -430,6 +705,7 @@ class PharmacieGaherApp {
         
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const userData = {
                 prenom: document.getElementById('registerPrenom').value,
                 nom: document.getElementById('registerNom').value,
@@ -437,6 +713,14 @@ class PharmacieGaherApp {
                 telephone: document.getElementById('registerTelephone').value,
                 motDePasse: document.getElementById('registerPassword').value
             };
+            
+            const btn = document.getElementById('registerBtn');
+            const btnText = document.getElementById('registerBtnText');
+            const btnSpinner = document.getElementById('registerBtnSpinner');
+            
+            btn.disabled = true;
+            btnText.classList.add('hidden');
+            btnSpinner.classList.remove('hidden');
             
             try {
                 const data = await registerUser(userData);
@@ -446,6 +730,9 @@ class PharmacieGaherApp {
                 this.showPage('home');
             } catch (error) {
                 this.showToast(error.message, 'error');
+                btn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
             }
         });
     }
@@ -496,6 +783,37 @@ class PharmacieGaherApp {
         `;
     }
     
+    async loadContactPage() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
+                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div>
+                        <h2 class="text-2xl font-semibold mb-6">Nos coordonnées</h2>
+                        <div class="space-y-4">
+                            <p><i class="fas fa-map-marker-alt text-emerald-600 mr-3"></i> Tipaza, Algérie</p>
+                            <p><i class="fas fa-phone text-emerald-600 mr-3"></i> +213 123 456 789</p>
+                            <p><i class="fas fa-envelope text-emerald-600 mr-3"></i> pharmaciegaher@gmail.com</p>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-xl p-8">
+                        <h2 class="text-2xl font-semibold mb-6">Envoyez un message</h2>
+                        <form class="space-y-4">
+                            <input type="text" placeholder="Nom" class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl">
+                            <input type="email" placeholder="Email" class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl">
+                            <textarea placeholder="Message" rows="5" class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl"></textarea>
+                            <button type="submit" class="btn-primary w-full py-3">Envoyer</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
     async loadCategories() {
         const mainPageCategories = [
             { nom: 'Vitalité', description: 'Vitamines & Énergie', icon: 'fa-seedling' },
@@ -513,14 +831,13 @@ class PharmacieGaherApp {
         const categoriesGrid = document.getElementById('categoriesGrid');
         if (categoriesGrid) {
             categoriesGrid.innerHTML = mainPageCategories.map((category, index) => `
-                <div class="category-card text-center cursor-pointer p-6 bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-sm rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 border border-emerald-200/50 ${index === 0 ? 'ring-2 ring-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100' : ''}"
+                <div class="category-card text-center cursor-pointer p-6 bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-sm rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 border border-emerald-200/50 ${index === 0 ? 'ring-2 ring-emerald-400' : ''}"
                      onclick="app.filterByCategory('${category.nom}')">
-                    <div class="category-icon mx-auto ${index === 0 ? 'pulse-slow' : ''}">
-                        <i class="fas ${category.icon} drop-shadow-lg"></i>
+                    <div class="category-icon mx-auto">
+                        <i class="fas ${category.icon} text-4xl text-emerald-600 mb-3"></i>
                     </div>
                     <h3 class="font-bold text-emerald-800 mb-2 text-sm lg:text-base">${category.nom}</h3>
                     <p class="text-xs lg:text-sm text-emerald-600 font-medium">${category.description}</p>
-                    ${index === 0 ? '<div class="mt-2"><span class="text-xs bg-emerald-500 text-white px-2 py-1 rounded-full font-semibold">★ POPULAIRE</span></div>' : ''}
                 </div>
             `).join('');
         }
@@ -566,12 +883,24 @@ class PharmacieGaherApp {
         const isOutOfStock = product.stock === 0;
         const hasPromotion = product.enPromotion && product.prixOriginal;
         
-        let imageUrl = product.image || 'https://via.placeholder.com/300';
+        const getCategoryColor = (category) => {
+            const colors = {
+                'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
+                'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                'Dentaire': '6366f1'
+            };
+            return colors[category] || '10b981';
+        };
+        
+        const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+        const categoryColor = getCategoryColor(product.categorie);
+        const imageUrl = product.image || `https://via.placeholder.com/300/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
         
         return `
             <div class="product-card bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-2xl overflow-hidden transition-all duration-500 cursor-pointer relative border border-emerald-200/50 hover:border-emerald-400/60 ${isOutOfStock ? 'opacity-75' : ''}"
                  onclick="app.showPage('product', {id: '${product._id}'})">
-                ${hasPromotion ? `<div class="badge-promotion absolute top-4 left-4 z-20">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
+                ${hasPromotion ? `<div class="absolute top-4 left-4 z-20 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
                 ${isOutOfStock ? `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10 rounded-2xl">
                     <span class="text-white font-bold text-lg">Rupture de stock</span>
                 </div>` : ''}
@@ -597,7 +926,7 @@ class PharmacieGaherApp {
                         
                         ${!isOutOfStock ? `
                             <button onclick="event.stopPropagation(); addToCartFromCard('${product._id}')" 
-                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-5 py-2 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
+                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-5 py-2 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg">
                                 <i class="fas fa-cart-plus"></i>
                             </button>
                         ` : ''}
@@ -656,6 +985,20 @@ class PharmacieGaherApp {
                 return;
             }
             
+            const getCategoryColor = (category) => {
+                const colors = {
+                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                    'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
+                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                    'Dentaire': '6366f1'
+                };
+                return colors[category] || '10b981';
+            };
+            
+            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+            const categoryColor = getCategoryColor(product.categorie);
+            const imageUrl = product.image || `https://via.placeholder.com/64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+            
             const existingIndex = this.cart.findIndex(item => item.id === productId);
             
             if (existingIndex > -1) {
@@ -672,7 +1015,7 @@ class PharmacieGaherApp {
                     id: product._id,
                     nom: product.nom,
                     prix: product.prix,
-                    image: product.image || 'https://via.placeholder.com/64',
+                    image: imageUrl,
                     quantite: quantity,
                     stock: product.stock,
                     categorie: product.categorie
@@ -821,23 +1164,7 @@ class PharmacieGaherApp {
     }
     
     logout() {
-        localStorage.removeItem('token');
-        this.currentUser = null;
-        this.updateUserUI();
-        this.showToast('Déconnexion réussie', 'success');
-        this.showPage('home');
-    }
-    
-    async loadContactPage() {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-8 max-w-6xl">
-                <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Contactez-nous</h1>
-                    <p class="text-xl text-gray-600">Nous sommes là pour vous aider</p>
-                </div>
-            </div>
-        `;
+        logoutUser();
     }
     
     async loadAdminPage() {
@@ -956,7 +1283,10 @@ class PharmacieGaherApp {
     }
 }
 
-// Global functions
+// ============================================
+// GLOBAL FUNCTIONS
+// ============================================
+
 function addToCartFromCard(productId, quantity = 1) {
     if (window.app) window.app.addToCart(productId, quantity);
 }
@@ -1003,16 +1333,18 @@ function handleContactForm(event) {
 }
 
 function logout() {
-    if (window.app) window.app.logout();
+    logoutUser();
 }
 
-// Initialize app
+// ============================================
+// INITIALIZE APP
+// ============================================
+
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Initializing app...');
+    console.log('🚀 Initializing Shifa Parapharmacie...');
     app = new PharmacieGaherApp();
     window.app = app;
-    console.log('✅ App initialized successfully');
 });
 
-console.log('✅ Complete app.js loaded with ALL page methods');
+console.log('✅ COMPLETE app.js loaded with ALL functions + Backend Wake-up System');
