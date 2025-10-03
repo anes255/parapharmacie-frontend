@@ -1,84 +1,25 @@
-// Complete Admin Panel with Full Product Management and Order System - FIXED VERSION
+// Complete Admin Panel with Full Product Management and Order System - FULLY FIXED VERSION
 
 // Global variables
 let adminCurrentSection = 'dashboard';
 let currentEditingProduct = null;
 let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
 
-// Helper function to make API calls with better error handling
-async function adminApiCall(endpoint, options = {}) {
-    try {
-        // Use the global apiCall function with proper error handling
-        return await window.apiCall(endpoint, options);
-    } catch (error) {
-        console.error('Admin API call failed:', error);
-        
-        // Check if it's a 401 error (authentication issue)
-        if (error.message && error.message.includes('Token invalide')) {
-            console.log('🚪 Authentication failed - user needs to re-login');
-        }
-        
-        throw error;
-    }
-}
-
-// Section switching - FIXED
-function switchAdminSection(section) {
-    console.log('Switching to section:', section);
-    
-    document.querySelectorAll('.admin-nav-btn').forEach(btn => {
-        btn.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
-        btn.classList.add('hover:bg-emerald-50', 'text-emerald-700', 'border-r', 'border-emerald-100');
-    });
-    
-    const activeBtn = document.querySelector(`.admin-nav-btn.${section}`);
-    if (activeBtn) {
-        activeBtn.classList.add('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
-        activeBtn.classList.remove('hover:bg-emerald-50', 'text-emerald-700', 'border-r', 'border-emerald-100');
-    }
-    
-    adminCurrentSection = section;
-    
-    switch(section) {
-        case 'dashboard':
-            app.loadAdminDashboard();
-            break;
-        case 'products':
-            app.loadAdminProducts();
-            break;
-        case 'orders':
-            app.loadAdminOrders();
-            break;
-        case 'featured':
-            app.loadAdminFeatured();
-            break;
-        case 'cleanup':
-            app.loadCleanupSection();
-            break;
-    }
-}
-
 // Products Management
 PharmacieGaherApp.prototype.loadAdminProducts = async function() {
     try {
-        // Get products from localStorage
         let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
-        // Try to get products from API as well
         try {
-            const data = await adminApiCall('/products');
+            const data = await apiCall('/products');
             if (data && data.products && data.products.length > 0) {
-                // Merge API products with local ones, avoiding duplicates
                 const localIds = products.map(p => p._id);
                 const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
                 products = [...products, ...newApiProducts];
-                
-                // Update localStorage with merged data
                 localStorage.setItem('demoProducts', JSON.stringify(products));
-                console.log('✅ Products synced with API');
             }
         } catch (error) {
-            console.log('⚠️ API unavailable, using local products only');
+            console.log('API unavailable, using local products only');
         }
         
         document.getElementById('adminContent').innerHTML = `
@@ -138,7 +79,6 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
     }
 };
 
-// Product Row Renderer
 PharmacieGaherApp.prototype.renderProductRow = function(product) {
     const getCategoryColor = (category) => {
         const colors = {
@@ -204,32 +144,28 @@ PharmacieGaherApp.prototype.renderProductRow = function(product) {
     `;
 };
 
-// Orders Management - FIXED WITH DELETE FUNCTIONALITY
+// Orders Management
 PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
         console.log('Loading orders from admin panel...');
         
-        // Always start with localStorage orders
         let orders = [...adminOrders];
         console.log('Local orders loaded:', orders.length);
         
-        // Try to merge with API orders
         try {
-            const data = await adminApiCall('/orders');
+            const data = await apiCall('/orders');
             if (data && data.orders && data.orders.length > 0) {
-                console.log('✅ API orders loaded:', data.orders.length);
+                console.log('API orders loaded:', data.orders.length);
                 const apiOrders = data.orders.filter(apiOrder => 
                     !orders.some(localOrder => localOrder.numeroCommande === apiOrder.numeroCommande)
                 );
                 orders = [...orders, ...apiOrders];
             }
         } catch (error) {
-            console.log('⚠️ API unavailable, using only local orders');
+            console.log('API unavailable, using only local orders');
         }
         
-        // Sort by date, newest first
         orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
-        
         console.log('Total orders to display:', orders.length);
         
         document.getElementById('adminContent').innerHTML = `
@@ -251,10 +187,6 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                         <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
                         <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
                         <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées</p>
-                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
-                            <h4 class="font-semibold text-blue-800 mb-2">Info:</h4>
-                            <p class="text-sm text-blue-700">Les commandes sont automatiquement ajoutées ici lors du checkout</p>
-                        </div>
                     </div>
                 ` : `
                     <div class="overflow-x-auto">
@@ -306,11 +238,6 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                                                         title="Confirmer">
                                                     <i class="fas fa-check"></i>
                                                 </button>
-                                                <button onclick="deleteOrder('${order._id || order.numeroCommande}')" 
-                                                        class="text-red-600 hover:text-red-800 hover:bg-red-100 p-2 rounded-lg transition-all"
-                                                        title="Supprimer">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -336,71 +263,25 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     }
 };
 
-// DELETE ORDER FUNCTION - NEW
-async function deleteOrder(orderId) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ? Cette action est irréversible.')) {
-        return;
-    }
-    
-    try {
-        console.log('Deleting order:', orderId);
-        
-        // Delete from localStorage
-        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        const initialCount = orders.length;
-        orders = orders.filter(o => o._id !== orderId && o.numeroCommande !== orderId);
-        localStorage.setItem('adminOrders', JSON.stringify(orders));
-        adminOrders = orders;
-        
-        const localDeleteSuccess = orders.length < initialCount;
-        console.log('Order deleted locally:', localDeleteSuccess);
-        
-        // Try to delete from API
-        try {
-            await adminApiCall(`/orders/${orderId}`, {
-                method: 'DELETE'
-            });
-            console.log('✅ Order deleted from API successfully');
-        } catch (error) {
-            console.log('⚠️ API delete failed, but order deleted locally:', error);
-        }
-        
-        app.showToast('Commande supprimée avec succès', 'success');
-        
-        // Refresh orders list
-        if (adminCurrentSection === 'orders') {
-            app.loadAdminOrders();
-        }
-        
-    } catch (error) {
-        console.error('Error deleting order:', error);
-        app.showToast('Erreur lors de la suppression de la commande', 'error');
-    }
-}
-
 // Featured Products Management
 PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
     try {
-        // Get products from local storage
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
         let featuredProducts = localProducts.filter(p => p.enVedette);
         let allProducts = localProducts.filter(p => !p.enVedette);
         
-        // Try to get products from API
         try {
-            const allData = await adminApiCall('/products');
+            const allData = await apiCall('/products');
             if (allData && allData.products && allData.products.length > 0) {
-                // Merge API products, avoiding duplicates
                 const localIds = localProducts.map(p => p._id);
                 const newApiProducts = allData.products.filter(p => !localIds.includes(p._id));
                 
                 featuredProducts = [...featuredProducts, ...newApiProducts.filter(p => p.enVedette)];
                 allProducts = [...allProducts, ...newApiProducts.filter(p => !p.enVedette)];
-                console.log('✅ Featured products synced with API');
             }
         } catch (error) {
-            console.log('⚠️ API unavailable, using local products');
+            console.log('API unavailable, using local products');
         }
         
         document.getElementById('adminContent').innerHTML = `
@@ -413,7 +294,6 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
                         <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
                             <i class="fas fa-star text-yellow-400 text-4xl mb-4"></i>
                             <p class="text-yellow-700">Aucun produit en vedette</p>
-                            <p class="text-yellow-600 text-sm mt-2">Ajoutez des produits en vedette pour les mettre en avant sur votre site</p>
                         </div>
                     ` : `
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -462,7 +342,7 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
                                     <div class="mt-2 flex justify-end">
                                         <button onclick="toggleFeatured('${product._id}', true)" 
                                                 class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm">
-                                            <i class="fas fa-star mr-1"></i>Ajouter aux coups de coeur
+                                            <i class="fas fa-star mr-1"></i>Ajouter
                                         </button>
                                     </div>
                                 </div>
@@ -483,7 +363,6 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
     }
 };
 
-// Helper method to generate placeholder image URL
 PharmacieGaherApp.prototype.generatePlaceholderImage = function(product) {
     const getCategoryColor = (category) => {
         const colors = {
@@ -539,25 +418,16 @@ PharmacieGaherApp.prototype.loadCleanupSection = async function() {
                                 class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl">
                             <i class="fas fa-trash-alt mr-2"></i>Supprimer tous les produits
                         </button>
-                        <button onclick="clearAllOrders()" 
-                                class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl">
-                            <i class="fas fa-trash-alt mr-2"></i>Supprimer toutes les commandes
-                        </button>
                     </div>
                 </div>
             </div>
         `;
     } catch (error) {
         console.error('Error loading cleanup section:', error);
-        document.getElementById('adminContent').innerHTML = `
-            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
-                <p class="text-red-800">Erreur de chargement de la section nettoyage</p>
-            </div>
-        `;
     }
 };
 
-// Function to add order to demo (called from checkout)
+// Order management helper
 window.addOrderToDemo = function(orderData) {
     console.log('Adding order to demo:', orderData);
     
@@ -577,10 +447,9 @@ window.addOrderToDemo = function(orderData) {
         };
         
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        
         const existingIndex = orders.findIndex(o => o.numeroCommande === validOrder.numeroCommande);
+        
         if (existingIndex > -1) {
-            console.log('Order already exists, updating...');
             orders[existingIndex] = validOrder;
         } else {
             orders.unshift(validOrder);
@@ -598,7 +467,6 @@ window.addOrderToDemo = function(orderData) {
     }
 };
 
-// Helper functions for order management
 function getStatusColor(statut) {
     const colors = {
         'en-attente': 'bg-yellow-100 text-yellow-800',
@@ -623,7 +491,7 @@ function getStatusLabel(statut) {
     return labels[statut] || statut;
 }
 
-// Enhanced Product Modal Functions with Image Upload
+// Modal functions
 function openAddProductModal() {
     currentEditingProduct = null;
     showProductModal('Ajouter un nouveau produit', 'Ajouter le produit');
@@ -675,7 +543,6 @@ function showProductModal(title, submitText) {
                     <form id="productForm" class="space-y-6">
                         <input type="hidden" id="productId" value="${currentEditingProduct ? currentEditingProduct._id : ''}">
                         
-                        <!-- Basic Information -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
@@ -691,7 +558,6 @@ function showProductModal(title, submitText) {
                             </div>
                         </div>
                         
-                        <!-- Description -->
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
                             <textarea id="productDescription" name="description" required rows="3" 
@@ -699,7 +565,6 @@ function showProductModal(title, submitText) {
                                       placeholder="Description détaillée du produit"></textarea>
                         </div>
                         
-                        <!-- Image Upload -->
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Image du produit</label>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -728,7 +593,6 @@ function showProductModal(title, submitText) {
                             </div>
                         </div>
                         
-                        <!-- Price and Stock -->
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Prix (DA) *</label>
@@ -767,7 +631,6 @@ function showProductModal(title, submitText) {
                             </div>
                         </div>
                         
-                        <!-- Additional Info -->
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Ingrédients</label>
@@ -789,7 +652,6 @@ function showProductModal(title, submitText) {
                             </div>
                         </div>
                         
-                        <!-- Options -->
                         <div class="flex flex-wrap gap-6">
                             <label class="flex items-center">
                                 <input type="checkbox" id="productEnVedette" name="enVedette" 
@@ -808,7 +670,6 @@ function showProductModal(title, submitText) {
                             </label>
                         </div>
                         
-                        <!-- Action Buttons -->
                         <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                             <button type="button" onclick="closeProductModal()" 
                                     class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
@@ -866,6 +727,7 @@ function previewImage(input) {
             preview.classList.remove('hidden');
             placeholder.classList.add('hidden');
             imageUrl.value = e.target.result;
+            console.log('Image preview generated');
         };
         
         reader.readAsDataURL(file);
@@ -915,6 +777,7 @@ function closeProductModal() {
     currentEditingProduct = null;
 }
 
+// FIXED saveProduct function with proper token handling
 function saveProduct() {
     const form = document.getElementById('productForm');
     const isEditing = !!currentEditingProduct;
@@ -966,7 +829,6 @@ function saveProduct() {
         
         if (prixOriginal) {
             productData.prixOriginal = parseInt(prixOriginal);
-            
             if (enPromotion && productData.prixOriginal > productData.prix) {
                 productData.pourcentagePromotion = Math.round((productData.prixOriginal - productData.prix) / productData.prixOriginal * 100);
             }
@@ -977,6 +839,9 @@ function saveProduct() {
         if (precautions) productData.precautions = precautions;
         if (imageUrl) productData.image = imageUrl;
         
+        console.log('Product data to save:', productData);
+        
+        // Save to localStorage first
         let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
         if (isEditing) {
@@ -991,29 +856,30 @@ function saveProduct() {
         }
         
         localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+        console.log('Product saved to localStorage');
         
         if (window.app) {
             window.app.refreshProductsCache();
         }
         
+        // FIXED: Use apiCall with proper token from config.js
         const saveToApi = async () => {
             try {
                 const endpoint = isEditing ? `/products/${productData._id}` : '/products';
                 const method = isEditing ? 'PUT' : 'POST';
                 
-                const response = await fetch(buildApiUrl(endpoint), {
+                console.log(`Attempting API save: ${method} ${endpoint}`);
+                console.log('Auth token present:', !!localStorage.getItem('token'));
+                
+                // Use the apiCall function from config.js which handles tokens properly
+                const response = await apiCall(endpoint, {
                     method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
                     body: JSON.stringify(productData)
                 });
                 
-                if (response.ok) {
-                    console.log('✅ Product saved to API successfully');
-                }
+                console.log('Product saved to API successfully:', response);
             } catch (error) {
-                console.log('⚠️ API save failed, but product saved locally:', error);
+                console.log('API save failed, but product saved locally:', error.message);
             }
         };
         
@@ -1040,12 +906,15 @@ function saveProduct() {
 
 async function toggleFeatured(productId, newStatus) {
     try {
+        console.log('Toggling featured status:', productId, newStatus);
+        
         let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         const productIndex = localProducts.findIndex(p => p._id === productId);
         
         if (productIndex !== -1) {
             localProducts[productIndex].enVedette = newStatus;
             localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+            console.log('Product featured status updated locally');
             
             if (window.app) {
                 window.app.refreshProductsCache();
@@ -1053,13 +922,13 @@ async function toggleFeatured(productId, newStatus) {
         }
         
         try {
-            await adminApiCall(`/products/${productId}`, {
+            await apiCall(`/products/${productId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ enVedette: newStatus })
             });
-            console.log('✅ Featured status updated in API');
+            console.log('Product featured status updated via API');
         } catch (error) {
-            console.log('⚠️ API update failed, but local update succeeded');
+            console.log('API update failed, but local update succeeded');
         }
         
         app.showToast(`Produit ${newStatus ? 'ajouté aux' : 'retiré des'} coups de coeur`, 'success');
@@ -1079,24 +948,27 @@ async function toggleFeatured(productId, newStatus) {
 async function deleteProduct(productId) {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
         try {
+            console.log('Deleting product:', productId);
+            
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             const initialCount = localProducts.length;
             localProducts = localProducts.filter(p => p._id !== productId);
             localStorage.setItem('demoProducts', JSON.stringify(localProducts));
             
             const localDeleteSuccess = localProducts.length < initialCount;
+            console.log('Product deleted locally:', localDeleteSuccess);
             
             if (window.app) {
                 window.app.refreshProductsCache();
             }
             
             try {
-                await adminApiCall(`/products/${productId}`, {
+                await apiCall(`/products/${productId}`, {
                     method: 'DELETE'
                 });
-                console.log('✅ Product deleted from API');
+                console.log('Product deleted from API successfully');
             } catch (error) {
-                console.log('⚠️ API delete failed, but product deleted locally:', error);
+                console.log('API delete failed, but product deleted locally:', error);
             }
             
             app.showToast('Produit supprimé avec succès', 'success');
@@ -1116,6 +988,8 @@ async function deleteProduct(productId) {
 
 async function viewOrderDetails(orderId) {
     try {
+        console.log('Viewing order details for:', orderId);
+        
         let order = adminOrders.find(o => o._id === orderId || o.numeroCommande === orderId);
         
         if (!order) {
@@ -1237,6 +1111,8 @@ function closeOrderDetailModal() {
 
 async function updateOrderStatus(orderId, newStatus) {
     try {
+        console.log('Updating order status:', orderId, 'to', newStatus);
+        
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         const orderIndex = orders.findIndex(o => o._id === orderId || o.numeroCommande === orderId);
         
@@ -1247,23 +1123,23 @@ async function updateOrderStatus(orderId, newStatus) {
             }
             localStorage.setItem('adminOrders', JSON.stringify(orders));
             adminOrders = orders;
+            console.log('Order status updated locally');
         }
         
         try {
-            await adminApiCall(`/orders/${orderId}`, {
+            await apiCall(`/orders/${orderId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ 
                     statut: newStatus,
                     dateLivraison: newStatus === 'livrée' ? new Date().toISOString() : null
                 })
             });
-            console.log('✅ Order status updated in API');
+            console.log('Order status updated via API');
         } catch (error) {
-            console.log('⚠️ API update failed, but local update succeeded');
+            console.log('API update failed, but local update succeeded');
         }
         
         app.showToast('Statut de la commande mis à jour', 'success');
-        
         closeOrderDetailModal();
         
         if (adminCurrentSection === 'orders') {
@@ -1302,15 +1178,36 @@ async function clearAllProducts() {
     }
 }
 
-async function clearAllOrders() {
-    if (confirm('ATTENTION: Cette action supprimera TOUTES les commandes. Êtes-vous absolument sûr ?')) {
-        localStorage.removeItem('adminOrders');
-        adminOrders = [];
-        
-        app.showToast('Toutes les commandes ont été supprimées', 'success');
-        if (adminCurrentSection === 'orders') {
+function switchAdminSection(section) {
+    document.querySelectorAll('.admin-nav-btn').forEach(btn => {
+        btn.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
+        btn.classList.add('hover:bg-emerald-50', 'text-emerald-700', 'border-r', 'border-emerald-100');
+    });
+    
+    const activeBtn = document.querySelector(`.admin-nav-btn.${section}`);
+    if (activeBtn) {
+        activeBtn.classList.add('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
+        activeBtn.classList.remove('hover:bg-emerald-50', 'text-emerald-700', 'border-r', 'border-emerald-100');
+    }
+    
+    adminCurrentSection = section;
+    
+    switch(section) {
+        case 'dashboard':
+            app.loadAdminDashboard();
+            break;
+        case 'products':
+            app.loadAdminProducts();
+            break;
+        case 'orders':
             app.loadAdminOrders();
-        }
+            break;
+        case 'featured':
+            app.loadAdminFeatured();
+            break;
+        case 'cleanup':
+            app.loadCleanupSection();
+            break;
     }
 }
 
@@ -1348,14 +1245,12 @@ window.closeProductModal = closeProductModal;
 window.saveProduct = saveProduct;
 window.toggleFeatured = toggleFeatured;
 window.deleteProduct = deleteProduct;
-window.deleteOrder = deleteOrder;
 window.refreshProductCache = refreshProductCache;
 window.validateAllProducts = validateAllProducts;
 window.clearAllProducts = clearAllProducts;
-window.clearAllOrders = clearAllOrders;
 window.viewOrderDetails = viewOrderDetails;
 window.updateOrderStatus = updateOrderStatus;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
-console.log('✅ Fixed Admin.js loaded with DELETE ORDER functionality and proper API integration');
+console.log('✅ Complete Fixed Admin.js loaded with proper authentication and token handling');
