@@ -146,13 +146,32 @@ class PharmacieGaherApp {
     
     async loginUser(email, password) {
         try {
+            console.log('🔐 Attempting login with:', { email, hasPassword: !!password });
+            
+            if (!email || !password) {
+                throw new Error('Email et mot de passe requis');
+            }
+            
+            const requestBody = {
+                email: email.trim(),
+                motDePasse: password
+            };
+            
+            console.log('📤 Sending login request...');
+            
             const response = await fetch(buildApiUrl('/auth/login'), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, motDePasse: password })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
             });
             
+            console.log('📥 Response status:', response.status);
+            
             const data = await response.json();
+            console.log('📥 Response data:', data);
             
             if (!response.ok) {
                 throw new Error(data.message || 'Erreur de connexion');
@@ -173,7 +192,7 @@ class PharmacieGaherApp {
             
             return data;
         } catch (error) {
-            console.error('Erreur login:', error);
+            console.error('❌ Erreur login:', error);
             this.showToast(error.message, 'error');
             throw error;
         }
