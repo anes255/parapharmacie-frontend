@@ -16,12 +16,16 @@ class PharmacieGaherApp {
             livraisonGratuite: 5000
         };
         this.currentPage = 'home';
+        this.backendReady = false;
         
         this.init();
     }
     
     async init() {
         try {
+            // Show loading screen and wake up backend
+            await this.wakeUpBackend();
+            
             await this.checkAuth();
             await this.loadProductsCache();
             this.initUI();
@@ -32,6 +36,91 @@ class PharmacieGaherApp {
             console.error('Erreur initialisation app:', error);
             this.showToast('Erreur de chargement de l\'application', 'error');
         }
+    }
+    
+    // ========================================================================
+    // BACKEND WAKE-UP SYSTEM
+    // ========================================================================
+    async wakeUpBackend() {
+        const loadingScreen = document.getElementById('serverLoadingScreen');
+        const loadingMessage = document.getElementById('loadingMessage');
+        
+        if (!loadingScreen) {
+            console.log('No loading screen found, skipping wake-up');
+            return;
+        }
+        
+        loadingScreen.classList.remove('hidden');
+        
+        const messages = [
+            '🌱 Réveil du serveur en cours...',
+            '🔄 Connexion à la base de données...',
+            '📦 Chargement des produits...',
+            '✨ Préparation de l\'interface...',
+            '🎉 Presque prêt...'
+        ];
+        
+        let messageIndex = 0;
+        const messageInterval = setInterval(() => {
+            if (messageIndex < messages.length && loadingMessage) {
+                loadingMessage.textContent = messages[messageIndex];
+                messageIndex++;
+            }
+        }, 2000);
+        
+        const maxAttempts = 10;
+        let attempt = 0;
+        
+        while (attempt < maxAttempts) {
+            try {
+                console.log(`🔄 Tentative ${attempt + 1}/${maxAttempts} de connexion au backend...`);
+                
+                const response = await fetch(buildApiUrl('/products'), {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    console.log('✅ Backend is awake and ready!');
+                    this.backendReady = true;
+                    clearInterval(messageInterval);
+                    
+                    if (loadingMessage) {
+                        loadingMessage.textContent = '✅ Connexion établie !';
+                    }
+                    
+                    setTimeout(() => {
+                        loadingScreen.classList.add('fade-out');
+                        setTimeout(() => {
+                            loadingScreen.classList.add('hidden');
+                        }, 500);
+                    }, 500);
+                    
+                    return;
+                }
+            } catch (error) {
+                console.log(`⏳ Tentative ${attempt + 1} échouée, nouvelle tentative dans 3s...`);
+            }
+            
+            attempt++;
+            if (attempt < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+        }
+        
+        clearInterval(messageInterval);
+        console.log('⚠️ Backend not responding, continuing with local data');
+        
+        if (loadingMessage) {
+            loadingMessage.textContent = '⚠️ Mode hors ligne - Utilisation des données locales';
+        }
+        
+        setTimeout(() => {
+            loadingScreen.classList.add('fade-out');
+            setTimeout(() => {
+                loadingScreen.classList.add('hidden');
+            }, 500);
+        }, 1500);
     }
     
     // ========================================================================
@@ -2176,7 +2265,22 @@ function toggleFeatured(productId) {
     }
 }
 
-function cleanupOutOfStock() {
+// Admin helper functions
+function toggleFeatured(productId) {
+    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+    const productIndex = products.findIndex(p => p._id === productId);
+    
+    if (productIndex > -1) {
+        products[productIndex].enVedette = !products[productIndex].enVedette;
+        localStorage.setItem('demoProducts', JSON.stringify(products));
+        
+        if (window.app) {
+            window.app.refreshProductsCache();
+            loadAdminFeatured();
+            window.app.showToast('Produit mis à jour', 'success');
+        }
+    }
+}
     if (!confirm('Supprimer tous les produits en rupture de stock ?')) return;
     
     const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
@@ -2219,8 +2323,47 @@ function confirmResetAllProducts() {
     }
 }
 
-function showAddProductModal() {
-    window.app.showToast('Fonctionnalité en cours de développement', 'info');
+function cleanupOutOfStock() {
+    if (!confirm('Supprimer tous les produits en rupture de stock ?')) return;
+    
+    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+    const filtered = products.filter(p => p.stock > 0);
+    
+    localStorage.setItem('demoProducts', JSON.stringify(filtered));
+    
+    if (window.app) {
+        window.app.refreshProductsCache();
+        window.app.showToast(`${products.length - filtered.length} produits supprimés`, 'success');
+        loadAdminCleanup();
+    }
+}
+
+function cleanupInactive() {
+    if (!confirm('Supprimer tous les produits inactifs ?')) return;
+    
+    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+    const filtered = products.filter(p => p.actif !== false);
+    
+    localStorage.setItem('demoProducts', JSON.stringify(filtered));
+    
+    if (window.app) {
+        window.app.refreshProductsCache();
+        window.app.showToast(`${products.length - filtered.length} produits supprimés`, 'success');
+        loadAdminCleanup();
+    }
+}
+
+function confirmResetAllProducts() {
+    if (!confirm('⚠️ ATTENTION: Voulez-vous vraiment supprimer TOUS les produits ? Cette action est IRRÉVERSIBLE !')) return;
+    if (!confirm('Dernière confirmation: Êtes-vous ABSOLUMENT sûr ?')) return;
+    
+    localStorage.setItem('demoProducts', '[]');
+    
+    if (window.app) {
+        window.app.refreshProductsCache();
+        window.app.showToast('Tous les produits ont été supprimés', 'success');
+        switchAdminSection('dashboard');
+    }
 }
 
 function editProduct(productId) {
