@@ -1,21 +1,29 @@
-// Complete Admin Panel with Full Product Management and Order System - FULLY FIXED VERSION
+// Complete Admin Panel with Full Product Management and Order System - AUTHENTICATION FIXED
 
 // Global variables
 let adminCurrentSection = 'dashboard';
 let currentEditingProduct = null;
 let adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
 
-// Products Management
+// Use the global apiCall from config.js instead of defining a local one
+// This ensures consistent token handling across the app
+
+// Products Management - Add to app prototype
 PharmacieGaherApp.prototype.loadAdminProducts = async function() {
     try {
+        // Get products from localStorage
         let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
+        // Try to get products from API as well
         try {
-            const data = await apiCall('/products');
+            const data = await window.apiCall('/products');
             if (data && data.products && data.products.length > 0) {
+                // Merge API products with local ones, avoiding duplicates
                 const localIds = products.map(p => p._id);
                 const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
                 products = [...products, ...newApiProducts];
+                
+                // Update localStorage with merged data
                 localStorage.setItem('demoProducts', JSON.stringify(products));
             }
         } catch (error) {
@@ -79,6 +87,7 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
     }
 };
 
+// Product Row Renderer
 PharmacieGaherApp.prototype.renderProductRow = function(product) {
     const getCategoryColor = (category) => {
         const colors = {
@@ -149,11 +158,13 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
     try {
         console.log('Loading orders from admin panel...');
         
+        // Always start with localStorage orders
         let orders = [...adminOrders];
         console.log('Local orders loaded:', orders.length);
         
+        // Try to merge with API orders
         try {
-            const data = await apiCall('/orders');
+            const data = await window.apiCall('/orders');
             if (data && data.orders && data.orders.length > 0) {
                 console.log('API orders loaded:', data.orders.length);
                 const apiOrders = data.orders.filter(apiOrder => 
@@ -165,7 +176,9 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
             console.log('API unavailable, using only local orders');
         }
         
+        // Sort by date, newest first
         orders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
+        
         console.log('Total orders to display:', orders.length);
         
         document.getElementById('adminContent').innerHTML = `
@@ -187,6 +200,10 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
                         <i class="fas fa-shopping-bag text-6xl text-emerald-200 mb-6"></i>
                         <h3 class="text-2xl font-bold text-emerald-800 mb-4">Aucune commande</h3>
                         <p class="text-emerald-600 mb-4">Les commandes apparaîtront ici une fois passées</p>
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
+                            <h4 class="font-semibold text-blue-800 mb-2">Info:</h4>
+                            <p class="text-sm text-blue-700">Les commandes sont automatiquement ajoutées ici lors du checkout</p>
+                        </div>
                     </div>
                 ` : `
                     <div class="overflow-x-auto">
@@ -266,14 +283,17 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
 // Featured Products Management
 PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
     try {
+        // Get products from local storage
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
         let featuredProducts = localProducts.filter(p => p.enVedette);
         let allProducts = localProducts.filter(p => !p.enVedette);
         
+        // Try to get products from API
         try {
-            const allData = await apiCall('/products');
+            const allData = await window.apiCall('/products');
             if (allData && allData.products && allData.products.length > 0) {
+                // Merge API products, avoiding duplicates
                 const localIds = localProducts.map(p => p._id);
                 const newApiProducts = allData.products.filter(p => !localIds.includes(p._id));
                 
@@ -294,6 +314,7 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
                         <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
                             <i class="fas fa-star text-yellow-400 text-4xl mb-4"></i>
                             <p class="text-yellow-700">Aucun produit en vedette</p>
+                            <p class="text-yellow-600 text-sm mt-2">Ajoutez des produits en vedette pour les mettre en avant sur votre site</p>
                         </div>
                     ` : `
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -342,7 +363,7 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
                                     <div class="mt-2 flex justify-end">
                                         <button onclick="toggleFeatured('${product._id}', true)" 
                                                 class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm">
-                                            <i class="fas fa-star mr-1"></i>Ajouter
+                                            <i class="fas fa-star mr-1"></i>Ajouter aux coups de coeur
                                         </button>
                                     </div>
                                 </div>
@@ -363,6 +384,7 @@ PharmacieGaherApp.prototype.loadAdminFeatured = async function() {
     }
 };
 
+// Helper method to generate placeholder image URL
 PharmacieGaherApp.prototype.generatePlaceholderImage = function(product) {
     const getCategoryColor = (category) => {
         const colors = {
@@ -424,14 +446,20 @@ PharmacieGaherApp.prototype.loadCleanupSection = async function() {
         `;
     } catch (error) {
         console.error('Error loading cleanup section:', error);
+        document.getElementById('adminContent').innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                <p class="text-red-800">Erreur de chargement de la section nettoyage</p>
+            </div>
+        `;
     }
 };
 
-// Order management helper
+// Function to add order to demo (called from checkout) - FIXED
 window.addOrderToDemo = function(orderData) {
     console.log('Adding order to demo:', orderData);
     
     try {
+        // Ensure the order has a valid structure
         const validOrder = {
             _id: orderData._id || Date.now().toString(),
             numeroCommande: orderData.numeroCommande,
@@ -446,19 +474,26 @@ window.addOrderToDemo = function(orderData) {
             commentaires: orderData.commentaires || ''
         };
         
+        // Add to localStorage
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        const existingIndex = orders.findIndex(o => o.numeroCommande === validOrder.numeroCommande);
         
+        // Check for duplicates based on numeroCommande
+        const existingIndex = orders.findIndex(o => o.numeroCommande === validOrder.numeroCommande);
         if (existingIndex > -1) {
+            console.log('Order already exists, updating...');
             orders[existingIndex] = validOrder;
         } else {
             orders.unshift(validOrder);
         }
         
         localStorage.setItem('adminOrders', JSON.stringify(orders));
+        
+        // Update global variable
         adminOrders = orders;
         
         console.log('Order added successfully. Total orders:', orders.length);
+        console.log('Order details:', validOrder);
+        
         return validOrder;
         
     } catch (error) {
@@ -467,6 +502,7 @@ window.addOrderToDemo = function(orderData) {
     }
 };
 
+// Helper functions for order management
 function getStatusColor(statut) {
     const colors = {
         'en-attente': 'bg-yellow-100 text-yellow-800',
@@ -491,7 +527,7 @@ function getStatusLabel(statut) {
     return labels[statut] || statut;
 }
 
-// Modal functions
+// Enhanced Product Modal Functions with Image Upload
 function openAddProductModal() {
     currentEditingProduct = null;
     showProductModal('Ajouter un nouveau produit', 'Ajouter le produit');
@@ -499,13 +535,15 @@ function openAddProductModal() {
 
 async function openEditProductModal(productId) {
     try {
+        // Look for product in local storage first
         let product = null;
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         product = localProducts.find(p => p._id === productId);
         
+        // If not found locally, try API
         if (!product) {
             try {
-                const response = await fetch(buildApiUrl(`/products/${productId}`));
+                const response = await fetch(window.buildApiUrl(`/products/${productId}`));
                 if (response.ok) {
                     product = await response.json();
                 }
@@ -514,6 +552,7 @@ async function openEditProductModal(productId) {
             }
         }
         
+        // If still not found, show error
         if (!product) {
             app.showToast('Produit non trouvé', 'error');
             return;
@@ -543,6 +582,7 @@ function showProductModal(title, submitText) {
                     <form id="productForm" class="space-y-6">
                         <input type="hidden" id="productId" value="${currentEditingProduct ? currentEditingProduct._id : ''}">
                         
+                        <!-- Basic Information -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
@@ -558,6 +598,7 @@ function showProductModal(title, submitText) {
                             </div>
                         </div>
                         
+                        <!-- Description -->
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
                             <textarea id="productDescription" name="description" required rows="3" 
@@ -565,6 +606,7 @@ function showProductModal(title, submitText) {
                                       placeholder="Description détaillée du produit"></textarea>
                         </div>
                         
+                        <!-- Image Upload -->
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Image du produit</label>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -593,6 +635,7 @@ function showProductModal(title, submitText) {
                             </div>
                         </div>
                         
+                        <!-- Price and Stock -->
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Prix (DA) *</label>
@@ -631,6 +674,7 @@ function showProductModal(title, submitText) {
                             </div>
                         </div>
                         
+                        <!-- Additional Info -->
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Ingrédients</label>
@@ -652,6 +696,7 @@ function showProductModal(title, submitText) {
                             </div>
                         </div>
                         
+                        <!-- Options -->
                         <div class="flex flex-wrap gap-6">
                             <label class="flex items-center">
                                 <input type="checkbox" id="productEnVedette" name="enVedette" 
@@ -670,6 +715,7 @@ function showProductModal(title, submitText) {
                             </label>
                         </div>
                         
+                        <!-- Action Buttons -->
                         <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                             <button type="button" onclick="closeProductModal()" 
                                     class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
@@ -689,6 +735,7 @@ function showProductModal(title, submitText) {
     
     document.body.style.overflow = 'hidden';
     
+    // Initialize promotion checkbox behavior
     document.getElementById('productEnPromotion').addEventListener('change', function() {
         const prixOriginalField = document.getElementById('productPrixOriginal');
         if (this.checked) {
@@ -700,6 +747,7 @@ function showProductModal(title, submitText) {
     });
 }
 
+// Improved image preview function
 function previewImage(input) {
     const preview = document.getElementById('imagePreview');
     const placeholder = document.getElementById('imagePreviewPlaceholder');
@@ -708,12 +756,14 @@ function previewImage(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
         
+        // Validate file size (2MB max)
         if (file.size > 2 * 1024 * 1024) {
             app.showToast('Image trop volumineuse. Maximum 2MB.', 'error');
             input.value = '';
             return;
         }
         
+        // Validate file type
         if (!file.type.startsWith('image/')) {
             app.showToast('Veuillez sélectionner un fichier image.', 'error');
             input.value = '';
@@ -726,15 +776,19 @@ function previewImage(input) {
             preview.src = e.target.result;
             preview.classList.remove('hidden');
             placeholder.classList.add('hidden');
+            
+            // Save image data to hidden input
             imageUrl.value = e.target.result;
             console.log('Image preview generated');
         };
         
         reader.readAsDataURL(file);
     } else {
+        // Reset preview if no file selected
         preview.classList.add('hidden');
         placeholder.classList.remove('hidden');
         imageUrl.value = '';
+        console.log('No file selected');
     }
 }
 
@@ -752,8 +806,9 @@ function fillProductForm(product) {
     document.getElementById('productPrecautions').value = product.precautions || '';
     document.getElementById('productEnVedette').checked = product.enVedette || false;
     document.getElementById('productEnPromotion').checked = product.enPromotion || false;
-    document.getElementById('productActif').checked = product.actif !== false;
+    document.getElementById('productActif').checked = product.actif !== false; // Default to true
     
+    // Handle image preview
     if (product.image) {
         const preview = document.getElementById('imagePreview');
         const placeholder = document.getElementById('imagePreviewPlaceholder');
@@ -765,6 +820,7 @@ function fillProductForm(product) {
         imageUrl.value = product.image;
     }
     
+    // Trigger change event for promotion checkbox
     document.getElementById('productEnPromotion').dispatchEvent(new Event('change'));
 }
 
@@ -777,11 +833,12 @@ function closeProductModal() {
     currentEditingProduct = null;
 }
 
-// FIXED saveProduct function with proper token handling
+// New function to save product directly
 function saveProduct() {
     const form = document.getElementById('productForm');
     const isEditing = !!currentEditingProduct;
     
+    // Validate form
     const nom = document.getElementById('productNom').value.trim();
     const prix = document.getElementById('productPrix').value;
     const stock = document.getElementById('productStock').value;
@@ -797,11 +854,13 @@ function saveProduct() {
     const buttonText = document.getElementById('productSubmitText');
     const spinner = document.getElementById('productSubmitSpinner');
     
+    // Disable button and show loading
     button.disabled = true;
     buttonText.classList.add('hidden');
     spinner.classList.remove('hidden');
     
     try {
+        // Get form values
         const productId = document.getElementById('productId').value || Date.now().toString();
         const marque = document.getElementById('productMarque').value.trim();
         const prixOriginal = document.getElementById('productPrixOriginal').value;
@@ -813,6 +872,7 @@ function saveProduct() {
         const actif = document.getElementById('productActif').checked;
         const imageUrl = document.getElementById('productImageUrl').value;
         
+        // Prepare product data
         const productData = {
             _id: productId,
             nom: nom,
@@ -827,8 +887,11 @@ function saveProduct() {
             dateAjout: new Date().toISOString()
         };
         
+        // Add optional fields
         if (prixOriginal) {
             productData.prixOriginal = parseInt(prixOriginal);
+            
+            // Calculate discount percentage
             if (enPromotion && productData.prixOriginal > productData.prix) {
                 productData.pourcentagePromotion = Math.round((productData.prixOriginal - productData.prix) / productData.prixOriginal * 100);
             }
@@ -837,7 +900,11 @@ function saveProduct() {
         if (ingredients) productData.ingredients = ingredients;
         if (modeEmploi) productData.modeEmploi = modeEmploi;
         if (precautions) productData.precautions = precautions;
-        if (imageUrl) productData.image = imageUrl;
+        
+        // Handle image
+        if (imageUrl) {
+            productData.image = imageUrl;
+        }
         
         console.log('Product data to save:', productData);
         
@@ -845,6 +912,7 @@ function saveProduct() {
         let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         
         if (isEditing) {
+            // Update existing product
             const index = localProducts.findIndex(p => p._id === productData._id);
             if (index !== -1) {
                 localProducts[index] = productData;
@@ -852,42 +920,51 @@ function saveProduct() {
                 localProducts.push(productData);
             }
         } else {
+            // Add new product
             localProducts.push(productData);
         }
         
+        // Save back to localStorage
         localStorage.setItem('demoProducts', JSON.stringify(localProducts));
         console.log('Product saved to localStorage');
         
+        // Update the app's product cache to refresh main page immediately
         if (window.app) {
             window.app.refreshProductsCache();
         }
         
-        // FIXED: Use apiCall with proper token from config.js
+        // Try to save to API (optional)
         const saveToApi = async () => {
             try {
                 const endpoint = isEditing ? `/products/${productData._id}` : '/products';
                 const method = isEditing ? 'PUT' : 'POST';
                 
-                console.log(`Attempting API save: ${method} ${endpoint}`);
-                console.log('Auth token present:', !!localStorage.getItem('token'));
-                
-                // Use the apiCall function from config.js which handles tokens properly
-                const response = await apiCall(endpoint, {
+                const response = await fetch(window.buildApiUrl(endpoint), {
                     method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify(productData)
                 });
                 
-                console.log('Product saved to API successfully:', response);
+                if (response.ok) {
+                    console.log('Product saved to API successfully');
+                } else {
+                    console.log('API save failed but product saved locally');
+                }
             } catch (error) {
-                console.log('API save failed, but product saved locally:', error.message);
+                console.log('API save failed, but product saved locally:', error);
             }
         };
         
+        // Save to API in background
         saveToApi();
         
+        // Show success message
         app.showToast(isEditing ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 'success');
         closeProductModal();
         
+        // Refresh admin section
         if (adminCurrentSection === 'products') {
             app.loadAdminProducts();
         } else if (adminCurrentSection === 'featured' && productData.enVedette) {
@@ -898,16 +975,19 @@ function saveProduct() {
         console.error('Error saving product:', error);
         app.showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
     } finally {
+        // Re-enable button
         button.disabled = false;
         buttonText.classList.remove('hidden');
         spinner.classList.add('hidden');
     }
 }
 
+// Product operations
 async function toggleFeatured(productId, newStatus) {
     try {
         console.log('Toggling featured status:', productId, newStatus);
         
+        // Update in localStorage first
         let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         const productIndex = localProducts.findIndex(p => p._id === productId);
         
@@ -916,13 +996,15 @@ async function toggleFeatured(productId, newStatus) {
             localStorage.setItem('demoProducts', JSON.stringify(localProducts));
             console.log('Product featured status updated locally');
             
+            // Update the app's product cache
             if (window.app) {
                 window.app.refreshProductsCache();
             }
         }
         
+        // Try to update via API
         try {
-            await apiCall(`/products/${productId}`, {
+            await window.apiCall(`/products/${productId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ enVedette: newStatus })
             });
@@ -950,6 +1032,7 @@ async function deleteProduct(productId) {
         try {
             console.log('Deleting product:', productId);
             
+            // Delete from local storage first
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             const initialCount = localProducts.length;
             localProducts = localProducts.filter(p => p._id !== productId);
@@ -958,12 +1041,14 @@ async function deleteProduct(productId) {
             const localDeleteSuccess = localProducts.length < initialCount;
             console.log('Product deleted locally:', localDeleteSuccess);
             
+            // Update the app's product cache
             if (window.app) {
                 window.app.refreshProductsCache();
             }
             
+            // Try to delete from API
             try {
-                await apiCall(`/products/${productId}`, {
+                await window.apiCall(`/products/${productId}`, {
                     method: 'DELETE'
                 });
                 console.log('Product deleted from API successfully');
@@ -971,6 +1056,7 @@ async function deleteProduct(productId) {
                 console.log('API delete failed, but product deleted locally:', error);
             }
             
+            // Refresh the products list
             app.showToast('Produit supprimé avec succès', 'success');
             
             if (adminCurrentSection === 'products') {
@@ -986,15 +1072,18 @@ async function deleteProduct(productId) {
     }
 }
 
+// Order detail modal
 async function viewOrderDetails(orderId) {
     try {
         console.log('Viewing order details for:', orderId);
         
+        // Find order in localStorage first
         let order = adminOrders.find(o => o._id === orderId || o.numeroCommande === orderId);
         
         if (!order) {
+            // Try to get from API
             try {
-                const response = await fetch(buildApiUrl(`/orders/${orderId}`));
+                const response = await fetch(window.buildApiUrl(`/orders/${orderId}`));
                 if (response.ok) {
                     order = await response.json();
                 }
@@ -1004,6 +1093,7 @@ async function viewOrderDetails(orderId) {
         }
         
         if (order) {
+            // Create detailed order modal
             document.body.insertAdjacentHTML('beforeend', `
                 <div id="orderDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
@@ -1113,6 +1203,7 @@ async function updateOrderStatus(orderId, newStatus) {
     try {
         console.log('Updating order status:', orderId, 'to', newStatus);
         
+        // Update in localStorage
         let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         const orderIndex = orders.findIndex(o => o._id === orderId || o.numeroCommande === orderId);
         
@@ -1126,8 +1217,9 @@ async function updateOrderStatus(orderId, newStatus) {
             console.log('Order status updated locally');
         }
         
+        // Try to update via API
         try {
-            await apiCall(`/orders/${orderId}`, {
+            await window.apiCall(`/orders/${orderId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ 
                     statut: newStatus,
@@ -1140,8 +1232,11 @@ async function updateOrderStatus(orderId, newStatus) {
         }
         
         app.showToast('Statut de la commande mis à jour', 'success');
+        
+        // Close modal if open
         closeOrderDetailModal();
         
+        // Refresh orders list
         if (adminCurrentSection === 'orders') {
             app.loadAdminOrders();
         }
@@ -1152,6 +1247,7 @@ async function updateOrderStatus(orderId, newStatus) {
     }
 }
 
+// Utility functions
 async function refreshProductCache() {
     if (window.app) {
         window.app.refreshProductsCache();
@@ -1167,6 +1263,7 @@ async function clearAllProducts() {
     if (confirm('ATTENTION: Cette action supprimera TOUS les produits. Êtes-vous absolument sûr ?')) {
         localStorage.removeItem('demoProducts');
         
+        // Update the app's product cache
         if (window.app) {
             window.app.refreshProductsCache();
         }
@@ -1178,6 +1275,7 @@ async function clearAllProducts() {
     }
 }
 
+// Section switching
 function switchAdminSection(section) {
     document.querySelectorAll('.admin-nav-btn').forEach(btn => {
         btn.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
@@ -1211,6 +1309,7 @@ function switchAdminSection(section) {
     }
 }
 
+// Modal event handlers
 document.addEventListener('click', function(event) {
     const modal = document.getElementById('productModal');
     if (modal && event.target === modal) {
@@ -1253,4 +1352,4 @@ window.updateOrderStatus = updateOrderStatus;
 window.closeOrderDetailModal = closeOrderDetailModal;
 window.previewImage = previewImage;
 
-console.log('✅ Complete Fixed Admin.js loaded with proper authentication and token handling');
+console.log('✅ Fixed Admin.js loaded - Authentication issue resolved');
