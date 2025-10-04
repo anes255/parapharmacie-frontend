@@ -1,5 +1,5 @@
 // ============================================================================
-// COMPLETE PharmacieGaherApp - All Pages & Features
+// COMPLETE PharmacieGaherApp - All Pages & Features - SYNTAX FIXED
 // ============================================================================
 
 class PharmacieGaherApp {
@@ -23,9 +23,7 @@ class PharmacieGaherApp {
     
     async init() {
         try {
-            // Show loading screen and wake up backend
             await this.wakeUpBackend();
-            
             await this.checkAuth();
             await this.loadProductsCache();
             this.initUI();
@@ -38,9 +36,6 @@ class PharmacieGaherApp {
         }
     }
     
-    // ========================================================================
-    // BACKEND WAKE-UP SYSTEM
-    // ========================================================================
     async wakeUpBackend() {
         const loadingScreen = document.getElementById('serverLoadingScreen');
         const loadingMessage = document.getElementById('loadingMessage');
@@ -128,9 +123,6 @@ class PharmacieGaherApp {
         }, 1500);
     }
     
-    // ========================================================================
-    // AUTHENTICATION METHODS
-    // ========================================================================
     async checkAuth() {
         const token = localStorage.getItem('token');
         if (token) {
@@ -224,9 +216,6 @@ class PharmacieGaherApp {
         this.showPage('home');
     }
     
-    // ========================================================================
-    // PRODUCTS CACHE & DATA LOADING
-    // ========================================================================
     async loadProductsCache() {
         try {
             console.log('Loading products cache...');
@@ -279,9 +268,6 @@ class PharmacieGaherApp {
         this.loadPromotionProducts();
     }
     
-    // ========================================================================
-    // UI INITIALIZATION & UPDATES
-    // ========================================================================
     initUI() {
         const searchInput = document.getElementById('searchInput');
         if (searchInput) {
@@ -315,9 +301,6 @@ class PharmacieGaherApp {
         }
     }
     
-    // ========================================================================
-    // PAGE ROUTING
-    // ========================================================================
     async showPage(pageName, params = {}) {
         try {
             this.showLoading();
@@ -375,9 +358,6 @@ class PharmacieGaherApp {
         }
     }
     
-    // ========================================================================
-    // HOME PAGE
-    // ========================================================================
     async loadHomePage() {
         const mainContent = document.getElementById('mainContent');
         mainContent.innerHTML = `
@@ -511,9 +491,6 @@ class PharmacieGaherApp {
         }
     }
     
-    // ========================================================================
-    // PRODUCTS PAGE
-    // ========================================================================
     async loadProductsPage(params = {}) {
         const mainContent = document.getElementById('mainContent');
         
@@ -570,9 +547,6 @@ class PharmacieGaherApp {
         this.currentFilteredProducts = filteredProducts;
     }
     
-    // ========================================================================
-    // PRODUCT DETAIL PAGE
-    // ========================================================================
     async loadProductPage(productId) {
         const product = this.allProducts.find(p => p._id === productId);
         
@@ -671,9 +645,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ========================================================================
-    // LOGIN PAGE
-    // ========================================================================
     async loadLoginPage() {
         const mainContent = document.getElementById('mainContent');
         mainContent.innerHTML = `
@@ -727,9 +698,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ========================================================================
-    // REGISTER PAGE
-    // ========================================================================
     async loadRegisterPage() {
         const mainContent = document.getElementById('mainContent');
         mainContent.innerHTML = `
@@ -810,9 +778,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ========================================================================
-    // PROFILE PAGE
-    // ========================================================================
     async loadProfilePage() {
         if (!this.currentUser) {
             this.showPage('login');
@@ -912,9 +877,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ========================================================================
-    // CHECKOUT PAGE
-    // ========================================================================
     async loadCheckoutPage() {
         if (this.cart.length === 0) {
             this.showToast('Votre panier est vide', 'warning');
@@ -1055,9 +1017,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ========================================================================
-    // ORDER CONFIRMATION PAGE
-    // ========================================================================
     async loadOrderConfirmationPage(orderNumber) {
         const mainContent = document.getElementById('mainContent');
         
@@ -1105,9 +1064,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ========================================================================
-    // CONTACT PAGE
-    // ========================================================================
     async loadContactPage() {
         const mainContent = document.getElementById('mainContent');
         
@@ -1190,9 +1146,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ========================================================================
-    // ADMIN PAGE
-    // ========================================================================
     async loadAdminPage() {
         if (!this.currentUser || this.currentUser.role !== 'admin') {
             this.showToast('Accès refusé - Droits administrateur requis', 'error');
@@ -1369,9 +1322,6 @@ class PharmacieGaherApp {
         }
     }
     
-    // ========================================================================
-    // PRODUCT CARD CREATION
-    // ========================================================================
     createProductCard(product) {
         const isOutOfStock = product.stock === 0;
         const hasPromotion = product.enPromotion && product.prixOriginal;
@@ -1444,9 +1394,6 @@ class PharmacieGaherApp {
         `;
     }
     
-    // ========================================================================
-    // CART METHODS
-    // ========================================================================
     async addToCart(productId, quantity = 1) {
         try {
             const product = this.allProducts.find(p => p._id === productId);
@@ -1643,9 +1590,6 @@ class PharmacieGaherApp {
         localStorage.setItem('cart', JSON.stringify(this.cart));
     }
     
-    // ========================================================================
-    // UTILITY METHODS
-    // ========================================================================
     async filterByCategory(category) {
         await this.showPage('products', { categorie: category });
     }
@@ -1912,7 +1856,6 @@ async function handleCheckout(event) {
         
         const data = await response.json();
         
-        // Store order locally
         const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         adminOrders.push({
             numero: data.order?.numero || `ORD-${Date.now()}`,
@@ -1930,7 +1873,6 @@ async function handleCheckout(event) {
     } catch (error) {
         console.error('Checkout error:', error);
         
-        // Fallback: create order locally if API fails
         const orderNumber = `ORD-${Date.now()}`;
         const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         adminOrders.push({
@@ -1977,12 +1919,7 @@ function logout() {
     }
 }
 
-// ============================================================================
-// ADMIN SECTION SWITCHING (from admin.js integration)
-// ============================================================================
-
 function switchAdminSection(section) {
-    // Update nav buttons
     const navButtons = document.querySelectorAll('.admin-nav-btn');
     navButtons.forEach(btn => {
         btn.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
@@ -1995,7 +1932,6 @@ function switchAdminSection(section) {
         activeBtn.classList.remove('text-emerald-700', 'hover:bg-emerald-50');
     }
     
-    // Load section content
     const adminContent = document.getElementById('adminContent');
     
     switch(section) {
@@ -2080,7 +2016,238 @@ function loadAdminProducts() {
                 </table>
             </div>
         </div>
+        
+        <div id="addProductModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="bg-gradient-to-br from-emerald-500 to-green-600 p-6 text-white">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-2xl font-bold">
+                            <i class="fas fa-plus-circle mr-2"></i>
+                            Ajouter un produit
+                        </h3>
+                        <button onclick="closeAddProductModal()" class="text-white hover:text-gray-200">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <form id="addProductForm" onsubmit="handleAddProduct(event)" class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
+                        <input type="text" id="productNom" required class="form-input" placeholder="Ex: Vitamine C 1000mg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                        <textarea id="productDescription" rows="3" class="form-input" placeholder="Description du produit"></textarea>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Catégorie *</label>
+                            <select id="productCategorie" required class="form-input">
+                                <option value="">Sélectionner...</option>
+                                <option value="Vitalité">Vitalité</option>
+                                <option value="Sport">Sport</option>
+                                <option value="Visage">Visage</option>
+                                <option value="Cheveux">Cheveux</option>
+                                <option value="Solaire">Solaire</option>
+                                <option value="Intime">Intime</option>
+                                <option value="Soins">Soins</option>
+                                <option value="Bébé">Bébé</option>
+                                <option value="Homme">Homme</option>
+                                <option value="Dentaire">Dentaire</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Marque</label>
+                            <input type="text" id="productMarque" class="form-input" placeholder="Ex: Bioderma">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Prix (DA) *</label>
+                            <input type="number" id="productPrix" required min="0" class="form-input" placeholder="1500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Stock *</label>
+                            <input type="number" id="productStock" required min="0" class="form-input" placeholder="50">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">URL de l'image</label>
+                        <input type="url" id="productImage" class="form-input" placeholder="https://exemple.com/image.jpg">
+                    </div>
+                    
+                    <div class="flex items-center space-x-6">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="productActif" checked class="mr-2">
+                            <span class="text-sm font-semibold text-gray-700">Produit actif</span>
+                        </label>
+                        
+                        <label class="flex items-center">
+                            <input type="checkbox" id="productVedette" class="mr-2">
+                            <span class="text-sm font-semibold text-gray-700">En vedette</span>
+                        </label>
+                        
+                        <label class="flex items-center">
+                            <input type="checkbox" id="productPromotion" class="mr-2">
+                            <span class="text-sm font-semibold text-gray-700">En promotion</span>
+                        </label>
+                    </div>
+                    
+                    <div id="promotionFields" class="hidden space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prix original (DA)</label>
+                                <input type="number" id="productPrixOriginal" min="0" class="form-input" placeholder="2000">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">% de réduction</label>
+                                <input type="number" id="productPourcentagePromotion" min="0" max="100" class="form-input" placeholder="25">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex space-x-4 pt-4">
+                        <button type="submit" class="btn-primary flex-1">
+                            <i class="fas fa-save mr-2"></i>
+                            Ajouter le produit
+                        </button>
+                        <button type="button" onclick="closeAddProductModal()" class="btn-secondary flex-1">
+                            <i class="fas fa-times mr-2"></i>
+                            Annuler
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     `;
+    
+    setTimeout(() => {
+        const promotionCheckbox = document.getElementById('productPromotion');
+        const promotionFields = document.getElementById('promotionFields');
+        
+        if (promotionCheckbox && promotionFields) {
+            promotionCheckbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    promotionFields.classList.remove('hidden');
+                } else {
+                    promotionFields.classList.add('hidden');
+                }
+            });
+        }
+    }, 100);
+}
+
+function showAddProductModal() {
+    const modal = document.getElementById('addProductModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeAddProductModal() {
+    const modal = document.getElementById('addProductModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        document.getElementById('addProductForm').reset();
+        document.getElementById('promotionFields').classList.add('hidden');
+    }
+}
+
+async function handleAddProduct(event) {
+    event.preventDefault();
+    
+    if (!window.app || !window.app.currentUser) {
+        window.app.showToast('Vous devez être connecté', 'error');
+        return;
+    }
+    
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.app.showToast('Session expirée. Veuillez vous reconnecter.', 'error');
+        window.app.showPage('login');
+        return;
+    }
+    
+    const productData = {
+        nom: document.getElementById('productNom').value,
+        description: document.getElementById('productDescription').value,
+        categorie: document.getElementById('productCategorie').value,
+        marque: document.getElementById('productMarque').value,
+        prix: parseFloat(document.getElementById('productPrix').value),
+        stock: parseInt(document.getElementById('productStock').value),
+        image: document.getElementById('productImage').value,
+        actif: document.getElementById('productActif').checked,
+        enVedette: document.getElementById('productVedette').checked,
+        enPromotion: document.getElementById('productPromotion').checked
+    };
+    
+    if (productData.enPromotion) {
+        productData.prixOriginal = parseFloat(document.getElementById('productPrixOriginal').value);
+        productData.pourcentagePromotion = parseInt(document.getElementById('productPourcentagePromotion').value);
+    }
+    
+    try {
+        const response = await fetch(buildApiUrl('/products'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            },
+            body: JSON.stringify(productData)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            
+            if (response.status === 401) {
+                window.app.showToast('Session expirée. Reconnexion nécessaire.', 'error');
+                localStorage.removeItem('token');
+                window.app.currentUser = null;
+                window.app.showPage('login');
+                return;
+            }
+            
+            throw new Error(errorData.message || 'Erreur lors de l\'ajout du produit');
+        }
+        
+        const data = await response.json();
+        
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        localProducts.push(data.product || { ...productData, _id: Date.now().toString() });
+        localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+        
+        window.app.refreshProductsCache();
+        window.app.showToast('Produit ajouté avec succès !', 'success');
+        
+        closeAddProductModal();
+        loadAdminProducts();
+        
+    } catch (error) {
+        console.error('Error adding product:', error);
+        
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        const newProduct = {
+            ...productData,
+            _id: Date.now().toString(),
+            createdAt: new Date().toISOString()
+        };
+        localProducts.push(newProduct);
+        localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+        
+        window.app.refreshProductsCache();
+        window.app.showToast('Produit ajouté localement (API non disponible)', 'warning');
+        
+        closeAddProductModal();
+        loadAdminProducts();
+    }
 }
 
 function loadAdminOrders() {
@@ -2253,7 +2420,6 @@ function loadAdminCleanup() {
     `;
 }
 
-// Admin helper functions
 function toggleFeatured(productId) {
     const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
     const productIndex = products.findIndex(p => p._id === productId);
@@ -2267,64 +2433,6 @@ function toggleFeatured(productId) {
             loadAdminFeatured();
             window.app.showToast('Produit mis à jour', 'success');
         }
-    }
-}
-
-// Admin helper functions
-function toggleFeatured(productId) {
-    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    const productIndex = products.findIndex(p => p._id === productId);
-    
-    if (productIndex > -1) {
-        products[productIndex].enVedette = !products[productIndex].enVedette;
-        localStorage.setItem('demoProducts', JSON.stringify(products));
-        
-        if (window.app) {
-            window.app.refreshProductsCache();
-            loadAdminFeatured();
-            window.app.showToast('Produit mis à jour', 'success');
-        }
-    }
-}
-    if (!confirm('Supprimer tous les produits en rupture de stock ?')) return;
-    
-    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    const filtered = products.filter(p => p.stock > 0);
-    
-    localStorage.setItem('demoProducts', JSON.stringify(filtered));
-    
-    if (window.app) {
-        window.app.refreshProductsCache();
-        window.app.showToast(`${products.length - filtered.length} produits supprimés`, 'success');
-        loadAdminCleanup();
-    }
-}
-
-function cleanupInactive() {
-    if (!confirm('Supprimer tous les produits inactifs ?')) return;
-    
-    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    const filtered = products.filter(p => p.actif !== false);
-    
-    localStorage.setItem('demoProducts', JSON.stringify(filtered));
-    
-    if (window.app) {
-        window.app.refreshProductsCache();
-        window.app.showToast(`${products.length - filtered.length} produits supprimés`, 'success');
-        loadAdminCleanup();
-    }
-}
-
-function confirmResetAllProducts() {
-    if (!confirm('⚠️ ATTENTION: Voulez-vous vraiment supprimer TOUS les produits ? Cette action est IRRÉVERSIBLE !')) return;
-    if (!confirm('Dernière confirmation: Êtes-vous ABSOLUMENT sûr ?')) return;
-    
-    localStorage.setItem('demoProducts', '[]');
-    
-    if (window.app) {
-        window.app.refreshProductsCache();
-        window.app.showToast('Tous les produits ont été supprimés', 'success');
-        switchAdminSection('dashboard');
     }
 }
 
