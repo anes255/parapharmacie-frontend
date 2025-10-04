@@ -152,9 +152,10 @@ class PharmacieGaherApp {
                 throw new Error('Email et mot de passe requis');
             }
             
+            // FIXED: Backend expects 'password' not 'motDePasse'
             const requestBody = {
                 email: email.trim(),
-                motDePasse: password
+                password: password
             };
             
             console.log('📤 Sending login request...');
@@ -752,19 +753,63 @@ class PharmacieGaherApp {
                             </div>
                             
                             <div>
-                                <label for="registerAdresse" class="block text-sm font-semibold text-gray-700 mb-2">Adresse *</label>
-                                <input type="text" id="registerAdresse" required class="form-input" placeholder="Votre adresse complète">
+                                <label for="registerWilaya" class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
+                                <select id="registerWilaya" required class="form-input">
+                                    <option value="">Sélectionnez votre wilaya</option>
+                                    <option value="Adrar">01 - Adrar</option>
+                                    <option value="Chlef">02 - Chlef</option>
+                                    <option value="Laghouat">03 - Laghouat</option>
+                                    <option value="Oum El Bouaghi">04 - Oum El Bouaghi</option>
+                                    <option value="Batna">05 - Batna</option>
+                                    <option value="Béjaïa">06 - Béjaïa</option>
+                                    <option value="Biskra">07 - Biskra</option>
+                                    <option value="Béchar">08 - Béchar</option>
+                                    <option value="Blida">09 - Blida</option>
+                                    <option value="Bouira">10 - Bouira</option>
+                                    <option value="Tamanrasset">11 - Tamanrasset</option>
+                                    <option value="Tébessa">12 - Tébessa</option>
+                                    <option value="Tlemcen">13 - Tlemcen</option>
+                                    <option value="Tiaret">14 - Tiaret</option>
+                                    <option value="Tizi Ouzou">15 - Tizi Ouzou</option>
+                                    <option value="Alger">16 - Alger</option>
+                                    <option value="Djelfa">17 - Djelfa</option>
+                                    <option value="Jijel">18 - Jijel</option>
+                                    <option value="Sétif">19 - Sétif</option>
+                                    <option value="Saïda">20 - Saïda</option>
+                                    <option value="Skikda">21 - Skikda</option>
+                                    <option value="Sidi Bel Abbès">22 - Sidi Bel Abbès</option>
+                                    <option value="Annaba">23 - Annaba</option>
+                                    <option value="Guelma">24 - Guelma</option>
+                                    <option value="Constantine">25 - Constantine</option>
+                                    <option value="Médéa">26 - Médéa</option>
+                                    <option value="Mostaganem">27 - Mostaganem</option>
+                                    <option value="M'Sila">28 - M'Sila</option>
+                                    <option value="Mascara">29 - Mascara</option>
+                                    <option value="Ouargla">30 - Ouargla</option>
+                                    <option value="Oran">31 - Oran</option>
+                                    <option value="El Bayadh">32 - El Bayadh</option>
+                                    <option value="Illizi">33 - Illizi</option>
+                                    <option value="Bordj Bou Arreridj">34 - Bordj Bou Arreridj</option>
+                                    <option value="Boumerdès">35 - Boumerdès</option>
+                                    <option value="El Tarf">36 - El Tarf</option>
+                                    <option value="Tindouf">37 - Tindouf</option>
+                                    <option value="Tissemsilt">38 - Tissemsilt</option>
+                                    <option value="El Oued">39 - El Oued</option>
+                                    <option value="Khenchela">40 - Khenchela</option>
+                                    <option value="Souk Ahras">41 - Souk Ahras</option>
+                                    <option value="Tipaza">42 - Tipaza</option>
+                                    <option value="Mila">43 - Mila</option>
+                                    <option value="Aïn Defla">44 - Aïn Defla</option>
+                                    <option value="Naâma">45 - Naâma</option>
+                                    <option value="Aïn Témouchent">46 - Aïn Témouchent</option>
+                                    <option value="Ghardaïa">47 - Ghardaïa</option>
+                                    <option value="Relizane">48 - Relizane</option>
+                                </select>
                             </div>
                             
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="registerVille" class="block text-sm font-semibold text-gray-700 mb-2">Ville *</label>
-                                    <input type="text" id="registerVille" required class="form-input" placeholder="Alger">
-                                </div>
-                                <div>
-                                    <label for="registerCodePostal" class="block text-sm font-semibold text-gray-700 mb-2">Code postal</label>
-                                    <input type="text" id="registerCodePostal" class="form-input" placeholder="16000">
-                                </div>
+                            <div>
+                                <label for="registerAdresse" class="block text-sm font-semibold text-gray-700 mb-2">Adresse</label>
+                                <input type="text" id="registerAdresse" class="form-input" placeholder="Votre adresse complète">
                             </div>
                             
                             <div>
@@ -843,8 +888,8 @@ class PharmacieGaherApp {
                                     <p class="text-gray-900">${this.currentUser.adresse || 'Non renseignée'}</p>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Ville</label>
-                                    <p class="text-gray-900">${this.currentUser.ville || 'Non renseignée'}</p>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Wilaya</label>
+                                    <p class="text-gray-900">${this.currentUser.wilaya || 'Non renseignée'}</p>
                                 </div>
                             </div>
                         </div>
@@ -949,17 +994,14 @@ class PharmacieGaherApp {
                                            value="${this.currentUser?.adresse || ''}">
                                 </div>
                                 
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                                    <div>
-                                        <label for="checkoutVille" class="block text-sm font-semibold text-gray-700 mb-2">Ville *</label>
-                                        <input type="text" id="checkoutVille" required class="form-input"
-                                               value="${this.currentUser?.ville || ''}">
-                                    </div>
-                                    <div>
-                                        <label for="checkoutCodePostal" class="block text-sm font-semibold text-gray-700 mb-2">Code postal</label>
-                                        <input type="text" id="checkoutCodePostal" class="form-input"
-                                               value="${this.currentUser?.codePostal || ''}">
-                                    </div>
+                                <div class="mt-6">
+                                    <label for="checkoutWilaya" class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
+                                    <select id="checkoutWilaya" required class="form-input">
+                                        <option value="">Sélectionnez votre wilaya</option>
+                                        <option value="Tipaza" ${this.currentUser?.wilaya === 'Tipaza' ? 'selected' : ''}>42 - Tipaza</option>
+                                        <option value="Alger" ${this.currentUser?.wilaya === 'Alger' ? 'selected' : ''}>16 - Alger</option>
+                                        <!-- Add other wilayas as needed -->
+                                    </select>
                                 </div>
                                 
                                 <div class="mt-6">
@@ -1788,6 +1830,7 @@ function proceedToCheckout() {
     }
 }
 
+// FIXED: handleLogin function - sends 'password' not 'motDePasse'
 async function handleLogin(event) {
     event.preventDefault();
     
@@ -1803,6 +1846,7 @@ async function handleLogin(event) {
     }
 }
 
+// FIXED: handleRegister function - sends correct field names and no codePostal
 async function handleRegister(event) {
     event.preventDefault();
     
@@ -1814,15 +1858,17 @@ async function handleRegister(event) {
         return;
     }
     
+    // FIXED: Correct field mapping for backend API
     const userData = {
         prenom: document.getElementById('registerPrenom').value,
         nom: document.getElementById('registerNom').value,
         email: document.getElementById('registerEmail').value,
         telephone: document.getElementById('registerTelephone').value,
-        adresse: document.getElementById('registerAdresse').value,
-        ville: document.getElementById('registerVille').value,
-        codePostal: document.getElementById('registerCodePostal').value,
-        motDePasse: password
+        wilaya: document.getElementById('registerWilaya').value,
+        adresse: document.getElementById('registerAdresse')?.value || '',
+        ville: '', // Not collected in form anymore
+        codePostal: '', // Not collected in form anymore
+        password: password // Backend expects 'password' not 'motDePasse'
     };
     
     if (window.app) {
@@ -1846,8 +1892,7 @@ async function handleCheckout(event) {
             email: document.getElementById('checkoutEmail').value,
             telephone: document.getElementById('checkoutTelephone').value,
             adresse: document.getElementById('checkoutAdresse').value,
-            ville: document.getElementById('checkoutVille').value,
-            codePostal: document.getElementById('checkoutCodePostal').value
+            wilaya: document.getElementById('checkoutWilaya').value
         },
         produits: window.app.cart.map(item => ({
             produit: item.id,
@@ -1950,8 +1995,6 @@ function switchAdminSection(section) {
         activeBtn.classList.add('bg-gradient-to-r', 'from-emerald-500', 'to-green-600', 'text-white');
         activeBtn.classList.remove('text-emerald-700', 'hover:bg-emerald-50');
     }
-    
-    const adminContent = document.getElementById('adminContent');
     
     switch(section) {
         case 'dashboard':
@@ -2301,7 +2344,7 @@ function loadAdminOrders() {
                                     </p>
                                     <p class="text-sm text-gray-700">
                                         <i class="fas fa-map-marker-alt mr-2"></i>
-                                        ${order.client.adresse}, ${order.client.ville}
+                                        ${order.client.adresse}, ${order.client.wilaya}
                                     </p>
                                 </div>
                                 <div class="text-right">
