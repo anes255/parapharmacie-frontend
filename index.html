@@ -2,13 +2,12 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=0.9">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shifa - Parapharmacie</title>
     <meta name="description" content="Shifa - Parapharmacie Gaher à Tipaza, Algérie. Découvrez nos produits de santé et beauté. Livraison rapide dans toute l'Algérie.">
     
     <!-- Simple green pill favicon -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='16' fill='%2310b981'/%3E%3Cpath d='M16 8c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 12c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z' fill='white'/%3E%3C/svg%3E">
-    <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='16' fill='%2310b981'/%3E%3Cpath d='M16 8c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 12c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z' fill='white'/%3E%3C/svg%3E">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -33,11 +32,41 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="bg-gradient-to-br from-emerald-50 to-green-100">
-    <!-- Navigation with Enhanced Logo -->
+    
+    <!-- ================================ -->
+    <!-- SERVER LOADING SCREEN -->
+    <!-- ================================ -->
+    <div id="serverLoadingScreen" class="fixed inset-0 bg-gradient-to-br from-emerald-500 via-green-600 to-teal-700 flex items-center justify-center z-[9999]">
+        <div class="text-center">
+            <div class="relative mb-8">
+                <div class="w-32 h-32 mx-auto">
+                    <div class="absolute inset-0 bg-white/30 rounded-full animate-ping"></div>
+                    <div class="relative w-32 h-32 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-4 border-white/40 shadow-2xl">
+                        <i class="fas fa-seedling text-6xl text-white animate-pulse"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <h2 class="text-4xl font-bold text-white mb-4 drop-shadow-lg">Shifa</h2>
+            <p class="text-xl text-white/90 mb-8">Parapharmacie</p>
+            
+            <div class="flex justify-center mb-6">
+                <div class="w-48 h-1.5 bg-white/30 rounded-full overflow-hidden">
+                    <div class="h-full bg-white rounded-full animate-loading-bar"></div>
+                </div>
+            </div>
+            
+            <p id="loadingMessage" class="text-white text-lg font-medium animate-pulse">
+                🌱 Réveil du serveur en cours...
+            </p>
+        </div>
+    </div>
+
+    <!-- Navigation -->
     <nav class="bg-gradient-to-r from-emerald-600 to-green-700 shadow-xl sticky top-0 z-50">
         <div class="container mx-auto px-4">
             <div class="flex justify-between items-center py-4">
-                <!-- Enhanced Logo -->
+                <!-- Logo -->
                 <div class="logo-container cursor-pointer flex items-center" onclick="showPage('home')">
                     <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mr-4 border-2 border-white/30 shadow-lg hover:bg-white/30 transition-all duration-300 hover:scale-105">
                         <i class="fas fa-seedling text-white text-2xl drop-shadow-md"></i>
@@ -140,9 +169,6 @@
                                 <a href="#" onclick="showPage('profile')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors font-medium">
                                     <i class="fas fa-user mr-3 text-emerald-500"></i>Mon Profil
                                 </a>
-                                <a href="#" onclick="showPage('orders')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors font-medium">
-                                    <i class="fas fa-box mr-3 text-emerald-500"></i>Mes Commandes
-                                </a>
                                 <div id="adminMenuLink" class="hidden">
                                     <a href="#" onclick="showPage('admin')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors font-medium">
                                         <i class="fas fa-cog mr-3 text-emerald-500"></i>Administration
@@ -230,10 +256,9 @@
     <div id="cartOverlay" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40" onclick="toggleCart()"></div>
 
     <!-- Footer -->
-    <footer class="bg-gradient-to-r from-emerald-600 to-green-700 text-white mt-16">
+    <footer class="bg-gradient-to-r from-emerald-800 to-green-900 text-white mt-16">
         <div class="container mx-auto px-4 py-12">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <!-- Informations -->
                 <div>
                     <div class="flex items-center space-x-3 mb-6">
                         <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/30">
@@ -257,18 +282,15 @@
                     </div>
                 </div>
                 
-                <!-- Liens Rapides -->
                 <div>
                     <h4 class="text-lg font-semibold mb-4">Liens Rapides</h4>
                     <ul class="space-y-2">
                         <li><a href="#" onclick="showPage('home')" class="text-emerald-200 hover:text-white transition-colors">Accueil</a></li>
                         <li><a href="#" onclick="showPage('products')" class="text-emerald-200 hover:text-white transition-colors">Nos Produits</a></li>
                         <li><a href="#" onclick="showPage('contact')" class="text-emerald-200 hover:text-white transition-colors">Contact</a></li>
-                        <li><a href="#" onclick="showPage('about')" class="text-emerald-200 hover:text-white transition-colors">À Propos</a></li>
                     </ul>
                 </div>
                 
-                <!-- Catégories -->
                 <div>
                     <h4 class="text-lg font-semibold mb-4">Catégories</h4>
                     <ul class="space-y-2">
@@ -279,7 +301,6 @@
                     </ul>
                 </div>
                 
-                <!-- Contact -->
                 <div>
                     <h4 class="text-lg font-semibold mb-4">Contact</h4>
                     <ul class="space-y-2 text-emerald-200">
@@ -295,15 +316,11 @@
                             <i class="fas fa-phone mr-3 text-emerald-300"></i>
                             +213 123 456 789
                         </li>
-                        <li class="flex items-center">
-                            <i class="fas fa-clock mr-3 text-emerald-300"></i>
-                            Lun-Sam: 8h-20h, Dim: 9h-18h
-                        </li>
                     </ul>
                 </div>
             </div>
             
-            <hr class="border-emerald-500 my-8">
+            <hr class="border-emerald-700 my-8">
             
             <div class="text-center text-emerald-200">
                 <p>&copy; 2024 Shifa - Parapharmacie. Tous droits réservés.</p>
@@ -327,11 +344,5 @@
     <!-- Scripts -->
     <script src="js/config.js"></script>
     <script src="js/app.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/products.js"></script>
-    <script src="js/cart.js"></script>
-    <script src="js/checkout.js"></script>
-    <script src="js/admin.js"></script>
 </body>
-
 </html>
