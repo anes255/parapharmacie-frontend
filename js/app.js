@@ -47,6 +47,7 @@ class PharmacieGaherApp {
         
         if (!loadingScreen) {
             console.log('No loading screen found, skipping wake-up');
+            this.backendReady = true;
             return;
         }
         
@@ -90,10 +91,12 @@ class PharmacieGaherApp {
                     }
                     
                     setTimeout(() => {
-                        loadingScreen.classList.add('fade-out');
-                        setTimeout(() => {
-                            loadingScreen.classList.add('hidden');
-                        }, 500);
+                        if (loadingScreen) {
+                            loadingScreen.classList.add('fade-out');
+                            setTimeout(() => {
+                                loadingScreen.classList.add('hidden');
+                            }, 500);
+                        }
                     }, 500);
                     
                     return;
@@ -116,10 +119,12 @@ class PharmacieGaherApp {
         }
         
         setTimeout(() => {
-            loadingScreen.classList.add('fade-out');
-            setTimeout(() => {
-                loadingScreen.classList.add('hidden');
-            }, 500);
+            if (loadingScreen) {
+                loadingScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                }, 500);
+            }
         }, 1500);
     }
     
