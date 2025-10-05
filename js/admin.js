@@ -1,8 +1,13 @@
-
+// ============================================================================
+// COMPLETE ADMIN.JS - Product & Order Management System
+// Compatible with Shifa Parapharmacie Backend API
+// ============================================================================
 
 console.log('✅ Loading Complete Admin System...');
 
-
+// ============================================================================
+// SECTION SWITCHER - Navigation between admin sections
+// ============================================================================
 function switchAdminSection(section) {
     console.log('🔄 Switching to section:', section);
     
@@ -544,28 +549,43 @@ async function handleProductSubmit(event, productId = null) {
 }
 
 async function createProduct(productData) {
-    // Generate ID
+    console.log('➕ Creating new product...');
+    
+    // Generate ID and add to localStorage FIRST
     productData._id = 'prod_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    productData.dateAjout = new Date().toISOString();
     
-    // Try API first
-    try {
-        const response = await apiCall('/admin/products', {
-            method: 'POST',
-            body: JSON.stringify(productData)
-        });
-        
-        if (response && response.product) {
-            productData._id = response.product._id;
-            console.log('✅ Product created in API:', response.product._id);
-        }
-    } catch (error) {
-        console.log('API unavailable, saving to localStorage only:', error.message);
-    }
-    
-    // Always save to localStorage
-    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+    let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
     products.push(productData);
     localStorage.setItem('demoProducts', JSON.stringify(products));
+    console.log(`✅ Product added to localStorage with ID: ${productData._id}`);
+    
+    // Try API creation (non-blocking)
+    try {
+        const token = localStorage.getItem('token');
+        if (token) {
+            const response = await apiCall('/admin/products', {
+                method: 'POST',
+                body: JSON.stringify(productData)
+            });
+            
+            if (response && response.product && response.product._id) {
+                // Update with API-generated ID
+                products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+                const localProduct = products.find(p => p._id === productData._id);
+                if (localProduct) {
+                    localProduct._id = response.product._id;
+                    localStorage.setItem('demoProducts', JSON.stringify(products));
+                    console.log(`✅ Product synced with API, new ID: ${response.product._id}`);
+                }
+            }
+        } else {
+            console.log('⚠️ No auth token, API creation skipped');
+        }
+    } catch (error) {
+        console.log('⚠️ API creation failed:', error.message);
+        // Continue anyway since localStorage creation succeeded
+    }
     
     if (window.app) {
         window.app.showToast('Produit ajouté avec succès!', 'success');
@@ -573,24 +593,35 @@ async function createProduct(productData) {
 }
 
 async function updateProduct(productId, productData) {
-    // Try API first
-    try {
-        const response = await apiCall(`/admin/products/${productId}`, {
-            method: 'PUT',
-            body: JSON.stringify(productData)
-        });
-        console.log('✅ Product updated in API');
-    } catch (error) {
-        console.log('API unavailable, updating localStorage only:', error.message);
-    }
+    console.log('📝 Updating product:', productId);
     
-    // Always update localStorage
+    // Update localStorage FIRST
     let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
     const index = products.findIndex(p => p._id === productId);
     
-    if (index !== -1) {
-        products[index] = { ...products[index], ...productData, _id: productId };
-        localStorage.setItem('demoProducts', JSON.stringify(products));
+    if (index === -1) {
+        throw new Error('Produit non trouvé');
+    }
+    
+    products[index] = { ...products[index], ...productData, _id: productId };
+    localStorage.setItem('demoProducts', JSON.stringify(products));
+    console.log(`✅ Product updated in localStorage`);
+    
+    // Try API update (non-blocking)
+    try {
+        const token = localStorage.getItem('token');
+        if (token) {
+            await apiCall(`/admin/products/${productId}`, {
+                method: 'PUT',
+                body: JSON.stringify(productData)
+            });
+            console.log('✅ Product updated in API');
+        } else {
+            console.log('⚠️ No auth token, API update skipped');
+        }
+    } catch (error) {
+        console.log('⚠️ API update failed:', error.message);
+        // Continue anyway since localStorage update succeeded
     }
     
     if (window.app) {
@@ -602,34 +633,54 @@ async function deleteProduct(productId) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return;
     
     try {
-        // Try API first
-        try {
-            await apiCall(`/admin/products/${productId}`, {
-                method: 'DELETE'
-            });
-            console.log('✅ Product deleted from API');
-        } catch (error) {
-            console.log('API unavailable, deleting from localStorage only:', error.message);
+        console.log('🗑️ Deleting product:', productId);
+        
+        // Delete from localStorage FIRST
+        let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        const originalLength = products.length;
+        products = products.filter(p => p._id !== productId);
+        
+        if (products.length === originalLength) {
+            console.warn('Product not found in localStorage');
+            if (window.app) {
+                window.app.showToast('Produit non trouvé', 'error');
+            }
+            return;
         }
         
-        // Always delete from localStorage
-        let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        products = products.filter(p => p._id !== productId);
         localStorage.setItem('demoProducts', JSON.stringify(products));
+        console.log(`✅ Deleted from localStorage. ${originalLength} -> ${products.length} products`);
         
-        await loadAndDisplayProducts();
-        filterProducts();
+        // Try API deletion (non-blocking)
+        try {
+            const token = localStorage.getItem('token');
+            if (token) {
+                await apiCall(`/admin/products/${productId}`, {
+                    method: 'DELETE'
+                });
+                console.log('✅ Product deleted from API');
+            } else {
+                console.log('⚠️ No auth token, API deletion skipped');
+            }
+        } catch (error) {
+            console.log('⚠️ API deletion failed:', error.message);
+            // Continue anyway since localStorage deletion succeeded
+        }
         
-        // Refresh app cache
+        // Refresh app cache with localStorage data
         if (window.app && typeof window.app.refreshProductsCache === 'function') {
             window.app.refreshProductsCache();
         }
         
+        // Reload display from localStorage (not API)
+        displayProductsTable(products);
+        
         if (window.app) {
             window.app.showToast('Produit supprimé avec succès!', 'success');
         }
+        
     } catch (error) {
-        console.error('Error deleting product:', error);
+        console.error('❌ Error deleting product:', error);
         if (window.app) {
             window.app.showToast('Erreur lors de la suppression: ' + error.message, 'error');
         }
@@ -638,36 +689,52 @@ async function deleteProduct(productId) {
 
 async function toggleProductStatus(productId) {
     try {
+        console.log('🔄 Toggling product status:', productId);
+        
+        // Update localStorage FIRST
         let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         const product = products.find(p => p._id === productId);
         
-        if (product) {
-            product.actif = !product.actif;
-            
-            // Try API
-            try {
+        if (!product) {
+            console.warn('Product not found in localStorage');
+            return;
+        }
+        
+        product.actif = !product.actif;
+        localStorage.setItem('demoProducts', JSON.stringify(products));
+        console.log(`✅ Status toggled in localStorage: ${product.actif}`);
+        
+        // Try API update (non-blocking)
+        try {
+            const token = localStorage.getItem('token');
+            if (token) {
                 await apiCall(`/admin/products/${productId}`, {
                     method: 'PUT',
                     body: JSON.stringify({ actif: product.actif })
                 });
-            } catch (error) {
-                console.log('API unavailable:', error.message);
+                console.log('✅ Status updated in API');
+            } else {
+                console.log('⚠️ No auth token, API update skipped');
             }
-            
-            // Save to localStorage
-            localStorage.setItem('demoProducts', JSON.stringify(products));
-            
-            // Refresh cache
-            if (window.app && typeof window.app.refreshProductsCache === 'function') {
-                window.app.refreshProductsCache();
-            }
-            
-            if (window.app) {
-                window.app.showToast(`Produit ${product.actif ? 'activé' : 'désactivé'}`, 'success');
-            }
+        } catch (error) {
+            console.log('⚠️ API update failed:', error.message);
+            // Continue anyway since localStorage update succeeded
         }
+        
+        // Refresh cache with localStorage data
+        if (window.app && typeof window.app.refreshProductsCache === 'function') {
+            window.app.refreshProductsCache();
+        }
+        
+        // Reload display from localStorage
+        displayProductsTable(products);
+        
+        if (window.app) {
+            window.app.showToast(`Produit ${product.actif ? 'activé' : 'désactivé'}`, 'success');
+        }
+        
     } catch (error) {
-        console.error('Error toggling product status:', error);
+        console.error('❌ Error toggling product status:', error);
     }
 }
 
@@ -1412,7 +1479,9 @@ async function deleteAllInactive() {
     }
 }
 
-
+// ============================================================================
+// EXPORT GLOBAL FUNCTIONS
+// ============================================================================
 window.switchAdminSection = switchAdminSection;
 window.loadProductsManagement = loadProductsManagement;
 window.filterProducts = filterProducts;
