@@ -991,232 +991,229 @@ class PharmacieGaherApp {
         `;
     }
     
-// ADD THIS ENTIRE METHOD to your PharmacieGaherApp class in app.js
-// Place it after the loadContactPage() method (around line 1430)
-// and before the loadAdminPage() method
-
-async loadCheckoutPage() {
-    // Check if cart is empty
-    if (!this.cart || this.cart.length === 0) {
-        this.showToast('Votre panier est vide', 'warning');
-        this.showPage('products');
-        return;
-    }
-    
-    // All 58 Algerian wilayas alphabetically
-    const allWilayas = [
-        'Adrar', 'Aïn Defla', 'Aïn Témouchent', 'Alger', 'Annaba', 
-        'Batna', 'Béchar', 'Béjaïa', 'Béni Abbès', 'Biskra', 'Blida', 
-        'Bordj Bou Arreridj', 'Bouira', 'Boumerdès', 'Chlef', 'Constantine', 
-        'Djelfa', 'Djanet', 'El Bayadh', 'El M\'Ghair', 'El Meniaa', 'El Oued', 
-        'El Tarf', 'Ghardaïa', 'Guelma', 'Illizi', 'In Salah', 'Jijel', 
-        'Khenchela', 'Laghouat', 'M\'Sila', 'Mascara', 'Médéa', 'Mila', 
-        'Mostaganem', 'Naâma', 'Oran', 'Ouargla', 'Ouled Djellal', 'Oum El Bouaghi',
-        'Relizane', 'Saïda', 'Sétif', 'Sidi Bel Abbès', 'Skikda', 'Souk Ahras',
-        'Tamanrasset', 'Tébessa', 'Tiaret', 'Timimoun', 'Tindouf', 'Tipaza',
-        'Tissemsilt', 'Tizi Ouzou', 'Tlemcen', 'Touggourt'
-    ];
-    
-    const mainContent = document.getElementById('mainContent');
-    
-    // Use the existing getCartTotal method
-    const cartTotal = this.getCartTotal();
-    
-    mainContent.innerHTML = `
-        <div class="container mx-auto px-4 py-8 max-w-7xl">
-            <div class="text-center mb-8">
-                <h1 class="text-4xl font-bold text-emerald-800 mb-4">Finaliser votre commande</h1>
-                <p class="text-emerald-600 text-lg">Remplissez vos informations de livraison</p>
-            </div>
-            
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Left Column - Checkout Form -->
-                <div class="lg:col-span-2">
-                    <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
-                        <form id="checkoutForm" onsubmit="return false;">
-                            <!-- Personal Information -->
-                            <div class="mb-8">
-                                <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
-                                    <i class="fas fa-user mr-3 text-emerald-600"></i>
-                                    Informations personnelles
-                                </h2>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label for="checkoutPrenom" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            Prénom *
-                                        </label>
-                                        <input type="text" id="checkoutPrenom" name="prenom" required
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                               placeholder="Votre prénom">
-                                    </div>
-                                    
-                                    <div>
-                                        <label for="checkoutNom" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            Nom *
-                                        </label>
-                                        <input type="text" id="checkoutNom" name="nom" required
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                               placeholder="Votre nom">
-                                    </div>
-                                    
-                                    <div>
-                                        <label for="checkoutEmail" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            Email *
-                                        </label>
-                                        <input type="email" id="checkoutEmail" name="email" required
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                               placeholder="votre@email.com">
-                                    </div>
-                                    
-                                    <div>
-                                        <label for="checkoutTelephone" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            Téléphone *
-                                        </label>
-                                        <input type="tel" id="checkoutTelephone" name="telephone" required
-                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                               placeholder="0555 12 34 56">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Delivery Address -->
-                            <div class="mb-8">
-                                <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
-                                    <i class="fas fa-map-marker-alt mr-3 text-emerald-600"></i>
-                                    Adresse de livraison
-                                </h2>
-                                
-                                <div class="grid grid-cols-1 gap-6">
-                                    <div>
-                                        <label for="checkoutAdresse" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            Adresse complète *
-                                        </label>
-                                        <textarea id="checkoutAdresse" name="adresse" required rows="3"
-                                                  class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all resize-none"
-                                                  placeholder="Numéro, rue, quartier..."></textarea>
-                                    </div>
-                                    
-                                    <div>
-                                        <label for="checkoutWilaya" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            Wilaya * <span class="text-xs text-emerald-600">(Tarifs PREST Express)</span>
-                                        </label>
-                                        <select id="checkoutWilaya" name="wilaya" required
-                                                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all">
-                                            <option value="">Sélectionnez votre wilaya</option>
-                                            ${allWilayas.map(wilaya => `<option value="${wilaya}">${wilaya}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Payment Method -->
-                            <div class="mb-8">
-                                <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
-                                    <i class="fas fa-credit-card mr-3 text-emerald-600"></i>
-                                    Mode de paiement
-                                </h2>
-                                
-                                <div class="space-y-4">
-                                    <label class="flex items-center p-4 border-2 border-emerald-200 rounded-xl hover:bg-emerald-50 cursor-pointer transition-all">
-                                        <input type="radio" name="modePaiement" value="Paiement à la livraison" checked
-                                               class="w-5 h-5 text-emerald-600 mr-4">
-                                        <div class="flex-1">
-                                            <div class="font-semibold text-gray-900">Paiement à la livraison</div>
-                                            <div class="text-sm text-gray-600">Payez en espèces lors de la réception</div>
-                                        </div>
-                                        <i class="fas fa-money-bill-wave text-emerald-600 text-2xl"></i>
-                                    </label>
-                                    
-                                    <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer transition-all opacity-50">
-                                        <input type="radio" name="modePaiement" value="Carte bancaire" disabled
-                                               class="w-5 h-5 text-gray-400 mr-4">
-                                        <div class="flex-1">
-                                            <div class="font-semibold text-gray-900">Carte bancaire</div>
-                                            <div class="text-sm text-gray-600">Bientôt disponible</div>
-                                        </div>
-                                        <i class="fas fa-credit-card text-gray-400 text-2xl"></i>
-                                    </label>
-                                </div>
-                                
-                                <div id="paymentMethodInfo"></div>
-                            </div>
-                            
-                            <!-- Additional Comments -->
-                            <div class="mb-8">
-                                <label for="checkoutCommentaires" class="block text-sm font-semibold text-gray-700 mb-2">
-                                    Commentaires additionnels (optionnel)
-                                </label>
-                                <textarea id="checkoutCommentaires" name="commentaires" rows="3"
-                                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all resize-none"
-                                          placeholder="Instructions de livraison, préférences..."></textarea>
-                            </div>
-                            
-                            <div id="shippingMessage"></div>
-                        </form>
-                    </div>
+    async loadCheckoutPage() {
+        // Check if cart is empty
+        if (!this.cart || this.cart.length === 0) {
+            this.showToast('Votre panier est vide', 'warning');
+            this.showPage('products');
+            return;
+        }
+        
+        // All 58 Algerian wilayas alphabetically
+        const allWilayas = [
+            'Adrar', 'Aïn Defla', 'Aïn Témouchent', 'Alger', 'Annaba', 
+            'Batna', 'Béchar', 'Béjaïa', 'Béni Abbès', 'Biskra', 'Blida', 
+            'Bordj Bou Arreridj', 'Bouira', 'Boumerdès', 'Chlef', 'Constantine', 
+            'Djelfa', 'Djanet', 'El Bayadh', 'El M\'Ghair', 'El Meniaa', 'El Oued', 
+            'El Tarf', 'Ghardaïa', 'Guelma', 'Illizi', 'In Salah', 'Jijel', 
+            'Khenchela', 'Laghouat', 'M\'Sila', 'Mascara', 'Médéa', 'Mila', 
+            'Mostaganem', 'Naâma', 'Oran', 'Ouargla', 'Ouled Djellal', 'Oum El Bouaghi',
+            'Relizane', 'Saïda', 'Sétif', 'Sidi Bel Abbès', 'Skikda', 'Souk Ahras',
+            'Tamanrasset', 'Tébessa', 'Tiaret', 'Timimoun', 'Tindouf', 'Tipaza',
+            'Tissemsilt', 'Tizi Ouzou', 'Tlemcen', 'Touggourt'
+        ];
+        
+        const mainContent = document.getElementById('mainContent');
+        
+        // Use the existing getCartTotal method
+        const cartTotal = this.getCartTotal();
+        
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-8 max-w-7xl">
+                <div class="text-center mb-8">
+                    <h1 class="text-4xl font-bold text-emerald-800 mb-4">Finaliser votre commande</h1>
+                    <p class="text-emerald-600 text-lg">Remplissez vos informations de livraison</p>
                 </div>
                 
-                <!-- Right Column - Order Summary -->
-                <div class="lg:col-span-1">
-                    <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8 sticky top-4">
-                        <h2 class="text-2xl font-bold text-emerald-800 mb-6">Résumé de la commande</h2>
-                        
-                        <!-- Cart Items -->
-                        <div class="space-y-4 mb-6 max-h-64 overflow-y-auto">
-                            ${this.cart.map(item => `
-                                <div class="flex items-center space-x-3 p-3 bg-emerald-50/50 rounded-xl">
-                                    <img src="${item.image}" alt="${item.nom}" 
-                                         class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200">
-                                    <div class="flex-1">
-                                        <h4 class="font-medium text-gray-900 text-sm">${item.nom}</h4>
-                                        <p class="text-xs text-gray-600">${item.quantite} × ${item.prix} DA</p>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="font-semibold text-emerald-700">${item.quantite * item.prix} DA</p>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Left Column - Checkout Form -->
+                    <div class="lg:col-span-2">
+                        <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
+                            <form id="checkoutForm" onsubmit="return false;">
+                                <!-- Personal Information -->
+                                <div class="mb-8">
+                                    <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
+                                        <i class="fas fa-user mr-3 text-emerald-600"></i>
+                                        Informations personnelles
+                                    </h2>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label for="checkoutPrenom" class="block text-sm font-semibold text-gray-700 mb-2">
+                                                Prénom *
+                                            </label>
+                                            <input type="text" id="checkoutPrenom" name="prenom" required
+                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                                   placeholder="Votre prénom">
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="checkoutNom" class="block text-sm font-semibold text-gray-700 mb-2">
+                                                Nom *
+                                            </label>
+                                            <input type="text" id="checkoutNom" name="nom" required
+                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                                   placeholder="Votre nom">
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="checkoutEmail" class="block text-sm font-semibold text-gray-700 mb-2">
+                                                Email *
+                                            </label>
+                                            <input type="email" id="checkoutEmail" name="email" required
+                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                                   placeholder="votre@email.com">
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="checkoutTelephone" class="block text-sm font-semibold text-gray-700 mb-2">
+                                                Téléphone *
+                                            </label>
+                                            <input type="tel" id="checkoutTelephone" name="telephone" required
+                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
+                                                   placeholder="0555 12 34 56">
+                                        </div>
                                     </div>
                                 </div>
-                            `).join('')}
+                                
+                                <!-- Delivery Address -->
+                                <div class="mb-8">
+                                    <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
+                                        <i class="fas fa-map-marker-alt mr-3 text-emerald-600"></i>
+                                        Adresse de livraison
+                                    </h2>
+                                    
+                                    <div class="grid grid-cols-1 gap-6">
+                                        <div>
+                                            <label for="checkoutAdresse" class="block text-sm font-semibold text-gray-700 mb-2">
+                                                Adresse complète *
+                                            </label>
+                                            <textarea id="checkoutAdresse" name="adresse" required rows="3"
+                                                      class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all resize-none"
+                                                      placeholder="Numéro, rue, quartier..."></textarea>
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="checkoutWilaya" class="block text-sm font-semibold text-gray-700 mb-2">
+                                                Wilaya * <span class="text-xs text-emerald-600">(Tarifs PREST Express)</span>
+                                            </label>
+                                            <select id="checkoutWilaya" name="wilaya" required
+                                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all">
+                                                <option value="">Sélectionnez votre wilaya</option>
+                                                ${allWilayas.map(wilaya => `<option value="${wilaya}">${wilaya}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Payment Method -->
+                                <div class="mb-8">
+                                    <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
+                                        <i class="fas fa-credit-card mr-3 text-emerald-600"></i>
+                                        Mode de paiement
+                                    </h2>
+                                    
+                                    <div class="space-y-4">
+                                        <label class="flex items-center p-4 border-2 border-emerald-200 rounded-xl hover:bg-emerald-50 cursor-pointer transition-all">
+                                            <input type="radio" name="modePaiement" value="Paiement à la livraison" checked
+                                                   class="w-5 h-5 text-emerald-600 mr-4">
+                                            <div class="flex-1">
+                                                <div class="font-semibold text-gray-900">Paiement à la livraison</div>
+                                                <div class="text-sm text-gray-600">Payez en espèces lors de la réception</div>
+                                            </div>
+                                            <i class="fas fa-money-bill-wave text-emerald-600 text-2xl"></i>
+                                        </label>
+                                        
+                                        <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer transition-all opacity-50">
+                                            <input type="radio" name="modePaiement" value="Carte bancaire" disabled
+                                                   class="w-5 h-5 text-gray-400 mr-4">
+                                            <div class="flex-1">
+                                                <div class="font-semibold text-gray-900">Carte bancaire</div>
+                                                <div class="text-sm text-gray-600">Bientôt disponible</div>
+                                            </div>
+                                            <i class="fas fa-credit-card text-gray-400 text-2xl"></i>
+                                        </label>
+                                    </div>
+                                    
+                                    <div id="paymentMethodInfo"></div>
+                                </div>
+                                
+                                <!-- Additional Comments -->
+                                <div class="mb-8">
+                                    <label for="checkoutCommentaires" class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Commentaires additionnels (optionnel)
+                                    </label>
+                                    <textarea id="checkoutCommentaires" name="commentaires" rows="3"
+                                              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all resize-none"
+                                              placeholder="Instructions de livraison, préférences..."></textarea>
+                                </div>
+                                
+                                <div id="shippingMessage"></div>
+                            </form>
                         </div>
-                        
-                        <!-- Totals -->
-                        <div class="border-t border-emerald-200 pt-4 space-y-3">
-                            <div class="flex justify-between text-gray-700">
-                                <span>Sous-total:</span>
-                                <span id="checkoutSousTotal" class="font-semibold">${cartTotal} DA</span>
+                    </div>
+                    
+                    <!-- Right Column - Order Summary -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8 sticky top-4">
+                            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Résumé de la commande</h2>
+                            
+                            <!-- Cart Items -->
+                            <div class="space-y-4 mb-6 max-h-64 overflow-y-auto">
+                                ${this.cart.map(item => `
+                                    <div class="flex items-center space-x-3 p-3 bg-emerald-50/50 rounded-xl">
+                                        <img src="${item.image}" alt="${item.nom}" 
+                                             class="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200">
+                                        <div class="flex-1">
+                                            <h4 class="font-medium text-gray-900 text-sm">${item.nom}</h4>
+                                            <p class="text-xs text-gray-600">${item.quantite} × ${item.prix} DA</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-semibold text-emerald-700">${item.quantite * item.prix} DA</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
                             </div>
-                            <div class="flex justify-between text-gray-700">
-                                <span>Frais de livraison:</span>
-                                <span id="checkoutFraisLivraison" class="font-semibold">400 DA</span>
+                            
+                            <!-- Totals -->
+                            <div class="border-t border-emerald-200 pt-4 space-y-3">
+                                <div class="flex justify-between text-gray-700">
+                                    <span>Sous-total:</span>
+                                    <span id="checkoutSousTotal" class="font-semibold">${cartTotal} DA</span>
+                                </div>
+                                <div class="flex justify-between text-gray-700">
+                                    <span>Frais de livraison:</span>
+                                    <span id="checkoutFraisLivraison" class="font-semibold">400 DA</span>
+                                </div>
+                                <div class="flex justify-between text-xl font-bold text-emerald-800 border-t border-emerald-200 pt-3">
+                                    <span>Total:</span>
+                                    <span id="checkoutTotal">${cartTotal + 400} DA</span>
+                                </div>
                             </div>
-                            <div class="flex justify-between text-xl font-bold text-emerald-800 border-t border-emerald-200 pt-3">
-                                <span>Total:</span>
-                                <span id="checkoutTotal">${cartTotal + 400} DA</span>
-                            </div>
+                            
+                            <!-- Submit Button -->
+                            <button onclick="if(window.checkoutSystem) { window.checkoutSystem.processOrder(); }" 
+                                    class="w-full mt-6 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
+                                <i class="fas fa-check mr-2"></i>Confirmer la commande
+                            </button>
+                            
+                            <p class="text-xs text-gray-500 text-center mt-4">
+                                En passant commande, vous acceptez nos conditions générales de vente
+                            </p>
                         </div>
-                        
-                        <!-- Submit Button -->
-                        <button onclick="if(window.checkoutSystem) { window.checkoutSystem.processOrder(); }" 
-                                class="w-full mt-6 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
-                            <i class="fas fa-check mr-2"></i>Confirmer la commande
-                        </button>
-                        
-                        <p class="text-xs text-gray-500 text-center mt-4">
-                            En passant commande, vous acceptez nos conditions générales de vente
-                        </p>
                     </div>
                 </div>
             </div>
-        </div>
-    `;
-    
-    // Initialize checkout system after DOM is ready
-    setTimeout(() => {
-        if (window.initCheckout) {
-            window.initCheckout();
-        }
-    }, 100);
-}
+        `;
+        
+        // Initialize checkout system after DOM is ready
+        setTimeout(() => {
+            if (window.initCheckout) {
+                window.initCheckout();
+            }
+        }, 100);
+    }
+
     async loadOrderConfirmationPage(orderNumber) {
         const mainContent = document.getElementById('mainContent');
         
@@ -1669,9 +1666,13 @@ async loadCheckoutPage() {
         }
     }
     
+    getCartTotal() {
+        return this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+    }
+    
     updateCartUI() {
         const cartCount = document.getElementById('cartCount');
-        if (cartCount) {
+        if (cartCount){
             const totalItems = this.cart.reduce((sum, item) => sum + item.quantite, 0);
             cartCount.textContent = totalItems;
             
@@ -2803,6 +2804,7 @@ async function deleteProduct(productId) {
         }
     }
 }
+
 // ============================================================================
 // INITIALIZE APP
 // ============================================================================
@@ -2816,7 +2818,3 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 console.log('✅ Complete app.js loaded - Fixed version with canvas placeholders, image upload & order deletion!');
-
-
-
-
