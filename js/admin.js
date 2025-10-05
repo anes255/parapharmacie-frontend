@@ -61,20 +61,29 @@ PharmacieGaherApp.prototype.loadAdminProducts = async function() {
         
         let products = [];
         
-        // Try API first
+        // Try ADMIN API first
         try {
-            const data = await apiCall('/products');
+            const data = await apiCall('/admin/products?limit=1000');
             if (data && data.products) {
                 products = data.products;
-                console.log(`Loaded ${products.length} products from API`);
+                console.log(`Loaded ${products.length} products from ADMIN API`);
                 
                 // Update localStorage with API data
                 localStorage.setItem('demoProducts', JSON.stringify(products));
             }
         } catch (error) {
-            console.log('API unavailable, using localStorage:', error.message);
-            // Fallback to localStorage if API fails
-            products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            console.log('Admin API unavailable, trying public API:', error.message);
+            // Fallback to public API
+            try {
+                const data = await apiCall('/products?limit=1000');
+                if (data && data.products) {
+                    products = data.products;
+                    localStorage.setItem('demoProducts', JSON.stringify(products));
+                }
+            } catch (error2) {
+                console.log('All APIs unavailable, using localStorage');
+                products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            }
         }
         
         document.getElementById('adminContent').innerHTML = `
@@ -218,21 +227,31 @@ PharmacieGaherApp.prototype.loadAdminOrders = async function() {
         
         let orders = [];
         
-        // Try API first
+        // Try ADMIN API first
         try {
-            const data = await apiCall('/orders');
+            const data = await apiCall('/admin/orders?limit=1000');
             if (data && data.orders) {
                 orders = data.orders;
-                console.log(`Loaded ${orders.length} orders from API`);
+                console.log(`Loaded ${orders.length} orders from ADMIN API`);
                 
                 // Update localStorage with API data
                 localStorage.setItem('adminOrders', JSON.stringify(orders));
                 adminOrders = orders;
             }
         } catch (error) {
-            console.log('API unavailable, using localStorage:', error.message);
-            // Fallback to localStorage
-            orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            console.log('Admin API unavailable, trying public orders API:', error.message);
+            // Fallback to public orders API
+            try {
+                const data = await apiCall('/orders?limit=1000');
+                if (data && data.orders) {
+                    orders = data.orders;
+                    localStorage.setItem('adminOrders', JSON.stringify(orders));
+                    adminOrders = orders;
+                }
+            } catch (error2) {
+                console.log('All APIs unavailable, using localStorage');
+                orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            }
         }
         
         // Sort by date, newest first
@@ -476,9 +495,12 @@ async function openEditProductModal(productId) {
     try {
         let product = null;
         
-        // Try API first
+        // Try API first - USE /admin/products ENDPOINT
         try {
-            product = await apiCall(`/products/${productId}`);
+            const data = await apiCall(`/admin/products?limit=1000`);
+            if (data && data.products) {
+                product = data.products.find(p => p._id === productId);
+            }
         } catch (error) {
             console.log('API unavailable, trying localStorage');
             const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
@@ -710,7 +732,6 @@ async function saveProduct() {
     
     try {
         const productData = {
-            _id: document.getElementById('productId').value || Date.now().toString(),
             nom: nom,
             description: description,
             marque: document.getElementById('productMarque').value.trim(),
@@ -719,8 +740,7 @@ async function saveProduct() {
             categorie: categorie,
             actif: document.getElementById('productActif').checked,
             enVedette: document.getElementById('productEnVedette').checked,
-            enPromotion: document.getElementById('productEnPromotion').checked,
-            dateAjout: new Date().toISOString()
+            enPromotion: document.getElementById('productEnPromotion').checked
         };
         
         const prixOriginal = document.getElementById('productPrixOriginal').value;
@@ -738,9 +758,10 @@ async function saveProduct() {
         
         console.log('Saving product to API:', productData);
         
-        // SAVE TO API FIRST
+        // SAVE TO API FIRST - USE /admin/products ENDPOINT
         try {
-            const endpoint = isEditing ? `/products/${productData._id}` : '/products';
+            const productId = document.getElementById('productId').value;
+            const endpoint = isEditing ? `/admin/products/${productId}` : '/admin/products';
             const method = isEditing ? 'PUT' : 'POST';
             
             const result = await apiCall(endpoint, {
@@ -750,21 +771,11 @@ async function saveProduct() {
             
             console.log('✅ Product saved to API successfully:', result);
             
-            // Update localStorage after API success
-            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            
-            if (isEditing) {
-                const index = localProducts.findIndex(p => p._id === productData._id);
-                if (index !== -1) {
-                    localProducts[index] = productData;
-                } else {
-                    localProducts.push(productData);
-                }
-            } else {
-                localProducts.push(productData);
+            // Refresh from API to get the updated product with ID
+            const updatedData = await apiCall('/products');
+            if (updatedData && updatedData.products) {
+                localStorage.setItem('demoProducts', JSON.stringify(updatedData.products));
             }
-            
-            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
             
             // Refresh app cache
             if (window.app) {
@@ -801,21 +812,18 @@ async function toggleFeatured(productId, newStatus) {
     try {
         console.log('Toggling featured via API:', productId, newStatus);
         
-        // UPDATE API FIRST
-        await apiCall(`/products/${productId}`, {
+        // UPDATE API FIRST - USE /admin/products ENDPOINT
+        await apiCall(`/admin/products/${productId}`, {
             method: 'PUT',
             body: JSON.stringify({ enVedette: newStatus })
         });
         
         console.log('✅ Featured status updated in API');
         
-        // Update localStorage after API success
-        let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        const productIndex = localProducts.findIndex(p => p._id === productId);
-        
-        if (productIndex !== -1) {
-            localProducts[productIndex].enVedette = newStatus;
-            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+        // Reload from API to sync
+        const data = await apiCall('/products');
+        if (data && data.products) {
+            localStorage.setItem('demoProducts', JSON.stringify(data.products));
         }
         
         // Refresh app cache
@@ -847,17 +855,18 @@ async function deleteProduct(productId) {
     try {
         console.log('Deleting product from API:', productId);
         
-        // DELETE FROM API FIRST
-        await apiCall(`/products/${productId}`, {
+        // DELETE FROM API FIRST - USE /admin/products ENDPOINT
+        await apiCall(`/admin/products/${productId}`, {
             method: 'DELETE'
         });
         
         console.log('✅ Product deleted from API');
         
-        // Delete from localStorage after API success
-        let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        localProducts = localProducts.filter(p => p._id !== productId);
-        localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+        // Reload from API to sync
+        const data = await apiCall('/products');
+        if (data && data.products) {
+            localStorage.setItem('demoProducts', JSON.stringify(data.products));
+        }
         
         // Refresh app cache
         if (window.app) {
@@ -888,18 +897,34 @@ async function deleteOrder(orderId) {
     try {
         console.log('Deleting order from API:', orderId);
         
-        // DELETE FROM API FIRST
-        await apiCall(`/orders/${orderId}`, {
-            method: 'DELETE'
-        });
+        // DELETE FROM API FIRST - Try admin endpoint first, then orders endpoint
+        try {
+            await apiCall(`/admin/orders/${orderId}`, {
+                method: 'DELETE'
+            });
+            console.log('✅ Order deleted from ADMIN API');
+        } catch (error) {
+            // Try regular orders endpoint as fallback
+            await apiCall(`/orders/${orderId}`, {
+                method: 'DELETE'
+            });
+            console.log('✅ Order deleted from orders API');
+        }
         
-        console.log('✅ Order deleted from API');
-        
-        // Delete from localStorage after API success
-        let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        orders = orders.filter(o => o._id !== orderId && o.numeroCommande !== orderId);
-        localStorage.setItem('adminOrders', JSON.stringify(orders));
-        adminOrders = orders;
+        // Reload from API to sync
+        try {
+            const data = await apiCall('/admin/orders?limit=1000');
+            if (data && data.orders) {
+                localStorage.setItem('adminOrders', JSON.stringify(data.orders));
+                adminOrders = data.orders;
+            }
+        } catch (error) {
+            // Delete from localStorage manually if API fails
+            let orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+            orders = orders.filter(o => o._id !== orderId && o.numeroCommande !== orderId);
+            localStorage.setItem('adminOrders', JSON.stringify(orders));
+            adminOrders = orders;
+        }
         
         app.showToast('Commande supprimée avec succès', 'success');
         
@@ -943,13 +968,16 @@ async function clearAllProducts() {
     }
     
     try {
-        // Get all products from API
-        const data = await apiCall('/products');
+        // Get all products from ADMIN API
+        const data = await apiCall('/admin/products?limit=1000');
         const products = data.products || [];
         
-        // Delete each product from API
+        console.log(`Deleting ${products.length} products...`);
+        
+        // Delete each product from API using ADMIN endpoint
         for (const product of products) {
-            await apiCall(`/products/${product._id}`, { method: 'DELETE' });
+            await apiCall(`/admin/products/${product._id}`, { method: 'DELETE' });
+            console.log(`Deleted product: ${product.nom}`);
         }
         
         // Clear localStorage
