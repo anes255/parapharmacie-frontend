@@ -1,8 +1,7 @@
 // ============================================================================
-// ADMIN.JS - Full API Integration with Complete CRUD Operations
+// ADMIN.JS - Complete CRUD with Force Delete and Full Logging
 // ============================================================================
 
-// Generate placeholder image using canvas
 function generatePlaceholder(width, height, bgColor, textColor, text) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -21,7 +20,6 @@ function generatePlaceholder(width, height, bgColor, textColor, text) {
     return canvas.toDataURL('image/png');
 }
 
-// Preview uploaded image
 function previewImage(input) {
     const file = input.files[0];
     if (!file) return;
@@ -48,7 +46,6 @@ function previewImage(input) {
     reader.readAsDataURL(file);
 }
 
-// Switch between admin sections
 function switchAdminSection(section) {
     const navButtons = document.querySelectorAll('.admin-nav-btn');
     navButtons.forEach(btn => {
@@ -82,18 +79,18 @@ function switchAdminSection(section) {
 }
 
 // ============================================================================
-// PRODUCTS SECTION - Full CRUD with API
+// PRODUCTS SECTION
 // ============================================================================
 
 async function loadAdminProducts() {
     const adminContent = document.getElementById('adminContent');
-    adminContent.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i></div>';
+    adminContent.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i><p class="mt-4">Chargement des produits...</p></div>';
     
     try {
         const token = localStorage.getItem('token');
         let products = [];
         
-        // Fetch from API
+        console.log('Fetching products from API...');
         const response = await fetch(buildApiUrl('/products'), {
             headers: token ? { 'x-auth-token': token } : {}
         });
@@ -101,21 +98,19 @@ async function loadAdminProducts() {
         if (response.ok) {
             const data = await response.json();
             products = data.products || [];
-            console.log(`Loaded ${products.length} products from API`);
+            console.log(`✅ Loaded ${products.length} products from API`);
+            
+            localStorage.setItem('demoProducts', JSON.stringify(products));
+            window.app.allProducts = products;
         } else {
-            throw new Error('API fetch failed');
+            throw new Error(`API returned ${response.status}`);
         }
-        
-        // Also update localStorage cache
-        localStorage.setItem('demoProducts', JSON.stringify(products));
-        window.app.allProducts = products;
         
         renderProductsTable(products);
         
     } catch (error) {
-        console.error('Error loading products:', error);
+        console.error('❌ Error loading products:', error);
         
-        // Fallback to localStorage
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         renderProductsTable(localProducts);
         window.app?.showToast('Chargement depuis le cache local', 'warning');
@@ -155,7 +150,7 @@ function renderProductsTable(products) {
                                 imageUrl = generatePlaceholder(50, 50, '10b981', 'ffffff', initials);
                             }
                             return `
-                            <tr class="border-b border-emerald-100 hover:bg-emerald-50">
+                            <tr class="border-b border-emerald-100 hover:bg-emerald-50" data-product-id="${product._id}">
                                 <td class="px-4 py-3">
                                     <img src="${imageUrl}" alt="${product.nom}" class="w-12 h-12 object-cover rounded-lg">
                                 </td>
@@ -176,8 +171,11 @@ function renderProductsTable(products) {
                                     <button onclick="editProduct('${product._id}')" class="text-blue-600 hover:text-blue-800 mr-3" title="Modifier">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button onclick="deleteProduct('${product._id}')" class="text-red-600 hover:text-red-800" title="Supprimer">
+                                    <button onclick="deleteProduct('${product._id}', '${product.nom.replace(/'/g, "\\'")}', false)" class="text-red-600 hover:text-red-800 mr-3" title="Supprimer">
                                         <i class="fas fa-trash"></i>
+                                    </button>
+                                    <button onclick="deleteProduct('${product._id}', '${product.nom.replace(/'/g, "\\'")}', true)" class="text-orange-600 hover:text-orange-800" title="Forcer suppression">
+                                        <i class="fas fa-trash-alt"></i>
                                     </button>
                                 </td>
                             </tr>
@@ -195,7 +193,6 @@ function renderProductsTable(products) {
 
 function renderProductModal() {
     return `
-        <!-- Add/Edit Product Modal -->
         <div id="productModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
             <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
                 <div class="bg-gradient-to-br from-emerald-500 to-green-600 p-6 text-white">
@@ -374,7 +371,6 @@ async function editProduct(productId) {
         const data = await response.json();
         const product = data.product;
         
-        // Populate form
         document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit mr-2"></i>Modifier le produit';
         document.getElementById('submitButtonText').textContent = 'Enregistrer les modifications';
         document.getElementById('productId').value = product._id;
@@ -448,6 +444,8 @@ async function handleProductSubmit(event) {
         const url = productId ? `/products/${productId}` : '/products';
         const method = productId ? 'PUT' : 'POST';
         
+        console.log(`${method} request to ${url}`);
+        
         const response = await fetch(buildApiUrl(url), {
             method: method,
             headers: {
@@ -463,8 +461,8 @@ async function handleProductSubmit(event) {
         }
         
         const data = await response.json();
+        console.log('Product saved:', data);
         
-        // Update localStorage cache
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         if (productId) {
             const index = localProducts.findIndex(p => p._id === productId);
@@ -474,7 +472,6 @@ async function handleProductSubmit(event) {
         }
         localStorage.setItem('demoProducts', JSON.stringify(localProducts));
         
-        // Refresh app cache and UI
         window.app.allProducts = localProducts;
         window.app.refreshProductsCache();
         
@@ -488,39 +485,88 @@ async function handleProductSubmit(event) {
     }
 }
 
-async function deleteProduct(productId) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return;
+// FORCE DELETE - Deletes from API AND localStorage
+async function deleteProduct(productId, productName, forceDelete = false) {
+    const confirmMsg = forceDelete 
+        ? `FORCE DELETE: Êtes-vous sûr de vouloir supprimer définitivement "${productName}" de la base de données ET du cache ?`
+        : `Êtes-vous sûr de vouloir supprimer "${productName}" ?`;
+    
+    if (!confirm(confirmMsg)) return;
     
     const token = localStorage.getItem('token');
     
+    console.log(`🗑️ Attempting to delete product: ${productId}`);
+    console.log(`   Name: ${productName}`);
+    console.log(`   Force delete: ${forceDelete}`);
+    console.log(`   Token: ${token ? 'Present' : 'Missing'}`);
+    
+    let apiDeleteSuccess = false;
+    
     try {
+        console.log(`📡 Sending DELETE request to: ${buildApiUrl(`/products/${productId}`)}`);
+        
         const response = await fetch(buildApiUrl(`/products/${productId}`), {
             method: 'DELETE',
-            headers: { 'x-auth-token': token }
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            }
         });
         
-        if (!response.ok) throw new Error('Erreur lors de la suppression');
+        console.log(`📥 Response status: ${response.status} ${response.statusText}`);
         
-        // Update localStorage
+        if (response.ok) {
+            const data = await response.json();
+            console.log('✅ API delete successful:', data);
+            apiDeleteSuccess = true;
+        } else {
+            const errorData = await response.json();
+            console.error('❌ API delete failed:', errorData);
+            throw new Error(errorData.message || `HTTP ${response.status}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ DELETE request error:', error);
+        
+        if (!forceDelete) {
+            window.app?.showToast(`Erreur API: ${error.message}. Utilisez le bouton orange pour forcer la suppression.`, 'error');
+            return;
+        }
+        
+        console.log('⚠️ Force delete mode: continuing despite API error');
+    }
+    
+    // Delete from localStorage regardless of API success if force delete
+    if (apiDeleteSuccess || forceDelete) {
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        const beforeCount = localProducts.length;
         const filtered = localProducts.filter(p => p._id !== productId);
+        const afterCount = filtered.length;
+        
+        console.log(`💾 localStorage: ${beforeCount} products before, ${afterCount} after`);
+        
         localStorage.setItem('demoProducts', JSON.stringify(filtered));
         
-        // Refresh app cache
         window.app.allProducts = filtered;
         window.app.refreshProductsCache();
         
-        window.app?.showToast('Produit supprimé avec succès', 'success');
-        loadAdminProducts();
+        // Remove row from table immediately
+        const row = document.querySelector(`tr[data-product-id="${productId}"]`);
+        if (row) {
+            row.remove();
+            console.log('✅ Removed row from table');
+        }
         
-    } catch (error) {
-        console.error('Error deleting product:', error);
-        window.app?.showToast('Erreur lors de la suppression', 'error');
+        const msg = apiDeleteSuccess 
+            ? 'Produit supprimé avec succès de la base de données'
+            : 'Produit supprimé du cache local (API non disponible)';
+        
+        window.app?.showToast(msg, 'success');
     }
 }
 
 // ============================================================================
-// ORDERS SECTION - API Integration
+// ORDERS SECTION
 // ============================================================================
 
 async function loadAdminOrders() {
@@ -530,9 +576,7 @@ async function loadAdminOrders() {
     try {
         const token = localStorage.getItem('token');
         
-        if (!token) {
-            throw new Error('No authentication token');
-        }
+        if (!token) throw new Error('No authentication token');
         
         const response = await fetch(buildApiUrl('/orders'), {
             headers: { 'x-auth-token': token }
@@ -549,7 +593,6 @@ async function loadAdminOrders() {
     } catch (error) {
         console.error('Error loading orders:', error);
         
-        // Fallback to localStorage
         const localOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         renderOrdersTable(localOrders);
         window.app?.showToast('Chargement depuis le cache local', 'warning');
@@ -649,6 +692,7 @@ async function deleteOrder(orderId) {
         
         if (!response.ok) throw new Error('Erreur lors de la suppression');
         
+        console.log('Order deleted from API');
         window.app?.showToast('Commande supprimée avec succès', 'success');
         loadAdminOrders();
         
@@ -659,7 +703,7 @@ async function deleteOrder(orderId) {
 }
 
 // ============================================================================
-// FEATURED PRODUCTS SECTION
+// FEATURED SECTION
 // ============================================================================
 
 async function loadAdminFeatured() {
@@ -734,7 +778,6 @@ async function toggleFeatured(productId) {
             body: JSON.stringify(updatedData)
         });
         
-        // Update cache
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         const index = localProducts.findIndex(p => p._id === productId);
         if (index > -1) {
@@ -788,12 +831,15 @@ async function cleanupOutOfStock() {
     const token = localStorage.getItem('token');
     const products = window.app.allProducts.filter(p => p.stock === 0);
     
+    let deletedCount = 0;
+    
     for (const product of products) {
         try {
             await fetch(buildApiUrl(`/products/${product._id}`), {
                 method: 'DELETE',
                 headers: { 'x-auth-token': token }
             });
+            deletedCount++;
         } catch (error) {
             console.error(`Failed to delete ${product._id}`);
         }
@@ -804,8 +850,8 @@ async function cleanupOutOfStock() {
     window.app.allProducts = remaining;
     window.app.refreshProductsCache();
     
-    window.app?.showToast(`${products.length} produits supprimés`, 'success');
+    window.app?.showToast(`${deletedCount} produits supprimés`, 'success');
     loadAdminCleanup();
 }
 
-console.log('Admin.js loaded - Full API integration active');
+console.log('Admin.js loaded - Force delete enabled');
