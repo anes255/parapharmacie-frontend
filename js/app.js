@@ -991,13 +991,9 @@ class PharmacieGaherApp {
         `;
     }
     
-    // EXACT REPLACEMENT for loadCheckoutPage method in app.js
-// Find this line in your app.js (around line 1100-1200):
-//     async loadCheckoutPage() {
-// 
-// Delete everything from "async loadCheckoutPage() {" 
-// down to the closing "}" of that method
-// Then paste THIS entire method:
+// ADD THIS ENTIRE METHOD to your PharmacieGaherApp class in app.js
+// Place it after the loadContactPage() method (around line 1430)
+// and before the loadAdminPage() method
 
 async loadCheckoutPage() {
     // Check if cart is empty
@@ -1023,8 +1019,8 @@ async loadCheckoutPage() {
     
     const mainContent = document.getElementById('mainContent');
     
-    // Calculate cart total directly without calling method
-    const cartTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+    // Use the existing getCartTotal method
+    const cartTotal = this.getCartTotal();
     
     mainContent.innerHTML = `
         <div class="container mx-auto px-4 py-8 max-w-7xl">
@@ -2820,6 +2816,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 console.log('✅ Complete app.js loaded - Fixed version with canvas placeholders, image upload & order deletion!');
+
 
 
 
