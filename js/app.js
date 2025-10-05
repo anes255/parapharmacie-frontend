@@ -991,8 +991,13 @@ class PharmacieGaherApp {
         `;
     }
     
-    // Add this loadCheckoutPage method to your PharmacieGaherApp class in app.js
-// Replace the existing loadCheckoutPage method
+    // EXACT REPLACEMENT for loadCheckoutPage method in app.js
+// Find this line in your app.js (around line 1100-1200):
+//     async loadCheckoutPage() {
+// 
+// Delete everything from "async loadCheckoutPage() {" 
+// down to the closing "}" of that method
+// Then paste THIS entire method:
 
 async loadCheckoutPage() {
     // Check if cart is empty
@@ -1002,19 +1007,24 @@ async loadCheckoutPage() {
         return;
     }
     
+    // All 58 Algerian wilayas alphabetically
+    const allWilayas = [
+        'Adrar', 'Aïn Defla', 'Aïn Témouchent', 'Alger', 'Annaba', 
+        'Batna', 'Béchar', 'Béjaïa', 'Béni Abbès', 'Biskra', 'Blida', 
+        'Bordj Bou Arreridj', 'Bouira', 'Boumerdès', 'Chlef', 'Constantine', 
+        'Djelfa', 'Djanet', 'El Bayadh', 'El M\'Ghair', 'El Meniaa', 'El Oued', 
+        'El Tarf', 'Ghardaïa', 'Guelma', 'Illizi', 'In Salah', 'Jijel', 
+        'Khenchela', 'Laghouat', 'M\'Sila', 'Mascara', 'Médéa', 'Mila', 
+        'Mostaganem', 'Naâma', 'Oran', 'Ouargla', 'Ouled Djellal', 'Oum El Bouaghi',
+        'Relizane', 'Saïda', 'Sétif', 'Sidi Bel Abbès', 'Skikda', 'Souk Ahras',
+        'Tamanrasset', 'Tébessa', 'Tiaret', 'Timimoun', 'Tindouf', 'Tipaza',
+        'Tissemsilt', 'Tizi Ouzou', 'Tlemcen', 'Touggourt'
+    ];
+    
     const mainContent = document.getElementById('mainContent');
     
-    // All 58 Algerian wilayas
-    const allWilayas = [
-        'Adrar', 'Chlef', 'Laghouat', 'Oum El Bouaghi', 'Batna', 'Béjaïa', 'Biskra', 'Béchar',
-        'Blida', 'Bouira', 'Tamanrasset', 'Tébessa', 'Tlemcen', 'Tiaret', 'Tizi Ouzou', 'Alger',
-        'Djelfa', 'Jijel', 'Sétif', 'Saïda', 'Skikda', 'Sidi Bel Abbès', 'Annaba', 'Guelma',
-        'Constantine', 'Médéa', 'Mostaganem', 'M\'Sila', 'Mascara', 'Ouargla', 'Oran', 'El Bayadh',
-        'Illizi', 'Bordj Bou Arreridj', 'Boumerdès', 'El Tarf', 'Tindouf', 'Tissemsilt', 'El Oued',
-        'Khenchela', 'Souk Ahras', 'Tipaza', 'Mila', 'Aïn Defla', 'Naâma', 'Aïn Témouchent',
-        'Ghardaïa', 'Relizane', 'Timimoun', 'Bordj Badji Mokhtar', 'Ouled Djellal', 'Béni Abbès',
-        'In Salah', 'In Guezzam', 'Touggourt', 'Djanet', 'El M\'Ghair', 'El Meniaa'
-    ];
+    // Calculate cart total directly without calling method
+    const cartTotal = this.cart.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
     
     mainContent.innerHTML = `
         <div class="container mx-auto px-4 py-8 max-w-7xl">
@@ -1093,7 +1103,7 @@ async loadCheckoutPage() {
                                     
                                     <div>
                                         <label for="checkoutWilaya" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            Wilaya *
+                                            Wilaya * <span class="text-xs text-emerald-600">(Tarifs PREST Express)</span>
                                         </label>
                                         <select id="checkoutWilaya" name="wilaya" required
                                                 class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all">
@@ -1177,15 +1187,15 @@ async loadCheckoutPage() {
                         <div class="border-t border-emerald-200 pt-4 space-y-3">
                             <div class="flex justify-between text-gray-700">
                                 <span>Sous-total:</span>
-                                <span id="checkoutSousTotal" class="font-semibold">${this.getCartTotal()} DA</span>
+                                <span id="checkoutSousTotal" class="font-semibold">${cartTotal} DA</span>
                             </div>
                             <div class="flex justify-between text-gray-700">
                                 <span>Frais de livraison:</span>
-                                <span id="checkoutFraisLivraison" class="font-semibold">300 DA</span>
+                                <span id="checkoutFraisLivraison" class="font-semibold">400 DA</span>
                             </div>
                             <div class="flex justify-between text-xl font-bold text-emerald-800 border-t border-emerald-200 pt-3">
                                 <span>Total:</span>
-                                <span id="checkoutTotal">${this.getCartTotal() + 300} DA</span>
+                                <span id="checkoutTotal">${cartTotal + 400} DA</span>
                             </div>
                         </div>
                         
@@ -2810,5 +2820,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 console.log('✅ Complete app.js loaded - Fixed version with canvas placeholders, image upload & order deletion!');
+
 
 
