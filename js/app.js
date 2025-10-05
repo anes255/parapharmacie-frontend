@@ -2663,21 +2663,56 @@ function editProduct(productId) {
     window.app.showToast('Fonctionnalité en cours de développement', 'info');
 }
 
-function deleteProduct(productId) {
+async function deleteProduct(productId) {
     if (!confirm('Supprimer ce produit ?')) return;
     
-    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    const filtered = products.filter(p => p._id !== productId);
-    
-    localStorage.setItem('demoProducts', JSON.stringify(filtered));
-    
-    if (window.app) {
-        window.app.refreshProductsCache();
-        window.app.showToast('Produit supprimé', 'success');
-        loadAdminProducts();
+    try {
+        console.log('Deleting product:', productId);
+        
+        // 1. Delete from localStorage first
+        let products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        products = products.filter(p => p._id !== productId);
+        localStorage.setItem('demoProducts', JSON.stringify(products));
+        console.log('Deleted from localStorage');
+        
+        // 2. Try to delete from API
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                const response = await fetch(buildApiUrl(`/admin/products/${productId}`), {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-token': token
+                    }
+                });
+                
+                if (response.ok) {
+                    console.log('Deleted from API');
+                } else {
+                    console.log('API deletion failed:', response.status);
+                }
+            } catch (error) {
+                console.log('API error:', error.message);
+            }
+        }
+        
+        // 3. Refresh app cache from localStorage
+        if (window.app) {
+            window.app.allProducts = products;
+            window.app.showToast('Produit supprimé', 'success');
+            
+            // Reload admin products view
+            loadAdminProducts();
+        }
+        
+    } catch (error) {
+        console.error('Delete error:', error);
+        if (window.app) {
+            window.app.showToast('Erreur lors de la suppression', 'error');
+        }
     }
 }
-
 // ============================================================================
 // INITIALIZE APP
 // ============================================================================
@@ -2691,3 +2726,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 console.log('✅ Complete app.js loaded - Fixed version with canvas placeholders, image upload & order deletion!');
+
