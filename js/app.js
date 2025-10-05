@@ -1,6 +1,57 @@
 // ============================================================================
-// COMPLETE PharmacieGaherApp - All Pages & Features - SYNTAX FIXED
+// COMPLETE PharmacieGaherApp - All Pages & Features - FIXED VERSION
 // ============================================================================
+
+// UTILITY: Generate placeholder image using canvas instead of via.placeholder.com
+function generatePlaceholder(width, height, bgColor, textColor, text) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    // Background
+    ctx.fillStyle = `#${bgColor}`;
+    ctx.fillRect(0, 0, width, height);
+    
+    // Text
+    ctx.fillStyle = `#${textColor}`;
+    ctx.font = `bold ${Math.floor(width / 4)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, width / 2, height / 2);
+    
+    return canvas.toDataURL('image/png');
+}
+
+// UTILITY: Preview uploaded image
+function previewImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    // Check file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+        if (window.app) {
+            window.app.showToast('Image trop volumineuse. Maximum 2MB', 'error');
+        }
+        input.value = '';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const preview = document.getElementById('imagePreview');
+        const placeholder = document.getElementById('imagePreviewPlaceholder');
+        const imageUrlInput = document.getElementById('productImageUrl');
+        
+        if (preview && placeholder && imageUrlInput) {
+            preview.src = e.target.result;
+            preview.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            imageUrlInput.value = e.target.result; // Store base64
+        }
+    };
+    reader.readAsDataURL(file);
+}
 
 class PharmacieGaherApp {
     constructor() {
@@ -152,7 +203,6 @@ class PharmacieGaherApp {
                 throw new Error('Email et mot de passe requis');
             }
             
-            // FIXED: Backend expects 'password' not 'motDePasse'
             const requestBody = {
                 email: email.trim(),
                 password: password
@@ -587,7 +637,7 @@ class PharmacieGaherApp {
             imageUrl = product.image;
         } else {
             const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
-            imageUrl = `https://via.placeholder.com/500x500/10b981/ffffff?text=${encodeURIComponent(initials)}`;
+            imageUrl = generatePlaceholder(500, 500, '10b981', 'ffffff', initials);
         }
         
         mainContent.innerHTML = `
@@ -601,7 +651,7 @@ class PharmacieGaherApp {
                         ${hasPromotion ? `<div class="badge-promotion absolute top-4 left-4 z-10">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
                         <img src="${imageUrl}" alt="${product.nom}" 
                              class="w-full rounded-2xl shadow-2xl border-4 border-emerald-100"
-                             onerror="this.src='https://via.placeholder.com/500x500/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
+                             onerror="this.src='${generatePlaceholder(500, 500, '10b981', 'ffffff', product.nom.substring(0, 2).toUpperCase())}'">
                     </div>
                     
                     <div>
@@ -1000,7 +1050,6 @@ class PharmacieGaherApp {
                                         <option value="">Sélectionnez votre wilaya</option>
                                         <option value="Tipaza" ${this.currentUser?.wilaya === 'Tipaza' ? 'selected' : ''}>42 - Tipaza</option>
                                         <option value="Alger" ${this.currentUser?.wilaya === 'Alger' ? 'selected' : ''}>16 - Alger</option>
-                                        <!-- Add other wilayas as needed -->
                                     </select>
                                 </div>
                                 
@@ -1407,7 +1456,7 @@ class PharmacieGaherApp {
             
             const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
             const categoryColor = getCategoryColor(product.categorie);
-            imageUrl = `https://via.placeholder.com/300x300/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+            imageUrl = generatePlaceholder(300, 300, categoryColor, 'ffffff', initials);
         }
         
         return `
@@ -1421,7 +1470,7 @@ class PharmacieGaherApp {
                 <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden relative">
                     <img src="${imageUrl}" alt="${product.nom}" 
                          class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                         onerror="this.src='https://via.placeholder.com/300x300/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
+                         onerror="this.src='${generatePlaceholder(300, 300, '10b981', 'ffffff', product.nom.substring(0, 2).toUpperCase())}'">
                 </div>
                 
                 <div class="p-6">
@@ -1492,7 +1541,7 @@ class PharmacieGaherApp {
             } else if (product.image && product.image.startsWith('http')) {
                 imageUrl = product.image;
             } else {
-                imageUrl = `https://via.placeholder.com/64x64/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+                imageUrl = generatePlaceholder(64, 64, categoryColor, 'ffffff', initials);
             }
             
             const existingIndex = this.cart.findIndex(item => item.id === productId);
@@ -1830,7 +1879,6 @@ function proceedToCheckout() {
     }
 }
 
-// FIXED: handleLogin function - sends 'password' not 'motDePasse'
 async function handleLogin(event) {
     event.preventDefault();
     
@@ -1846,7 +1894,6 @@ async function handleLogin(event) {
     }
 }
 
-// FIXED: handleRegister function - sends correct field names and no codePostal
 async function handleRegister(event) {
     event.preventDefault();
     
@@ -1858,7 +1905,6 @@ async function handleRegister(event) {
         return;
     }
     
-    // FIXED: Correct field mapping for backend API
     const userData = {
         prenom: document.getElementById('registerPrenom').value,
         nom: document.getElementById('registerNom').value,
@@ -1866,9 +1912,9 @@ async function handleRegister(event) {
         telephone: document.getElementById('registerTelephone').value,
         wilaya: document.getElementById('registerWilaya').value,
         adresse: document.getElementById('registerAdresse')?.value || '',
-        ville: '', // Not collected in form anymore
-        codePostal: '', // Not collected in form anymore
-        password: password // Backend expects 'password' not 'motDePasse'
+        ville: '',
+        codePostal: '',
+        password: password
     };
     
     if (window.app) {
@@ -2044,10 +2090,16 @@ function loadAdminProducts() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${products.map(product => `
+                        ${products.map(product => {
+                            let imageUrl = product.image;
+                            if (!imageUrl || (!imageUrl.startsWith('http') && !imageUrl.startsWith('data:image'))) {
+                                const initials = product.nom.substring(0, 2).toUpperCase();
+                                imageUrl = generatePlaceholder(50, 50, '10b981', 'ffffff', initials);
+                            }
+                            return `
                             <tr class="border-b border-emerald-100 hover:bg-emerald-50">
                                 <td class="px-4 py-3">
-                                    <img src="${product.image || 'https://via.placeholder.com/50'}" 
+                                    <img src="${imageUrl}" 
                                          alt="${product.nom}" 
                                          class="w-12 h-12 object-cover rounded-lg">
                                 </td>
@@ -2073,7 +2125,7 @@ function loadAdminProducts() {
                                     </button>
                                 </td>
                             </tr>
-                        `).join('')}
+                        `;}).join('')}
                     </tbody>
                 </table>
             </div>
@@ -2141,8 +2193,31 @@ function loadAdminProducts() {
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">URL de l'image</label>
-                        <input type="url" id="productImage" class="form-input" placeholder="https://exemple.com/image.jpg">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Image du produit</label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <div id="imagePreviewContainer" class="bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl p-4 text-center mb-2 h-48 flex items-center justify-center">
+                                    <div id="imagePreviewPlaceholder">
+                                        <i class="fas fa-image text-gray-400 text-4xl mb-2"></i>
+                                        <p class="text-gray-500">Aperçu de l'image</p>
+                                    </div>
+                                    <img id="imagePreview" src="" alt="Aperçu" class="max-h-40 max-w-full hidden">
+                                </div>
+                            </div>
+                            <div class="flex flex-col justify-center">
+                                <div class="mb-4">
+                                    <label for="productImageUpload" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-4 rounded-xl text-center cursor-pointer flex items-center justify-center">
+                                        <i class="fas fa-upload mr-2"></i>Télécharger une image
+                                        <input type="file" id="productImageUpload" accept="image/*" class="hidden" onchange="previewImage(this)">
+                                    </label>
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    <p>Formats acceptés: JPG, PNG, GIF</p>
+                                    <p>Taille max: 2MB</p>
+                                </div>
+                                <input type="hidden" id="productImageUrl">
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="flex items-center space-x-6">
@@ -2220,6 +2295,14 @@ function closeAddProductModal() {
         modal.classList.add('hidden');
         document.getElementById('addProductForm').reset();
         document.getElementById('promotionFields').classList.add('hidden');
+        
+        // Reset image preview
+        const preview = document.getElementById('imagePreview');
+        const placeholder = document.getElementById('imagePreviewPlaceholder');
+        if (preview && placeholder) {
+            preview.classList.add('hidden');
+            placeholder.classList.remove('hidden');
+        }
     }
 }
 
@@ -2245,7 +2328,7 @@ async function handleAddProduct(event) {
         marque: document.getElementById('productMarque').value,
         prix: parseFloat(document.getElementById('productPrix').value),
         stock: parseInt(document.getElementById('productStock').value),
-        image: document.getElementById('productImage').value,
+        image: document.getElementById('productImageUrl').value || '',
         actif: document.getElementById('productActif').checked,
         enVedette: document.getElementById('productVedette').checked,
         enPromotion: document.getElementById('productPromotion').checked
@@ -2328,7 +2411,7 @@ function loadAdminOrders() {
                 </div>
             ` : `
                 <div class="space-y-4">
-                    ${orders.reverse().map(order => `
+                    ${orders.reverse().map((order, index) => `
                         <div class="border-2 border-emerald-100 rounded-xl p-6 hover:border-emerald-300 transition-all">
                             <div class="flex items-center justify-between mb-4">
                                 <div>
@@ -2357,6 +2440,11 @@ function loadAdminOrders() {
                                     }">
                                         ${order.statut}
                                     </span>
+                                    <div class="mt-3">
+                                        <button onclick="deleteOrder(${index})" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm">
+                                            <i class="fas fa-trash mr-2"></i>Supprimer
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -2388,6 +2476,24 @@ function loadAdminOrders() {
     `;
 }
 
+function deleteOrder(orderIndex) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ?')) return;
+    
+    const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+    const reversedOrders = [...orders].reverse();
+    
+    reversedOrders.splice(orderIndex, 1);
+    
+    const ordersBackToNormal = reversedOrders.reverse();
+    localStorage.setItem('adminOrders', JSON.stringify(ordersBackToNormal));
+    
+    if (window.app) {
+        window.app.showToast('Commande supprimée avec succès', 'success');
+    }
+    
+    loadAdminOrders();
+}
+
 function loadAdminFeatured() {
     const adminContent = document.getElementById('adminContent');
     const products = window.app.allProducts;
@@ -2398,9 +2504,15 @@ function loadAdminFeatured() {
             <h2 class="text-2xl font-bold text-emerald-800 mb-6">Produits en Vedette</h2>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                ${featuredProducts.map(product => `
+                ${featuredProducts.map(product => {
+                    let imageUrl = product.image;
+                    if (!imageUrl || (!imageUrl.startsWith('http') && !imageUrl.startsWith('data:image'))) {
+                        const initials = product.nom.substring(0, 2).toUpperCase();
+                        imageUrl = generatePlaceholder(200, 200, '10b981', 'ffffff', initials);
+                    }
+                    return `
                     <div class="border-2 border-emerald-200 rounded-xl p-4 relative">
-                        <img src="${product.image || 'https://via.placeholder.com/200'}" 
+                        <img src="${imageUrl}" 
                              alt="${product.nom}" 
                              class="w-full h-48 object-cover rounded-lg mb-4">
                         <h3 class="font-bold text-emerald-800 mb-2">${product.nom}</h3>
@@ -2410,14 +2522,20 @@ function loadAdminFeatured() {
                             <i class="fas fa-times mr-2"></i>Retirer
                         </button>
                     </div>
-                `).join('')}
+                `}).join('')}
             </div>
             
             <h3 class="text-xl font-bold text-emerald-800 mb-4">Ajouter des produits en vedette</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                ${products.filter(p => !p.enVedette).slice(0, 9).map(product => `
+                ${products.filter(p => !p.enVedette).slice(0, 9).map(product => {
+                    let imageUrl = product.image;
+                    if (!imageUrl || (!imageUrl.startsWith('http') && !imageUrl.startsWith('data:image'))) {
+                        const initials = product.nom.substring(0, 2).toUpperCase();
+                        imageUrl = generatePlaceholder(200, 200, '10b981', 'ffffff', initials);
+                    }
+                    return `
                     <div class="border border-emerald-200 rounded-xl p-4">
-                        <img src="${product.image || 'https://via.placeholder.com/200'}" 
+                        <img src="${imageUrl}" 
                              alt="${product.nom}" 
                              class="w-full h-48 object-cover rounded-lg mb-4">
                         <h3 class="font-bold text-emerald-800 mb-2">${product.nom}</h3>
@@ -2427,7 +2545,7 @@ function loadAdminFeatured() {
                             <i class="fas fa-star mr-2"></i>Mettre en vedette
                         </button>
                     </div>
-                `).join('')}
+                `}).join('')}
             </div>
         </div>
     `;
@@ -2572,4 +2690,4 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('✅ App initialized and globally available');
 });
 
-console.log('✅ Complete app.js loaded - All pages and features ready!');
+console.log('✅ Complete app.js loaded - Fixed version with canvas placeholders, image upload & order deletion!');
