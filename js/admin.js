@@ -1,5 +1,5 @@
 // ============================================================================
-// ADMIN.JS - Complete CRUD with Force Delete and Full Logging
+// ADMIN.JS - Complete with Full Debugging and Verification
 // ============================================================================
 
 function generatePlaceholder(width, height, bgColor, textColor, text) {
@@ -98,7 +98,7 @@ async function loadAdminProducts() {
         if (response.ok) {
             const data = await response.json();
             products = data.products || [];
-            console.log(`✅ Loaded ${products.length} products from API`);
+            console.log(`Loaded ${products.length} products from API`);
             
             localStorage.setItem('demoProducts', JSON.stringify(products));
             window.app.allProducts = products;
@@ -109,7 +109,7 @@ async function loadAdminProducts() {
         renderProductsTable(products);
         
     } catch (error) {
-        console.error('❌ Error loading products:', error);
+        console.error('Error loading products:', error);
         
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
         renderProductsTable(localProducts);
@@ -173,9 +173,6 @@ function renderProductsTable(products) {
                                     </button>
                                     <button onclick="deleteProduct('${product._id}', '${product.nom.replace(/'/g, "\\'")}', false)" class="text-red-600 hover:text-red-800 mr-3" title="Supprimer">
                                         <i class="fas fa-trash"></i>
-                                    </button>
-                                    <button onclick="deleteProduct('${product._id}', '${product.nom.replace(/'/g, "\\'")}', true)" class="text-orange-600 hover:text-orange-800" title="Forcer suppression">
-                                        <i class="fas fa-trash-alt"></i>
                                     </button>
                                 </td>
                             </tr>
@@ -485,26 +482,19 @@ async function handleProductSubmit(event) {
     }
 }
 
-// FORCE DELETE - Deletes from API AND localStorage
+// DELETE WITH FULL DEBUGGING
 async function deleteProduct(productId, productName, forceDelete = false) {
-    const confirmMsg = forceDelete 
-        ? `FORCE DELETE: Êtes-vous sûr de vouloir supprimer définitivement "${productName}" de la base de données ET du cache ?`
-        : `Êtes-vous sûr de vouloir supprimer "${productName}" ?`;
-    
-    if (!confirm(confirmMsg)) return;
+    if (!confirm(`Supprimer "${productName}" ?`)) return;
     
     const token = localStorage.getItem('token');
     
-    console.log(`🗑️ Attempting to delete product: ${productId}`);
-    console.log(`   Name: ${productName}`);
-    console.log(`   Force delete: ${forceDelete}`);
-    console.log(`   Token: ${token ? 'Present' : 'Missing'}`);
-    
-    let apiDeleteSuccess = false;
+    console.log('====== DELETE PRODUCT DEBUG START ======');
+    console.log('Product ID:', productId);
+    console.log('Product Name:', productName);
+    console.log('Token exists:', !!token);
+    console.log('API URL:', buildApiUrl(`/products/${productId}`));
     
     try {
-        console.log(`📡 Sending DELETE request to: ${buildApiUrl(`/products/${productId}`)}`);
-        
         const response = await fetch(buildApiUrl(`/products/${productId}`), {
             method: 'DELETE',
             headers: {
@@ -513,55 +503,87 @@ async function deleteProduct(productId, productName, forceDelete = false) {
             }
         });
         
-        console.log(`📥 Response status: ${response.status} ${response.statusText}`);
+        console.log('Response Status:', response.status);
+        console.log('Response OK:', response.ok);
+        console.log('Response Headers:', {
+            contentType: response.headers.get('content-type'),
+            auth: response.headers.get('x-auth-token')
+        });
         
-        if (response.ok) {
-            const data = await response.json();
-            console.log('✅ API delete successful:', data);
-            apiDeleteSuccess = true;
-        } else {
-            const errorData = await response.json();
-            console.error('❌ API delete failed:', errorData);
-            throw new Error(errorData.message || `HTTP ${response.status}`);
+        const responseText = await response.text();
+        console.log('Response Body (raw):', responseText);
+        
+        let data;
+        try {
+            data = JSON.parse(responseText);
+            console.log('Response Body (parsed):', data);
+        } catch (e) {
+            console.log('Could not parse response as JSON');
         }
         
-    } catch (error) {
-        console.error('❌ DELETE request error:', error);
-        
-        if (!forceDelete) {
-            window.app?.showToast(`Erreur API: ${error.message}. Utilisez le bouton orange pour forcer la suppression.`, 'error');
-            return;
+        if (!response.ok) {
+            console.error('DELETE FAILED - Response not OK');
+            console.error('Status:', response.status);
+            console.error('Data:', data);
+            throw new Error(data?.message || `HTTP ${response.status}`);
         }
         
-        console.log('⚠️ Force delete mode: continuing despite API error');
-    }
-    
-    // Delete from localStorage regardless of API success if force delete
-    if (apiDeleteSuccess || forceDelete) {
+        console.log('DELETE request successful');
+        
+        // Update localStorage
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        const beforeCount = localProducts.length;
+        console.log('Products in localStorage before delete:', localProducts.length);
         const filtered = localProducts.filter(p => p._id !== productId);
-        const afterCount = filtered.length;
-        
-        console.log(`💾 localStorage: ${beforeCount} products before, ${afterCount} after`);
-        
+        console.log('Products in localStorage after delete:', filtered.length);
         localStorage.setItem('demoProducts', JSON.stringify(filtered));
         
+        // Update app cache
         window.app.allProducts = filtered;
         window.app.refreshProductsCache();
         
-        // Remove row from table immediately
+        // Remove from UI
         const row = document.querySelector(`tr[data-product-id="${productId}"]`);
         if (row) {
             row.remove();
-            console.log('✅ Removed row from table');
+            console.log('Removed row from table');
         }
         
-        const msg = apiDeleteSuccess 
-            ? 'Produit supprimé avec succès de la base de données'
-            : 'Produit supprimé du cache local (API non disponible)';
+        window.app?.showToast('Produit supprimé avec succès', 'success');
         
-        window.app?.showToast(msg, 'success');
+        // VERIFY DELETION after 1 second
+        setTimeout(async () => {
+            console.log('--- VERIFICATION: Checking if product still exists in API ---');
+            try {
+                const verifyResponse = await fetch(buildApiUrl('/products'));
+                const verifyData = await verifyResponse.json();
+                console.log('Total products in API after delete:', verifyData.products.length);
+                
+                const stillExists = verifyData.products.find(p => p._id === productId);
+                if (stillExists) {
+                    console.error('CRITICAL ERROR: Product still exists in API!');
+                    console.error('Product data:', stillExists);
+                    alert('ERREUR CRITIQUE: Le produit existe toujours dans la base de données!\nVérifiez les logs de votre backend Render.');
+                } else {
+                    console.log('VERIFICATION SUCCESS: Product deleted from API');
+                }
+            } catch (verifyError) {
+                console.error('Verification failed:', verifyError);
+            }
+            console.log('====== DELETE PRODUCT DEBUG END ======');
+        }, 1000);
+        
+        // Reload products to be sure
+        setTimeout(() => {
+            loadAdminProducts();
+        }, 1500);
+        
+    } catch (error) {
+        console.error('====== DELETE ERROR ======');
+        console.error('Error type:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Full error:', error);
+        console.log('====== DELETE PRODUCT DEBUG END ======');
+        window.app?.showToast(`Erreur: ${error.message}`, 'error');
     }
 }
 
@@ -854,4 +876,4 @@ async function cleanupOutOfStock() {
     loadAdminCleanup();
 }
 
-console.log('Admin.js loaded - Force delete enabled');
+console.log('Admin.js loaded - Full debugging enabled');
