@@ -1,8 +1,8 @@
 // ============================================================================
-// ADMIN.JS - Fixed with API sync and proper cache refresh
+// ADMIN.JS - Full API Integration with Complete CRUD Operations
 // ============================================================================
 
-// UTILITY: Generate placeholder image using canvas
+// Generate placeholder image using canvas
 function generatePlaceholder(width, height, bgColor, textColor, text) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -21,15 +21,13 @@ function generatePlaceholder(width, height, bgColor, textColor, text) {
     return canvas.toDataURL('image/png');
 }
 
-// UTILITY: Preview uploaded image
+// Preview uploaded image
 function previewImage(input) {
     const file = input.files[0];
     if (!file) return;
     
     if (file.size > 2 * 1024 * 1024) {
-        if (window.app) {
-            window.app.showToast('Image trop volumineuse. Maximum 2MB', 'error');
-        }
+        window.app?.showToast('Image trop volumineuse. Maximum 2MB', 'error');
         input.value = '';
         return;
     }
@@ -66,9 +64,7 @@ function switchAdminSection(section) {
     
     switch(section) {
         case 'dashboard':
-            if (window.app) {
-                window.app.loadAdminDashboard();
-            }
+            window.app?.loadAdminDashboard();
             break;
         case 'products':
             loadAdminProducts();
@@ -85,15 +81,54 @@ function switchAdminSection(section) {
     }
 }
 
-// Load Admin Products Section
-function loadAdminProducts() {
+// ============================================================================
+// PRODUCTS SECTION - Full CRUD with API
+// ============================================================================
+
+async function loadAdminProducts() {
     const adminContent = document.getElementById('adminContent');
-    const products = window.app.allProducts;
+    adminContent.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i></div>';
+    
+    try {
+        const token = localStorage.getItem('token');
+        let products = [];
+        
+        // Fetch from API
+        const response = await fetch(buildApiUrl('/products'), {
+            headers: token ? { 'x-auth-token': token } : {}
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            products = data.products || [];
+            console.log(`Loaded ${products.length} products from API`);
+        } else {
+            throw new Error('API fetch failed');
+        }
+        
+        // Also update localStorage cache
+        localStorage.setItem('demoProducts', JSON.stringify(products));
+        window.app.allProducts = products;
+        
+        renderProductsTable(products);
+        
+    } catch (error) {
+        console.error('Error loading products:', error);
+        
+        // Fallback to localStorage
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        renderProductsTable(localProducts);
+        window.app?.showToast('Chargement depuis le cache local', 'warning');
+    }
+}
+
+function renderProductsTable(products) {
+    const adminContent = document.getElementById('adminContent');
     
     adminContent.innerHTML = `
         <div class="bg-white rounded-2xl shadow-xl p-8 border-2 border-emerald-200">
             <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-bold text-emerald-800">Gestion des Produits</h2>
+                <h2 class="text-2xl font-bold text-emerald-800">Gestion des Produits (${products.length})</h2>
                 <button onclick="showAddProductModal()" class="btn-primary">
                     <i class="fas fa-plus mr-2"></i>Ajouter un produit
                 </button>
@@ -122,9 +157,7 @@ function loadAdminProducts() {
                             return `
                             <tr class="border-b border-emerald-100 hover:bg-emerald-50">
                                 <td class="px-4 py-3">
-                                    <img src="${imageUrl}" 
-                                         alt="${product.nom}" 
-                                         class="w-12 h-12 object-cover rounded-lg">
+                                    <img src="${imageUrl}" alt="${product.nom}" class="w-12 h-12 object-cover rounded-lg">
                                 </td>
                                 <td class="px-4 py-3 font-semibold text-emerald-800">${product.nom}</td>
                                 <td class="px-4 py-3 text-gray-700">${product.categorie}</td>
@@ -140,10 +173,10 @@ function loadAdminProducts() {
                                     </span>
                                 </td>
                                 <td class="px-4 py-3">
-                                    <button onclick="editProduct('${product._id}')" class="text-blue-600 hover:text-blue-800 mr-3">
+                                    <button onclick="editProduct('${product._id}')" class="text-blue-600 hover:text-blue-800 mr-3" title="Modifier">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button onclick="deleteProduct('${product._id}')" class="text-red-600 hover:text-red-800">
+                                    <button onclick="deleteProduct('${product._id}')" class="text-red-600 hover:text-red-800" title="Supprimer">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
@@ -154,30 +187,39 @@ function loadAdminProducts() {
             </div>
         </div>
         
-        <!-- Add Product Modal -->
-        <div id="addProductModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        ${renderProductModal()}
+    `;
+    
+    setupProductModalListeners();
+}
+
+function renderProductModal() {
+    return `
+        <!-- Add/Edit Product Modal -->
+        <div id="productModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
             <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
                 <div class="bg-gradient-to-br from-emerald-500 to-green-600 p-6 text-white">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-2xl font-bold">
-                            <i class="fas fa-plus-circle mr-2"></i>
-                            Ajouter un produit
+                        <h3 class="text-2xl font-bold" id="modalTitle">
+                            <i class="fas fa-plus-circle mr-2"></i>Ajouter un produit
                         </h3>
-                        <button onclick="closeAddProductModal()" class="text-white hover:text-gray-200">
+                        <button onclick="closeProductModal()" class="text-white hover:text-gray-200">
                             <i class="fas fa-times text-2xl"></i>
                         </button>
                     </div>
                 </div>
                 
-                <form id="addProductForm" onsubmit="handleAddProduct(event)" class="p-6 space-y-4">
+                <form id="productForm" onsubmit="handleProductSubmit(event)" class="p-6 space-y-4">
+                    <input type="hidden" id="productId">
+                    
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
-                        <input type="text" id="productNom" required class="form-input" placeholder="Ex: Vitamine C 1000mg">
+                        <input type="text" id="productNom" required class="form-input">
                     </div>
                     
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                        <textarea id="productDescription" rows="3" class="form-input" placeholder="Description du produit"></textarea>
+                        <textarea id="productDescription" rows="3" class="form-input"></textarea>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -200,19 +242,19 @@ function loadAdminProducts() {
                         
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Marque</label>
-                            <input type="text" id="productMarque" class="form-input" placeholder="Ex: Bioderma">
+                            <input type="text" id="productMarque" class="form-input">
                         </div>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Prix (DA) *</label>
-                            <input type="number" id="productPrix" required min="0" class="form-input" placeholder="1500">
+                            <input type="number" id="productPrix" required min="0" class="form-input">
                         </div>
                         
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Stock *</label>
-                            <input type="number" id="productStock" required min="0" class="form-input" placeholder="50">
+                            <input type="number" id="productStock" required min="0" class="form-input">
                         </div>
                     </div>
                     
@@ -220,7 +262,7 @@ function loadAdminProducts() {
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Image du produit</label>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <div id="imagePreviewContainer" class="bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl p-4 text-center mb-2 h-48 flex items-center justify-center">
+                                <div id="imagePreviewContainer" class="bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl p-4 text-center h-48 flex items-center justify-center">
                                     <div id="imagePreviewPlaceholder">
                                         <i class="fas fa-image text-gray-400 text-4xl mb-2"></i>
                                         <p class="text-gray-500">Aperçu de l'image</p>
@@ -229,14 +271,12 @@ function loadAdminProducts() {
                                 </div>
                             </div>
                             <div class="flex flex-col justify-center">
-                                <div class="mb-4">
-                                    <label for="productImageUpload" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-4 rounded-xl text-center cursor-pointer flex items-center justify-center">
-                                        <i class="fas fa-upload mr-2"></i>Télécharger une image
-                                        <input type="file" id="productImageUpload" accept="image/*" class="hidden" onchange="previewImage(this)">
-                                    </label>
-                                </div>
-                                <div class="text-sm text-gray-500">
-                                    <p>Formats acceptés: JPG, PNG, GIF</p>
+                                <label for="productImageUpload" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-4 rounded-xl text-center cursor-pointer flex items-center justify-center">
+                                    <i class="fas fa-upload mr-2"></i>Télécharger une image
+                                    <input type="file" id="productImageUpload" accept="image/*" class="hidden" onchange="previewImage(this)">
+                                </label>
+                                <div class="text-sm text-gray-500 mt-4">
+                                    <p>Formats: JPG, PNG, GIF</p>
                                     <p>Taille max: 2MB</p>
                                 </div>
                                 <input type="hidden" id="productImageUrl">
@@ -265,12 +305,11 @@ function loadAdminProducts() {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Prix original (DA)</label>
-                                <input type="number" id="productPrixOriginal" min="0" class="form-input" placeholder="2000">
+                                <input type="number" id="productPrixOriginal" min="0" class="form-input">
                             </div>
-                            
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">% de réduction</label>
-                                <input type="number" id="productPourcentagePromotion" min="0" max="100" class="form-input" placeholder="25">
+                                <input type="number" id="productPourcentagePromotion" min="0" max="100" class="form-input">
                             </div>
                         </div>
                     </div>
@@ -278,18 +317,19 @@ function loadAdminProducts() {
                     <div class="flex space-x-4 pt-4">
                         <button type="submit" class="btn-primary flex-1">
                             <i class="fas fa-save mr-2"></i>
-                            Ajouter le produit
+                            <span id="submitButtonText">Ajouter le produit</span>
                         </button>
-                        <button type="button" onclick="closeAddProductModal()" class="btn-secondary flex-1">
-                            <i class="fas fa-times mr-2"></i>
-                            Annuler
+                        <button type="button" onclick="closeProductModal()" class="btn-secondary flex-1">
+                            <i class="fas fa-times mr-2"></i>Annuler
                         </button>
                     </div>
                 </form>
             </div>
         </div>
     `;
-    
+}
+
+function setupProductModalListeners() {
     setTimeout(() => {
         const promotionCheckbox = document.getElementById('productPromotion');
         const promotionFields = document.getElementById('promotionFields');
@@ -307,38 +347,84 @@ function loadAdminProducts() {
 }
 
 function showAddProductModal() {
-    const modal = document.getElementById('addProductModal');
-    if (modal) {
-        modal.classList.remove('hidden');
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle mr-2"></i>Ajouter un produit';
+    document.getElementById('submitButtonText').textContent = 'Ajouter le produit';
+    document.getElementById('productForm').reset();
+    document.getElementById('productId').value = '';
+    
+    const preview = document.getElementById('imagePreview');
+    const placeholder = document.getElementById('imagePreviewPlaceholder');
+    if (preview && placeholder) {
+        preview.classList.add('hidden');
+        placeholder.classList.remove('hidden');
     }
+    
+    document.getElementById('productModal').classList.remove('hidden');
 }
 
-function closeAddProductModal() {
-    const modal = document.getElementById('addProductModal');
-    if (modal) {
-        modal.classList.add('hidden');
-        document.getElementById('addProductForm').reset();
-        document.getElementById('promotionFields').classList.add('hidden');
+async function editProduct(productId) {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(buildApiUrl(`/products/${productId}`), {
+            headers: token ? { 'x-auth-token': token } : {}
+        });
         
-        const preview = document.getElementById('imagePreview');
-        const placeholder = document.getElementById('imagePreviewPlaceholder');
-        if (preview && placeholder) {
-            preview.classList.add('hidden');
-            placeholder.classList.remove('hidden');
+        if (!response.ok) throw new Error('Failed to fetch product');
+        
+        const data = await response.json();
+        const product = data.product;
+        
+        // Populate form
+        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit mr-2"></i>Modifier le produit';
+        document.getElementById('submitButtonText').textContent = 'Enregistrer les modifications';
+        document.getElementById('productId').value = product._id;
+        document.getElementById('productNom').value = product.nom;
+        document.getElementById('productDescription').value = product.description || '';
+        document.getElementById('productCategorie').value = product.categorie;
+        document.getElementById('productMarque').value = product.marque || '';
+        document.getElementById('productPrix').value = product.prix;
+        document.getElementById('productStock').value = product.stock;
+        document.getElementById('productImageUrl').value = product.image || '';
+        document.getElementById('productActif').checked = product.actif !== false;
+        document.getElementById('productVedette').checked = product.enVedette || false;
+        document.getElementById('productPromotion').checked = product.enPromotion || false;
+        
+        if (product.enPromotion) {
+            document.getElementById('promotionFields').classList.remove('hidden');
+            document.getElementById('productPrixOriginal').value = product.prixOriginal || '';
+            document.getElementById('productPourcentagePromotion').value = product.pourcentagePromotion || '';
         }
+        
+        if (product.image) {
+            const preview = document.getElementById('imagePreview');
+            const placeholder = document.getElementById('imagePreviewPlaceholder');
+            preview.src = product.image;
+            preview.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+        }
+        
+        document.getElementById('productModal').classList.remove('hidden');
+        
+    } catch (error) {
+        console.error('Error loading product:', error);
+        window.app?.showToast('Erreur de chargement du produit', 'error');
     }
 }
 
-// FIXED: Add product to BOTH API and localStorage, then refresh cache
-async function handleAddProduct(event) {
+function closeProductModal() {
+    document.getElementById('productModal').classList.add('hidden');
+}
+
+async function handleProductSubmit(event) {
     event.preventDefault();
     
-    if (!window.app || !window.app.currentUser) {
-        window.app.showToast('Vous devez être connecté', 'error');
+    const productId = document.getElementById('productId').value;
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+        window.app?.showToast('Session expirée. Reconnexion nécessaire.', 'error');
         return;
     }
-    
-    const token = localStorage.getItem('token');
     
     const productData = {
         nom: document.getElementById('productNom').value,
@@ -359,9 +445,11 @@ async function handleAddProduct(event) {
     }
     
     try {
-        // Try API first
-        const response = await fetch(buildApiUrl('/products'), {
-            method: 'POST',
+        const url = productId ? `/products/${productId}` : '/products';
+        const method = productId ? 'PUT' : 'POST';
+        
+        const response = await fetch(buildApiUrl(url), {
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
                 'x-auth-token': token
@@ -369,102 +457,111 @@ async function handleAddProduct(event) {
             body: JSON.stringify(productData)
         });
         
-        let newProduct;
-        
-        if (response.ok) {
-            const data = await response.json();
-            newProduct = data.product;
-            console.log('✅ Product added to API:', newProduct);
-        } else {
-            // API failed, create local product
-            newProduct = {
-                ...productData,
-                _id: Date.now().toString(),
-                createdAt: new Date().toISOString()
-            };
-            console.log('⚠️ API failed, creating local product');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Erreur lors de la sauvegarde');
         }
         
-        // CRITICAL: Add to localStorage
+        const data = await response.json();
+        
+        // Update localStorage cache
         const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        localProducts.push(newProduct);
+        if (productId) {
+            const index = localProducts.findIndex(p => p._id === productId);
+            if (index > -1) localProducts[index] = data.product;
+        } else {
+            localProducts.push(data.product);
+        }
         localStorage.setItem('demoProducts', JSON.stringify(localProducts));
         
-        // CRITICAL: Refresh app cache to update main page
+        // Refresh app cache and UI
+        window.app.allProducts = localProducts;
         window.app.refreshProductsCache();
         
-        window.app.showToast('Produit ajouté avec succès !', 'success');
-        closeAddProductModal();
+        window.app?.showToast(productId ? 'Produit modifié avec succès' : 'Produit ajouté avec succès', 'success');
+        closeProductModal();
         loadAdminProducts();
         
     } catch (error) {
-        console.error('Error adding product:', error);
-        
-        // Fallback: create local product
-        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        const newProduct = {
-            ...productData,
-            _id: Date.now().toString(),
-            createdAt: new Date().toISOString()
-        };
-        localProducts.push(newProduct);
-        localStorage.setItem('demoProducts', JSON.stringify(localProducts));
-        
-        // CRITICAL: Refresh app cache
-        window.app.refreshProductsCache();
-        
-        window.app.showToast('Produit ajouté localement', 'warning');
-        closeAddProductModal();
-        loadAdminProducts();
+        console.error('Error saving product:', error);
+        window.app?.showToast(error.message, 'error');
     }
 }
 
-// FIXED: Delete product from BOTH API and localStorage, then refresh cache
 async function deleteProduct(productId) {
-    if (!confirm('Supprimer ce produit ?')) return;
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return;
     
     const token = localStorage.getItem('token');
     
     try {
-        // Try API delete first
-        if (token) {
-            await fetch(buildApiUrl(`/products/${productId}`), {
-                method: 'DELETE',
-                headers: {
-                    'x-auth-token': token
-                }
-            });
-            console.log('✅ Product deleted from API');
-        }
-    } catch (error) {
-        console.log('⚠️ API delete failed, continuing with local delete');
-    }
-    
-    // CRITICAL: Delete from localStorage
-    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    const filtered = products.filter(p => p._id !== productId);
-    localStorage.setItem('demoProducts', JSON.stringify(filtered));
-    
-    // CRITICAL: Refresh app cache to update main page
-    if (window.app) {
+        const response = await fetch(buildApiUrl(`/products/${productId}`), {
+            method: 'DELETE',
+            headers: { 'x-auth-token': token }
+        });
+        
+        if (!response.ok) throw new Error('Erreur lors de la suppression');
+        
+        // Update localStorage
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        const filtered = localProducts.filter(p => p._id !== productId);
+        localStorage.setItem('demoProducts', JSON.stringify(filtered));
+        
+        // Refresh app cache
+        window.app.allProducts = filtered;
         window.app.refreshProductsCache();
-        window.app.showToast('Produit supprimé', 'success');
+        
+        window.app?.showToast('Produit supprimé avec succès', 'success');
         loadAdminProducts();
+        
+    } catch (error) {
+        console.error('Error deleting product:', error);
+        window.app?.showToast('Erreur lors de la suppression', 'error');
     }
 }
 
-function editProduct(productId) {
-    window.app.showToast('Fonctionnalité en cours de développement', 'info');
+// ============================================================================
+// ORDERS SECTION - API Integration
+// ============================================================================
+
+async function loadAdminOrders() {
+    const adminContent = document.getElementById('adminContent');
+    adminContent.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i></div>';
+    
+    try {
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+            throw new Error('No authentication token');
+        }
+        
+        const response = await fetch(buildApiUrl('/orders'), {
+            headers: { 'x-auth-token': token }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch orders');
+        
+        const data = await response.json();
+        const orders = data.orders || [];
+        
+        console.log(`Loaded ${orders.length} orders from API`);
+        renderOrdersTable(orders);
+        
+    } catch (error) {
+        console.error('Error loading orders:', error);
+        
+        // Fallback to localStorage
+        const localOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
+        renderOrdersTable(localOrders);
+        window.app?.showToast('Chargement depuis le cache local', 'warning');
+    }
 }
 
-// Load Orders Section
-function loadAdminOrders() {
+function renderOrdersTable(orders) {
     const adminContent = document.getElementById('adminContent');
-    const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
     
     adminContent.innerHTML = `
         <div class="bg-white rounded-2xl shadow-xl p-8 border-2 border-emerald-200">
-            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Gestion des Commandes</h2>
+            <h2 class="text-2xl font-bold text-emerald-800 mb-6">Gestion des Commandes (${orders.length})</h2>
             
             ${orders.length === 0 ? `
                 <div class="text-center py-12">
@@ -474,7 +571,7 @@ function loadAdminOrders() {
                 </div>
             ` : `
                 <div class="space-y-4">
-                    ${orders.reverse().map((order, index) => `
+                    ${orders.reverse().map(order => `
                         <div class="border-2 border-emerald-100 rounded-xl p-6 hover:border-emerald-300 transition-all">
                             <div class="flex items-center justify-between mb-4">
                                 <div>
@@ -504,7 +601,7 @@ function loadAdminOrders() {
                                         ${order.statut}
                                     </span>
                                     <div class="mt-3">
-                                        <button onclick="deleteOrder(${index})" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm">
+                                        <button onclick="deleteOrder('${order._id}')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm">
                                             <i class="fas fa-trash mr-2"></i>Supprimer
                                         </button>
                                     </div>
@@ -539,28 +636,37 @@ function loadAdminOrders() {
     `;
 }
 
-function deleteOrder(orderIndex) {
+async function deleteOrder(orderId) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ?')) return;
     
-    const orders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-    const reversedOrders = [...orders].reverse();
-    reversedOrders.splice(orderIndex, 1);
-    const ordersBackToNormal = reversedOrders.reverse();
-    localStorage.setItem('adminOrders', JSON.stringify(ordersBackToNormal));
+    const token = localStorage.getItem('token');
     
-    if (window.app) {
-        window.app.showToast('Commande supprimée avec succès', 'success');
+    try {
+        const response = await fetch(buildApiUrl(`/orders/${orderId}`), {
+            method: 'DELETE',
+            headers: { 'x-auth-token': token }
+        });
+        
+        if (!response.ok) throw new Error('Erreur lors de la suppression');
+        
+        window.app?.showToast('Commande supprimée avec succès', 'success');
+        loadAdminOrders();
+        
+    } catch (error) {
+        console.error('Error deleting order:', error);
+        window.app?.showToast('Erreur lors de la suppression', 'error');
     }
-    
-    loadAdminOrders();
 }
 
-// Load Featured Products Section
-function loadAdminFeatured() {
-    const adminContent = document.getElementById('adminContent');
+// ============================================================================
+// FEATURED PRODUCTS SECTION
+// ============================================================================
+
+async function loadAdminFeatured() {
     const products = window.app.allProducts;
     const featuredProducts = products.filter(p => p.enVedette);
     
+    const adminContent = document.getElementById('adminContent');
     adminContent.innerHTML = `
         <div class="bg-white rounded-2xl shadow-xl p-8 border-2 border-emerald-200">
             <h2 class="text-2xl font-bold text-emerald-800 mb-6">Produits en Vedette</h2>
@@ -573,14 +679,11 @@ function loadAdminFeatured() {
                         imageUrl = generatePlaceholder(200, 200, '10b981', 'ffffff', initials);
                     }
                     return `
-                    <div class="border-2 border-emerald-200 rounded-xl p-4 relative">
-                        <img src="${imageUrl}" 
-                             alt="${product.nom}" 
-                             class="w-full h-48 object-cover rounded-lg mb-4">
+                    <div class="border-2 border-emerald-200 rounded-xl p-4">
+                        <img src="${imageUrl}" alt="${product.nom}" class="w-full h-48 object-cover rounded-lg mb-4">
                         <h3 class="font-bold text-emerald-800 mb-2">${product.nom}</h3>
                         <p class="text-emerald-700 font-semibold mb-4">${product.prix} DA</p>
-                        <button onclick="toggleFeatured('${product._id}')" 
-                                class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">
+                        <button onclick="toggleFeatured('${product._id}')" class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">
                             <i class="fas fa-times mr-2"></i>Retirer
                         </button>
                     </div>
@@ -597,13 +700,10 @@ function loadAdminFeatured() {
                     }
                     return `
                     <div class="border border-emerald-200 rounded-xl p-4">
-                        <img src="${imageUrl}" 
-                             alt="${product.nom}" 
-                             class="w-full h-48 object-cover rounded-lg mb-4">
+                        <img src="${imageUrl}" alt="${product.nom}" class="w-full h-48 object-cover rounded-lg mb-4">
                         <h3 class="font-bold text-emerald-800 mb-2">${product.nom}</h3>
                         <p class="text-emerald-700 font-semibold mb-4">${product.prix} DA</p>
-                        <button onclick="toggleFeatured('${product._id}')" 
-                                class="w-full bg-emerald-500 text-white py-2 rounded-lg hover:bg-emerald-600">
+                        <button onclick="toggleFeatured('${product._id}')" class="w-full bg-emerald-500 text-white py-2 rounded-lg hover:bg-emerald-600">
                             <i class="fas fa-star mr-2"></i>Mettre en vedette
                         </button>
                     </div>
@@ -613,65 +713,68 @@ function loadAdminFeatured() {
     `;
 }
 
-function toggleFeatured(productId) {
-    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    const productIndex = products.findIndex(p => p._id === productId);
+async function toggleFeatured(productId) {
+    const product = window.app.allProducts.find(p => p._id === productId);
+    if (!product) return;
     
-    if (productIndex > -1) {
-        products[productIndex].enVedette = !products[productIndex].enVedette;
-        localStorage.setItem('demoProducts', JSON.stringify(products));
+    const updatedData = {
+        ...product,
+        enVedette: !product.enVedette
+    };
+    
+    const token = localStorage.getItem('token');
+    
+    try {
+        await fetch(buildApiUrl(`/products/${productId}`), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            },
+            body: JSON.stringify(updatedData)
+        });
         
-        if (window.app) {
-            window.app.refreshProductsCache();
-            loadAdminFeatured();
-            window.app.showToast('Produit mis à jour', 'success');
+        // Update cache
+        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+        const index = localProducts.findIndex(p => p._id === productId);
+        if (index > -1) {
+            localProducts[index].enVedette = !localProducts[index].enVedette;
+            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
         }
+        
+        window.app.allProducts = localProducts;
+        window.app.refreshProductsCache();
+        
+        loadAdminFeatured();
+        
+    } catch (error) {
+        console.error('Error toggling featured:', error);
     }
 }
 
-// Load Cleanup Section
+// ============================================================================
+// CLEANUP SECTION
+// ============================================================================
+
 function loadAdminCleanup() {
     const adminContent = document.getElementById('adminContent');
     
     adminContent.innerHTML = `
         <div class="bg-white rounded-2xl shadow-xl p-8 border-2 border-red-200">
             <h2 class="text-2xl font-bold text-red-800 mb-6">
-                <i class="fas fa-exclamation-triangle mr-2"></i>
-                Zone de Nettoyage
+                <i class="fas fa-exclamation-triangle mr-2"></i>Zone de Nettoyage
             </h2>
             
             <div class="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-6">
-                <h3 class="text-xl font-bold text-red-800 mb-4">⚠️ Attention</h3>
-                <p class="text-red-700 mb-4">
-                    Cette section permet de supprimer en masse les produits indésirables. 
-                    Ces actions sont <strong>irréversibles</strong>.
-                </p>
+                <h3 class="text-xl font-bold text-red-800 mb-4">Attention</h3>
+                <p class="text-red-700">Ces actions sont irréversibles.</p>
             </div>
             
             <div class="space-y-4">
                 <div class="border-2 border-gray-200 rounded-xl p-6">
-                    <h4 class="font-bold text-gray-800 mb-3">Supprimer les produits en rupture de stock</h4>
-                    <p class="text-gray-600 mb-4">Supprime tous les produits avec un stock de 0</p>
+                    <h4 class="font-bold text-gray-800 mb-3">Supprimer produits en rupture de stock</h4>
                     <button onclick="cleanupOutOfStock()" class="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600">
                         <i class="fas fa-broom mr-2"></i>Nettoyer
-                    </button>
-                </div>
-                
-                <div class="border-2 border-gray-200 rounded-xl p-6">
-                    <h4 class="font-bold text-gray-800 mb-3">Supprimer les produits inactifs</h4>
-                    <p class="text-gray-600 mb-4">Supprime tous les produits marqués comme inactifs</p>
-                    <button onclick="cleanupInactive()" class="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600">
-                        <i class="fas fa-broom mr-2"></i>Nettoyer
-                    </button>
-                </div>
-                
-                <div class="border-2 border-red-300 rounded-xl p-6 bg-red-50">
-                    <h4 class="font-bold text-red-800 mb-3">⚠️ Réinitialiser tous les produits</h4>
-                    <p class="text-red-700 mb-4">
-                        <strong>DANGER:</strong> Supprime TOUS les produits de la base de données
-                    </p>
-                    <button onclick="confirmResetAllProducts()" class="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700">
-                        <i class="fas fa-trash-alt mr-2"></i>Tout réinitialiser
                     </button>
                 </div>
             </div>
@@ -679,47 +782,30 @@ function loadAdminCleanup() {
     `;
 }
 
-function cleanupOutOfStock() {
+async function cleanupOutOfStock() {
     if (!confirm('Supprimer tous les produits en rupture de stock ?')) return;
     
-    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    const filtered = products.filter(p => p.stock > 0);
+    const token = localStorage.getItem('token');
+    const products = window.app.allProducts.filter(p => p.stock === 0);
     
-    localStorage.setItem('demoProducts', JSON.stringify(filtered));
-    
-    if (window.app) {
-        window.app.refreshProductsCache();
-        window.app.showToast(`${products.length - filtered.length} produits supprimés`, 'success');
-        loadAdminCleanup();
+    for (const product of products) {
+        try {
+            await fetch(buildApiUrl(`/products/${product._id}`), {
+                method: 'DELETE',
+                headers: { 'x-auth-token': token }
+            });
+        } catch (error) {
+            console.error(`Failed to delete ${product._id}`);
+        }
     }
+    
+    const remaining = window.app.allProducts.filter(p => p.stock > 0);
+    localStorage.setItem('demoProducts', JSON.stringify(remaining));
+    window.app.allProducts = remaining;
+    window.app.refreshProductsCache();
+    
+    window.app?.showToast(`${products.length} produits supprimés`, 'success');
+    loadAdminCleanup();
 }
 
-function cleanupInactive() {
-    if (!confirm('Supprimer tous les produits inactifs ?')) return;
-    
-    const products = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-    const filtered = products.filter(p => p.actif !== false);
-    
-    localStorage.setItem('demoProducts', JSON.stringify(filtered));
-    
-    if (window.app) {
-        window.app.refreshProductsCache();
-        window.app.showToast(`${products.length - filtered.length} produits supprimés`, 'success');
-        loadAdminCleanup();
-    }
-}
-
-function confirmResetAllProducts() {
-    if (!confirm('⚠️ ATTENTION: Voulez-vous vraiment supprimer TOUS les produits ? Cette action est IRRÉVERSIBLE !')) return;
-    if (!confirm('Dernière confirmation: Êtes-vous ABSOLUMENT sûr ?')) return;
-    
-    localStorage.setItem('demoProducts', '[]');
-    
-    if (window.app) {
-        window.app.refreshProductsCache();
-        window.app.showToast('Tous les produits ont été supprimés', 'success');
-        switchAdminSection('dashboard');
-    }
-}
-
-console.log('✅ Admin.js loaded - Fixed with API sync and cache refresh!');
+console.log('Admin.js loaded - Full API integration active');
