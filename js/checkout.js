@@ -1,4 +1,5 @@
-// Complete Fixed Checkout System for Shifa Parapharmacie with All 58 Algerian Wilayas
+// Complete Checkout System with Official PREST Express Shipping Rates
+// Based on PREST Express Tarification from Algiers
 
 class CheckoutSystem {
     constructor() {
@@ -6,49 +7,82 @@ class CheckoutSystem {
         this.orderData = {};
         this.isProcessing = false;
         
-        // Shipping rates for all 58 Algerian wilayas
+        // Official PREST Express shipping rates (Domicile - Home Delivery)
+        // Departing from Algiers - Updated from official tarification table
         this.shippingRates = {
-            // Major cities - Lower rates
-            'Alger': 250, 'Oran': 300, 'Constantine': 350, 'Annaba': 350,
-            'Blida': 250, 'Batna': 350, 'Sétif': 350, 'Sidi Bel Abbès': 350,
+            // Zone 21 (400-850 DA)
+            'Alger': 400,
+            'Blida': 650,
+            'Bouira': 650,
+            'Boumerdès': 650,
+            'Béjaïa': 750,
+            'Tizi Ouzou': 750,
+            'Tipaza': 650,
+            'Mila': 750,
+            'Aïn Defla': 700,
+            'Bordj Bou Arreridj': 700,
+            'Jijel': 750,
+            'Skikda': 750,
+            'Annaba': 800,
+            'Guelma': 800,
+            'Constantine': 750,
+            'Mostaganem': 750,
+            'Relizane': 700,
+            'Oran': 750,
+            'Chlef': 700,
+            'Batna': 750,
+            'Tlemcen': 850,
+            'Sétif': 700,
+            'El Tarf': 850,
             
-            // Coastal wilayas
-            'Tipaza': 200, 'Boumerdès': 250, 'Béjaïa': 350, 'Jijel': 400,
-            'Skikda': 400, 'Mostaganem': 350, 'Chlef': 350, 'Aïn Témouchent': 350,
-            'Tlemcen': 400, 'El Tarf': 450,
+            // Zone 22 (700-850 DA)
+            'Médéa': 750,
+            'Sidi Bel Abbès': 750,
+            'Mascara': 750,
+            'Oum El Bouaghi': 750,
+            'Khenchela': 800,
+            'Souk Ahras': 850,
+            'Aïn Témouchent': 850,
+            'Saïda': 800,
+            'Ouargla': 1000,
             
-            // Center wilayas
-            'Médéa': 300, 'Bouira': 350, 'Tizi Ouzou': 350, 'Bordj Bou Arreridj': 350,
-            'Aïn Defla': 350, 'Tissemsilt': 400, 'Tiaret': 400, 'Relizane': 400,
-            'Djelfa': 400, 'M\'Sila': 400, 'Mila': 400,
+            // Zone 23 (750-1200 DA)
+            'Laghouat': 950,
+            'Biskra': 950,
+            'Tébessa': 850,
+            'Tiaret': 750,
+            'Djelfa': 950,
+            'Naâma': 950,
+            'Ghardaïa': 1000,
+            'El Bayadh': 950,
+            'Tissemsilt': 750,
+            'El Oued': 950,
+            'M\'Sila': 750,
+            'Ouled Djellal': 1200,
+            'Touggourt': 1200,
+            'Djanet': 2400,
             
-            // East wilayas
-            'Oum El Bouaghi': 400, 'Tébessa': 450, 'Khenchela': 450, 'Souk Ahras': 450,
-            'Guelma': 400, 'Biskra': 450, 'El Oued': 500,
-            
-            // West wilayas
-            'Mascara': 400, 'Saïda': 400, 'Naâma': 500, 'El Bayadh': 500,
-            
-            // South wilayas - Higher rates due to distance
-            'Laghouat': 500, 'Ouargla': 600, 'Ghardaïa': 550, 'Béchar': 650,
-            'Tamanrasset': 800, 'Adrar': 700, 'Illizi': 800, 'Tindouf': 750,
-            
-            // New wilayas (2019-2021)
-            'Timimoun': 700, 'Bordj Badji Mokhtar': 850, 'Ouled Djellal': 550,
-            'Béni Abbès': 750, 'In Salah': 800, 'In Guezzam': 900,
-            'Touggourt': 550, 'Djanet': 850, 'El M\'Ghair': 600, 'El Meniaa': 650
+            // Zone 24 (1200-2400 DA)
+            'Adrar': 1400,
+            'Béchar': 1200,
+            'Tamanrasset': 1800,
+            'Tindouf': 1800,
+            'Timimoun': 1800,
+            'Béni Abbès': 1600,
+            'In Salah': 1800,
+            'Illizi': 1800,
+            'El M\'Ghair': 1200,
+            'El Meniaa': 1200
         };
     }
 
-    // Initialize checkout process
     init() {
-        console.log('Initializing checkout system...');
+        console.log('🚚 Initializing checkout with PREST Express rates...');
         this.validateCart();
         this.setupEventListeners();
         this.calculateTotals();
     }
 
-    // Validate cart before checkout
     validateCart() {
         if (!window.app || !window.app.cart || window.app.cart.length === 0) {
             console.error('Cart is empty');
@@ -59,7 +93,6 @@ class CheckoutSystem {
             return false;
         }
 
-        // Check stock availability
         for (let item of window.app.cart) {
             if (item.stock === 0) {
                 if (window.app) {
@@ -78,29 +111,24 @@ class CheckoutSystem {
         return true;
     }
 
-    // Setup form event listeners
     setupEventListeners() {
-        // Real-time form validation
         const inputs = document.querySelectorAll('#checkoutForm input, #checkoutForm select, #checkoutForm textarea');
         inputs.forEach(input => {
             input.addEventListener('blur', () => this.validateField(input));
             input.addEventListener('input', () => this.clearFieldError(input));
         });
 
-        // Payment method selection
         const paymentInputs = document.querySelectorAll('input[name="modePaiement"]');
         paymentInputs.forEach(input => {
             input.addEventListener('change', () => this.handlePaymentMethodChange(input.value));
         });
 
-        // Wilaya change for shipping calculation
         const wilayaSelect = document.getElementById('checkoutWilaya');
         if (wilayaSelect) {
             wilayaSelect.addEventListener('change', () => this.calculateShipping());
         }
     }
 
-    // Validate individual form field
     validateField(field) {
         const value = field.value.trim();
         let isValid = true;
@@ -160,7 +188,6 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // Display field validation result
     displayFieldValidation(field, isValid, errorMessage) {
         field.classList.remove('border-red-400', 'border-green-400');
         
@@ -181,7 +208,6 @@ class CheckoutSystem {
         }
     }
 
-    // Clear field error styling
     clearFieldError(field) {
         field.classList.remove('border-red-400');
         const existingError = field.parentNode.querySelector('.field-error');
@@ -190,7 +216,6 @@ class CheckoutSystem {
         }
     }
 
-    // Handle payment method change
     handlePaymentMethodChange(method) {
         console.log('Payment method changed to:', method);
         
@@ -221,10 +246,9 @@ class CheckoutSystem {
         }
     }
 
-    // Calculate shipping costs based on wilaya
     calculateShipping() {
         const wilaya = document.getElementById('checkoutWilaya')?.value;
-        const sousTotal = window.app ? window.app.getCartTotal() : 0;
+        const sousTotal = window.app ? window.app.cart.reduce((total, item) => total + (item.prix * item.quantite), 0) : 0;
         
         let fraisLivraison = 0;
         
@@ -232,10 +256,10 @@ class CheckoutSystem {
         if (sousTotal >= 5000) {
             fraisLivraison = 0;
         } else if (wilaya) {
-            // Get rate for selected wilaya, default to 400 DA if not found
+            // Get PREST Express rate for selected wilaya, default to 400 DA if not found
             fraisLivraison = this.shippingRates[wilaya] || 400;
         } else {
-            fraisLivraison = 300; // Default
+            fraisLivraison = 400; // Default Algiers rate
         }
 
         this.updateShippingDisplay(fraisLivraison);
@@ -244,7 +268,6 @@ class CheckoutSystem {
         return fraisLivraison;
     }
 
-    // Update shipping display
     updateShippingDisplay(fraisLivraison) {
         const shippingElement = document.getElementById('checkoutFraisLivraison');
         if (shippingElement) {
@@ -260,11 +283,10 @@ class CheckoutSystem {
         }
     }
 
-    // Calculate and update totals
     calculateTotals() {
         if (!window.app || !window.app.cart) return;
 
-        const sousTotal = window.app.getCartTotal();
+        const sousTotal = window.app.cart.reduce((total, item) => total + (item.prix * item.quantite), 0);
         const fraisLivraison = this.getCurrentShippingCost();
         const total = sousTotal + fraisLivraison;
 
@@ -283,19 +305,17 @@ class CheckoutSystem {
         }
     }
 
-    // Get current shipping cost
     getCurrentShippingCost() {
         const wilaya = document.getElementById('checkoutWilaya')?.value;
-        const sousTotal = window.app ? window.app.getCartTotal() : 0;
+        const sousTotal = window.app ? window.app.cart.reduce((total, item) => total + (item.prix * item.quantite), 0) : 0;
         
         if (sousTotal >= 5000) {
             return 0;
         }
         
-        return wilaya ? (this.shippingRates[wilaya] || 400) : 300;
+        return wilaya ? (this.shippingRates[wilaya] || 400) : 400;
     }
 
-    // Show free shipping message
     showFreeShippingMessage() {
         const container = document.getElementById('shippingMessage');
         if (container) {
@@ -310,7 +330,6 @@ class CheckoutSystem {
         }
     }
 
-    // Validate entire form
     validateForm() {
         const requiredFields = [
             'checkoutPrenom',
@@ -333,7 +352,6 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // Process the order - FIXED VERSION
     async processOrder() {
         try {
             if (this.isProcessing) {
@@ -344,17 +362,14 @@ class CheckoutSystem {
             console.log('🛒 Starting order processing...');
             this.isProcessing = true;
 
-            // Validate cart
             if (!this.validateCart()) {
                 throw new Error('Panier invalide');
             }
 
-            // Validate form
             if (!this.validateForm()) {
                 throw new Error('Veuillez corriger les erreurs dans le formulaire');
             }
 
-            // Gather form data - ENSURE ALL REQUIRED FIELDS
             const prenom = document.getElementById('checkoutPrenom')?.value.trim();
             const nom = document.getElementById('checkoutNom')?.value.trim();
             const email = document.getElementById('checkoutEmail')?.value.trim().toLowerCase();
@@ -364,20 +379,16 @@ class CheckoutSystem {
             const modePaiement = document.querySelector('input[name="modePaiement"]:checked')?.value || 'Paiement à la livraison';
             const commentaires = document.getElementById('checkoutCommentaires')?.value.trim() || '';
 
-            // Validate all required fields exist
             if (!prenom || !nom || !email || !telephone || !adresse || !wilaya) {
                 throw new Error('Veuillez remplir tous les champs obligatoires');
             }
 
-            // Calculate totals
-            const sousTotal = window.app ? window.app.getCartTotal() : 0;
+            const sousTotal = window.app ? window.app.cart.reduce((total, item) => total + (item.prix * item.quantite), 0) : 0;
             const fraisLivraison = this.getCurrentShippingCost();
             const total = sousTotal + fraisLivraison;
 
-            // Generate order number
             const orderNumber = this.generateOrderNumber();
 
-            // Prepare order data with ALL required fields
             const orderData = {
                 _id: Date.now().toString(),
                 numeroCommande: orderNumber,
@@ -408,15 +419,15 @@ class CheckoutSystem {
 
             console.log('📦 Order data prepared:', orderData);
 
-            // Always save locally first for admin panel
+            // Save locally first
             if (window.addOrderToDemo) {
                 const localOrder = window.addOrderToDemo(orderData);
                 if (localOrder) {
-                    console.log('✅ Order saved locally for admin panel');
+                    console.log('✅ Order saved locally');
                 }
             }
 
-            // Try to save to API (but don't fail if API is down)
+            // Try API save
             try {
                 const API_BASE_URL = window.location.hostname === 'localhost' 
                     ? 'http://localhost:5000/api'
@@ -431,16 +442,16 @@ class CheckoutSystem {
                 });
                 
                 if (response.ok) {
-                    console.log('✅ Order saved to API successfully');
+                    console.log('✅ Order saved to API');
                 } else {
                     const errorData = await response.json();
-                    console.log('⚠️ API save failed but order saved locally:', errorData.message);
+                    console.log('⚠️ API save failed:', errorData.message);
                 }
             } catch (apiError) {
-                console.log('⚠️ API unavailable, but order saved locally:', apiError.message);
+                console.log('⚠️ API unavailable:', apiError.message);
             }
 
-            // Save to user's order history
+            // Save to user history
             if (window.app && window.app.currentUser) {
                 this.saveToUserOrders(orderData);
             }
@@ -450,13 +461,13 @@ class CheckoutSystem {
                 window.app.clearCart();
             }
 
-            // Show success and redirect
+            // Success
             if (window.app) {
                 window.app.showToast('Commande passée avec succès !', 'success');
                 window.app.showPage('order-confirmation', { orderNumber: orderData.numeroCommande });
             }
 
-            console.log('✅ Order processing completed successfully');
+            console.log('✅ Order processing completed');
 
         } catch (error) {
             console.error('❌ Error processing order:', error);
@@ -469,7 +480,6 @@ class CheckoutSystem {
         }
     }
 
-    // Save order to user's order history
     saveToUserOrders(orderData) {
         if (!window.app?.currentUser?.id) return;
 
@@ -491,7 +501,6 @@ class CheckoutSystem {
         }
     }
 
-    // Generate unique order number
     generateOrderNumber() {
         const prefix = 'CMD';
         const timestamp = Date.now().toString().slice(-8);
@@ -499,13 +508,11 @@ class CheckoutSystem {
         return `${prefix}${timestamp}${random}`;
     }
 
-    // Email validation
     validateEmail(email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
     }
 
-    // Phone validation (Algerian format)
     validatePhone(phone) {
         const cleanPhone = phone.replace(/\s+/g, '');
         const phoneRegex = /^(\+213|0)[5-9]\d{8}$/;
@@ -513,19 +520,17 @@ class CheckoutSystem {
     }
 }
 
-// Global checkout system instance
+// Global instance
 let checkoutSystem;
 
-// Initialize checkout when page loads
 function initCheckout() {
     checkoutSystem = new CheckoutSystem();
     checkoutSystem.init();
     window.checkoutSystem = checkoutSystem;
-    console.log('✅ Checkout system initialized with all 58 Algerian wilayas');
+    console.log('✅ Checkout initialized with PREST Express rates');
 }
 
-// Export for global access
 window.initCheckout = initCheckout;
 window.checkoutSystem = checkoutSystem;
 
-console.log('✅ Fixed Checkout.js loaded successfully with all wilayas');
+console.log('✅ Checkout.js loaded with official PREST Express rates');
