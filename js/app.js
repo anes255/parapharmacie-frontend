@@ -194,8 +194,10 @@ class CheckoutSystem {
         }));
         
         // This matches the EXACT format the backend expects
+        // Include BOTH numeroCommande and orderNumber for compatibility
         const orderData = {
             numeroCommande: numeroCommande,
+            orderNumber: numeroCommande, // Backend might have old index on this field
             client: {
                 prenom: prenom,
                 nom: nom,
