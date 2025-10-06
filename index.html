@@ -6,7 +6,7 @@
     <title>Shifa - Parapharmacie</title>
     <meta name="description" content="Shifa - Parapharmacie Gaher à Tipaza, Algérie. Découvrez nos produits de santé et beauté. Livraison rapide dans toute l'Algérie.">
     
-    <!-- Simple green pill favicon -->
+    <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='16' fill='%2310b981'/%3E%3Cpath d='M16 8c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 12c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z' fill='white'/%3E%3C/svg%3E">
     
     <!-- Tailwind CSS -->
@@ -33,9 +33,7 @@
 </head>
 <body class="bg-gradient-to-br from-emerald-50 to-green-100">
     
-    <!-- ================================ -->
     <!-- SERVER LOADING SCREEN -->
-    <!-- ================================ -->
     <div id="serverLoadingScreen" class="fixed inset-0 bg-gradient-to-br from-emerald-500 via-green-600 to-teal-700 flex items-center justify-center z-[9999]">
         <div class="text-center">
             <div class="relative mb-8">
@@ -57,7 +55,7 @@
             </div>
             
             <p id="loadingMessage" class="text-white text-lg font-medium animate-pulse">
-                🌱 Réveil du serveur en cours...
+                Réveil du serveur en cours...
             </p>
         </div>
     </div>
@@ -341,9 +339,8 @@
     <!-- Toast Notifications -->
     <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
 
-    <!-- Scripts - IMPORTANT: Load in correct order -->
+    <!-- Scripts: Load ONLY app.js (checkout is integrated) -->
     <script src="js/config.js"></script>
     <script src="js/app.js"></script>
-    <script src="js/checkout.js"></script>
 </body>
 </html>
