@@ -197,7 +197,7 @@ class CheckoutSystem {
         // Include BOTH numeroCommande and orderNumber for compatibility
         const orderData = {
             numeroCommande: numeroCommande,
-            orderNumber: numeroCommande, // Backend might have old index on this field
+            orderNumber: numeroCommande, // Backend has old index on this field - MUST include
             client: {
                 prenom: prenom,
                 nom: nom,
@@ -219,6 +219,7 @@ class CheckoutSystem {
         console.log('📋 Formatted order data:', JSON.stringify(orderData, null, 2));
         console.log('📋 Articles count:', articles.length);
         console.log('📋 First article:', articles[0]);
+        console.log('📋 Has orderNumber?', 'orderNumber' in orderData, orderData.orderNumber);
         
         return orderData;
     }
