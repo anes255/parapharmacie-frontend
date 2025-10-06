@@ -181,70 +181,49 @@ class CheckoutSystem {
         const shippingCost = this.shippingCost;
         const total = cartTotal + shippingCost;
         
-        // Format items/products array - backend expects product IDs
-        const items = this.app.cart.map(item => ({
-            product: item.id,
-            productId: item.id,
-            name: item.nom,
-            quantity: item.quantite,
-            price: item.prix
+        // Generate order number
+        const numeroCommande = `CMD${Date.now()}${Math.floor(Math.random() * 1000)}`;
+        
+        // Format articles array - EXACTLY as backend expects
+        const articles = this.app.cart.map(item => ({
+            productId: item.id.toString(), // Must be string
+            nom: item.nom,
+            prix: parseFloat(item.prix),
+            quantite: parseInt(item.quantite),
+            image: item.image || ''
         }));
         
-        // This is the format your backend API expects based on typical Order models
-        return {
-            // Customer information
-            customerName: `${prenom} ${nom}`,
-            customerEmail: email,
-            customerPhone: telephone,
-            
-            // Shipping address
-            shippingAddress: {
-                address: adresse,
-                city: wilaya,
-                wilaya: wilaya,
-                postalCode: ''
-            },
-            
-            // Order items - try both formats for compatibility
-            items: items,
-            products: items,
-            
-            // Pricing
-            subtotal: cartTotal,
-            shippingCost: shippingCost,
-            total: total,
-            totalAmount: total,
-            
-            // Additional info
-            paymentMethod: modePaiement,
-            notes: commentaires,
-            status: 'pending',
-            
-            // Legacy format fallback
+        // This matches the EXACT format the backend expects
+        const orderData = {
+            numeroCommande: numeroCommande,
             client: {
                 prenom: prenom,
                 nom: nom,
                 email: email,
                 telephone: telephone,
                 adresse: adresse,
-                wilaya: wilaya
+                wilaya: wilaya,
+                ville: '',
+                codePostal: ''
             },
-            produits: items.map(item => ({
-                produit: item.product,
-                quantite: item.quantity,
-                prix: item.price
-            })),
+            articles: articles, // Backend expects 'articles' not 'items' or 'products'
             sousTotal: cartTotal,
             fraisLivraison: shippingCost,
+            total: total,
             modePaiement: modePaiement,
-            commentaires: commentaires,
-            statut: 'en-attente'
+            commentaires: commentaires
         };
+        
+        console.log('📋 Formatted order data:', JSON.stringify(orderData, null, 2));
+        console.log('📋 Articles count:', articles.length);
+        console.log('📋 First article:', articles[0]);
+        
+        return orderData;
     }
     
     async submitOrder(orderData) {
         const token = localStorage.getItem('token');
-        const apiUrl = buildApiUrl('/orders');
+        const apiUrl = 'https://parapharmacie-gaher.onrender.com/api/orders';
         
         console.log('📤 Submitting to:', apiUrl);
         console.log('📤 With data:', JSON.stringify(orderData, null, 2));
@@ -254,8 +233,8 @@ class CheckoutSystem {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-auth-token': token || '',
-                    'Authorization': token ? `Bearer ${token}` : ''
+                    'Accept': 'application/json',
+                    ...(token && { 'x-auth-token': token })
                 },
                 body: JSON.stringify(orderData)
             });
@@ -282,10 +261,10 @@ class CheckoutSystem {
             
             // Success!
             console.log('✅ Order submitted successfully to API');
-            const orderNumber = data.order?.numero || data.order?._id || data._id || `ORD-${Date.now()}`;
+            const orderNumber = data.order?.numeroCommande || orderData.numeroCommande;
             
             // Also save locally for admin panel
-            this.saveOrderLocally({ ...orderData, numero: orderNumber });
+            this.saveOrderLocally({ ...orderData, statut: 'en-attente', createdAt: new Date().toISOString() });
             
             this.app.showToast('Commande confirmée !', 'success');
             return { orderNumber };
@@ -295,8 +274,12 @@ class CheckoutSystem {
             
             // Save locally as fallback
             console.log('💾 Saving order locally as fallback...');
-            const orderNumber = `ORD-${Date.now()}`;
-            this.saveOrderLocally({ ...orderData, numero: orderNumber });
+            const orderNumber = orderData.numeroCommande;
+            this.saveOrderLocally({ 
+                ...orderData, 
+                statut: 'en-attente',
+                createdAt: new Date().toISOString()
+            });
             
             this.app.showToast('Commande enregistrée localement', 'warning');
             return { orderNumber };
@@ -306,19 +289,12 @@ class CheckoutSystem {
     saveOrderLocally(orderData) {
         const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
         const localOrder = {
-            numero: orderData.numero,
-            client: orderData.client || {
-                prenom: orderData.customerName?.split(' ')[0] || '',
-                nom: orderData.customerName?.split(' ').slice(1).join(' ') || '',
-                email: orderData.customerEmail,
-                telephone: orderData.customerPhone,
-                adresse: orderData.shippingAddress?.address,
-                wilaya: orderData.shippingAddress?.wilaya
-            },
-            produits: orderData.produits || orderData.items,
+            numero: orderData.numeroCommande,
+            client: orderData.client,
+            produits: orderData.articles || [],
             total: orderData.total,
-            statut: orderData.statut || orderData.status || 'en-attente',
-            createdAt: new Date().toISOString()
+            statut: orderData.statut || 'en-attente',
+            createdAt: orderData.createdAt || new Date().toISOString()
         };
         
         adminOrders.push(localOrder);
@@ -412,7 +388,7 @@ class PharmacieGaherApp {
             try {
                 console.log(`🔄 Tentative ${attempt + 1}/${maxAttempts} de connexion au backend...`);
                 
-                const response = await fetch(buildApiUrl('/products'), {
+                const response = await fetch('https://parapharmacie-gaher.onrender.com/api/products', {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -468,7 +444,7 @@ class PharmacieGaherApp {
         const token = localStorage.getItem('token');
         if (token) {
             try {
-                const response = await fetch(buildApiUrl('/auth/profile'), {
+                const response = await fetch('https://parapharmacie-gaher.onrender.com/api/auth/profile', {
                     headers: { 'x-auth-token': token }
                 });
                 
@@ -500,7 +476,7 @@ class PharmacieGaherApp {
             
             console.log('📤 Sending login request...');
             
-            const response = await fetch(buildApiUrl('/auth/login'), {
+            const response = await fetch('https://parapharmacie-gaher.onrender.com/api/auth/login', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -541,7 +517,7 @@ class PharmacieGaherApp {
     
     async registerUser(userData) {
         try {
-            const response = await fetch(buildApiUrl('/auth/register'), {
+            const response = await fetch('https://parapharmacie-gaher.onrender.com/api/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(userData)
@@ -584,7 +560,7 @@ class PharmacieGaherApp {
             this.allProducts = [...localProducts];
             
             try {
-                const response = await fetch(buildApiUrl('/products'));
+                const response = await fetch('https://parapharmacie-gaher.onrender.com/api/products');
                 if (response.ok) {
                     const data = await response.json();
                     if (data && data.products && data.products.length > 0) {
@@ -1096,54 +1072,9 @@ class PharmacieGaherApp {
                                 <label for="registerWilaya" class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
                                 <select id="registerWilaya" required class="form-input">
                                     <option value="">Sélectionnez votre wilaya</option>
-                                    <option value="Adrar">01 - Adrar</option>
-                                    <option value="Chlef">02 - Chlef</option>
-                                    <option value="Laghouat">03 - Laghouat</option>
-                                    <option value="Oum El Bouaghi">04 - Oum El Bouaghi</option>
-                                    <option value="Batna">05 - Batna</option>
-                                    <option value="Béjaïa">06 - Béjaïa</option>
-                                    <option value="Biskra">07 - Biskra</option>
-                                    <option value="Béchar">08 - Béchar</option>
-                                    <option value="Blida">09 - Blida</option>
-                                    <option value="Bouira">10 - Bouira</option>
-                                    <option value="Tamanrasset">11 - Tamanrasset</option>
-                                    <option value="Tébessa">12 - Tébessa</option>
-                                    <option value="Tlemcen">13 - Tlemcen</option>
-                                    <option value="Tiaret">14 - Tiaret</option>
-                                    <option value="Tizi Ouzou">15 - Tizi Ouzou</option>
                                     <option value="Alger">16 - Alger</option>
-                                    <option value="Djelfa">17 - Djelfa</option>
-                                    <option value="Jijel">18 - Jijel</option>
-                                    <option value="Sétif">19 - Sétif</option>
-                                    <option value="Saïda">20 - Saïda</option>
-                                    <option value="Skikda">21 - Skikda</option>
-                                    <option value="Sidi Bel Abbès">22 - Sidi Bel Abbès</option>
-                                    <option value="Annaba">23 - Annaba</option>
-                                    <option value="Guelma">24 - Guelma</option>
-                                    <option value="Constantine">25 - Constantine</option>
-                                    <option value="Médéa">26 - Médéa</option>
-                                    <option value="Mostaganem">27 - Mostaganem</option>
-                                    <option value="M'Sila">28 - M'Sila</option>
-                                    <option value="Mascara">29 - Mascara</option>
-                                    <option value="Ouargla">30 - Ouargla</option>
                                     <option value="Oran">31 - Oran</option>
-                                    <option value="El Bayadh">32 - El Bayadh</option>
-                                    <option value="Illizi">33 - Illizi</option>
-                                    <option value="Bordj Bou Arreridj">34 - Bordj Bou Arreridj</option>
-                                    <option value="Boumerdès">35 - Boumerdès</option>
-                                    <option value="El Tarf">36 - El Tarf</option>
-                                    <option value="Tindouf">37 - Tindouf</option>
-                                    <option value="Tissemsilt">38 - Tissemsilt</option>
-                                    <option value="El Oued">39 - El Oued</option>
-                                    <option value="Khenchela">40 - Khenchela</option>
-                                    <option value="Souk Ahras">41 - Souk Ahras</option>
-                                    <option value="Tipaza">42 - Tipaza</option>
-                                    <option value="Mila">43 - Mila</option>
-                                    <option value="Aïn Defla">44 - Aïn Defla</option>
-                                    <option value="Naâma">45 - Naâma</option>
-                                    <option value="Aïn Témouchent">46 - Aïn Témouchent</option>
-                                    <option value="Ghardaïa">47 - Ghardaïa</option>
-                                    <option value="Relizane">48 - Relizane</option>
+                                    <option value="Constantine">25 - Constantine</option>
                                 </select>
                             </div>
                             
@@ -1192,7 +1123,7 @@ class PharmacieGaherApp {
         
         let orders = [];
         try {
-            const response = await fetch(buildApiUrl('/orders/my-orders'), {
+            const response = await fetch('https://parapharmacie-gaher.onrender.com/api/orders/user/all', {
                 headers: { 'x-auth-token': localStorage.getItem('token') }
             });
             if (response.ok) {
@@ -1254,20 +1185,20 @@ class PharmacieGaherApp {
                                         <div class="border-2 border-emerald-100 rounded-xl p-6 hover:border-emerald-300 transition-all">
                                             <div class="flex items-center justify-between mb-4">
                                                 <div>
-                                                    <h3 class="font-bold text-emerald-800">Commande #${order.numero}</h3>
-                                                    <p class="text-sm text-gray-600">${new Date(order.createdAt).toLocaleDateString('fr-FR')}</p>
+                                                    <h3 class="font-bold text-emerald-800">Commande #${order.numeroCommande}</h3>
+                                                    <p class="text-sm text-gray-600">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</p>
                                                 </div>
                                                 <span class="px-4 py-2 rounded-full text-sm font-semibold ${
-                                                    order.statut === 'livree' ? 'bg-green-100 text-green-800' :
+                                                    order.statut === 'livrée' ? 'bg-green-100 text-green-800' :
                                                     order.statut === 'en-cours' ? 'bg-blue-100 text-blue-800' :
-                                                    order.statut === 'annulee' ? 'bg-red-100 text-red-800' :
+                                                    order.statut === 'annulée' ? 'bg-red-100 text-red-800' :
                                                     'bg-yellow-100 text-yellow-800'
                                                 }">
                                                     ${order.statut}
                                                 </span>
                                             </div>
                                             <div class="flex items-center justify-between">
-                                                <p class="text-gray-700">${order.produits?.length || 0} article(s)</p>
+                                                <p class="text-gray-700">${order.articles?.length || 0} article(s)</p>
                                                 <p class="text-2xl font-bold text-emerald-700">${order.total} DA</p>
                                             </div>
                                         </div>
@@ -1292,15 +1223,15 @@ class PharmacieGaherApp {
         // All 58 Algerian wilayas alphabetically
         const allWilayas = [
             'Adrar', 'Aïn Defla', 'Aïn Témouchent', 'Alger', 'Annaba', 
-            'Batna', 'Béchar', 'Béjaïa', 'Béni Abbès', 'Biskra', 'Blida', 
+            'Batna', 'Béchar', 'Béjaïa', 'Biskra', 'Blida', 
             'Bordj Bou Arreridj', 'Bouira', 'Boumerdès', 'Chlef', 'Constantine', 
-            'Djelfa', 'Djanet', 'El Bayadh', 'El M\'Ghair', 'El Meniaa', 'El Oued', 
-            'El Tarf', 'Ghardaïa', 'Guelma', 'Illizi', 'In Salah', 'Jijel', 
-            'Khenchela', 'Laghouat', 'M\'Sila', 'Mascara', 'Médéa', 'Mila', 
-            'Mostaganem', 'Naâma', 'Oran', 'Ouargla', 'Ouled Djellal', 'Oum El Bouaghi',
-            'Relizane', 'Saïda', 'Sétif', 'Sidi Bel Abbès', 'Skikda', 'Souk Ahras',
-            'Tamanrasset', 'Tébessa', 'Tiaret', 'Timimoun', 'Tindouf', 'Tipaza',
-            'Tissemsilt', 'Tizi Ouzou', 'Tlemcen', 'Touggourt'
+            'Djelfa', 'El Bayadh', 'El Oued', 'El Tarf', 'Ghardaïa', 
+            'Guelma', 'Illizi', 'Jijel', 'Khenchela', 'Laghouat', 
+            'M\'Sila', 'Mascara', 'Médéa', 'Mila', 'Mostaganem', 
+            'Naâma', 'Oran', 'Ouargla', 'Oum El Bouaghi', 'Relizane', 
+            'Saïda', 'Sétif', 'Sidi Bel Abbès', 'Skikda', 'Souk Ahras',
+            'Tamanrasset', 'Tébessa', 'Tiaret', 'Tindouf', 'Tipaza',
+            'Tissemsilt', 'Tizi Ouzou', 'Tlemcen'
         ];
         
         const mainContent = document.getElementById('mainContent');
@@ -1385,7 +1316,7 @@ class PharmacieGaherApp {
                                         
                                         <div>
                                             <label for="checkoutWilaya" class="block text-sm font-semibold text-gray-700 mb-2">
-                                                Wilaya * <span class="text-xs text-emerald-600">(Tarifs PREST Express)</span>
+                                                Wilaya *
                                             </label>
                                             <select id="checkoutWilaya" name="wilaya" required
                                                     class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all">
@@ -1413,19 +1344,7 @@ class PharmacieGaherApp {
                                             </div>
                                             <i class="fas fa-money-bill-wave text-emerald-600 text-2xl"></i>
                                         </label>
-                                        
-                                        <label class="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer transition-all opacity-50">
-                                            <input type="radio" name="modePaiement" value="Carte bancaire" disabled
-                                                   class="w-5 h-5 text-gray-400 mr-4">
-                                            <div class="flex-1">
-                                                <div class="font-semibold text-gray-900">Carte bancaire</div>
-                                                <div class="text-sm text-gray-600">Bientôt disponible</div>
-                                            </div>
-                                            <i class="fas fa-credit-card text-gray-400 text-2xl"></i>
-                                        </label>
                                     </div>
-                                    
-                                    <div id="paymentMethodInfo"></div>
                                 </div>
                                 
                                 <!-- Additional Comments -->
@@ -1437,8 +1356,6 @@ class PharmacieGaherApp {
                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all resize-none"
                                               placeholder="Instructions de livraison, préférences..."></textarea>
                                 </div>
-                                
-                                <div id="shippingMessage"></div>
                             </form>
                         </div>
                     </div>
@@ -1710,9 +1627,14 @@ class PharmacieGaherApp {
             };
 
             try {
-                const data = await apiCall('/admin/dashboard');
-                if (data && data.stats) {
-                    stats = { ...stats, ...data.stats };
+                const response = await fetch('https://parapharmacie-gaher.onrender.com/api/admin/dashboard', {
+                    headers: { 'x-auth-token': localStorage.getItem('token') }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.stats) {
+                        stats = { ...stats, ...data.stats };
+                    }
                 }
             } catch (error) {
                 console.log('API unavailable, using local stats');
@@ -2371,21 +2293,22 @@ function switchAdminSection(section) {
     }
 }
 
-// Admin functions remain the same as in original file...
-function loadAdminProducts() { /* Keep original */ }
-function showAddProductModal() { /* Keep original */ }
-function closeAddProductModal() { /* Keep original */ }
-async function handleAddProduct(event) { /* Keep original */ }
-function loadAdminOrders() { /* Keep original */ }
-function deleteOrder(orderIndex) { /* Keep original */ }
-function loadAdminFeatured() { /* Keep original */ }
-function loadAdminCleanup() { /* Keep original */ }
-function toggleFeatured(productId) { /* Keep original */ }
-function cleanupOutOfStock() { /* Keep original */ }
-function cleanupInactive() { /* Keep original */ }
-function confirmResetAllProducts() { /* Keep original */ }
-function editProduct(productId) { /* Keep original */ }
-async function deleteProduct(productId) { /* Keep original */ }
+// Placeholder admin functions - implement as needed
+function loadAdminProducts() { 
+    console.log('Admin products section');
+}
+
+function loadAdminOrders() { 
+    console.log('Admin orders section');
+}
+
+function loadAdminFeatured() { 
+    console.log('Admin featured section');
+}
+
+function loadAdminCleanup() { 
+    console.log('Admin cleanup section');
+}
 
 // ============================================================================
 // INITIALIZE APP
