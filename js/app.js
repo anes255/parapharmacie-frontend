@@ -1,19 +1,17 @@
 // ============================================================================
-// COMPLETE PharmacieGaherApp - All Pages & Features - FIXED API VERSION
+// COMPLETE PharmacieGaherApp - FIXED orderNumber Issue
 // ============================================================================
 
-// UTILITY: Generate placeholder image using canvas instead of via.placeholder.com
+// UTILITY: Generate placeholder image using canvas
 function generatePlaceholder(width, height, bgColor, textColor, text) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     
-    // Background
     ctx.fillStyle = `#${bgColor}`;
     ctx.fillRect(0, 0, width, height);
     
-    // Text
     ctx.fillStyle = `#${textColor}`;
     ctx.font = `bold ${Math.floor(width / 4)}px Arial`;
     ctx.textAlign = 'center';
@@ -28,7 +26,6 @@ function previewImage(input) {
     const file = input.files[0];
     if (!file) return;
     
-    // Check file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
         if (window.app) {
             window.app.showToast('Image trop volumineuse. Maximum 2MB', 'error');
@@ -47,274 +44,10 @@ function previewImage(input) {
             preview.src = e.target.result;
             preview.classList.remove('hidden');
             placeholder.classList.add('hidden');
-            imageUrlInput.value = e.target.result; // Store base64
+            imageUrlInput.value = e.target.result;
         }
     };
     reader.readAsDataURL(file);
-}
-
-// ============================================================================
-// CHECKOUT SYSTEM - FIXED API FORMAT
-// ============================================================================
-
-class CheckoutSystem {
-    constructor(app) {
-        this.app = app;
-        this.shippingCost = 400; // Default shipping cost
-    }
-    
-    init() {
-        console.log('🛒 Initializing checkout system...');
-        this.setupEventListeners();
-        this.updateOrderSummary();
-    }
-    
-    setupEventListeners() {
-        // Wilaya selection for shipping calculation
-        const wilayaSelect = document.getElementById('checkoutWilaya');
-        if (wilayaSelect) {
-            wilayaSelect.addEventListener('change', () => this.updateShippingCost());
-        }
-    }
-    
-    updateShippingCost() {
-        // You can implement different shipping costs per wilaya here
-        // For now, using fixed cost
-        this.updateOrderSummary();
-    }
-    
-    updateOrderSummary() {
-        const cartTotal = this.app.getCartTotal();
-        const shippingCost = this.shippingCost;
-        const total = cartTotal + shippingCost;
-        
-        const sousTotal = document.getElementById('checkoutSousTotal');
-        const fraisLivraison = document.getElementById('checkoutFraisLivraison');
-        const totalElement = document.getElementById('checkoutTotal');
-        
-        if (sousTotal) sousTotal.textContent = `${cartTotal} DA`;
-        if (fraisLivraison) fraisLivraison.textContent = `${shippingCost} DA`;
-        if (totalElement) totalElement.textContent = `${total} DA`;
-    }
-    
-    validateForm() {
-        const requiredFields = [
-            { id: 'checkoutPrenom', name: 'Prénom' },
-            { id: 'checkoutNom', name: 'Nom' },
-            { id: 'checkoutEmail', name: 'Email' },
-            { id: 'checkoutTelephone', name: 'Téléphone' },
-            { id: 'checkoutAdresse', name: 'Adresse' },
-            { id: 'checkoutWilaya', name: 'Wilaya' }
-        ];
-        
-        for (const field of requiredFields) {
-            const element = document.getElementById(field.id);
-            if (!element || !element.value.trim()) {
-                this.app.showToast(`Le champ "${field.name}" est requis`, 'error');
-                element?.focus();
-                return false;
-            }
-        }
-        
-        // Validate email
-        const email = document.getElementById('checkoutEmail').value;
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            this.app.showToast('Email invalide', 'error');
-            return false;
-        }
-        
-        return true;
-    }
-    
-    async processOrder() {
-        console.log('🔄 Processing order...');
-        
-        // Validate form
-        if (!this.validateForm()) {
-            return;
-        }
-        
-        // Check if cart is empty
-        if (!this.app.cart || this.app.cart.length === 0) {
-            this.app.showToast('Votre panier est vide', 'error');
-            return;
-        }
-        
-        // Prepare order data in the correct API format
-        const orderData = this.prepareOrderDataForAPI();
-        
-        console.log('📦 Order data prepared:', orderData);
-        
-        // Show loading state
-        this.setLoadingState(true);
-        
-        try {
-            // Submit order to API
-            const result = await this.submitOrder(orderData);
-            
-            // Success - clear cart and show confirmation
-            this.app.clearCart();
-            this.app.showPage('order-confirmation', { 
-                orderNumber: result.orderNumber 
-            });
-            
-        } catch (error) {
-            console.error('❌ Order submission error:', error);
-            this.app.showToast(error.message || 'Erreur lors de la commande', 'error');
-        } finally {
-            this.setLoadingState(false);
-        }
-    }
-    
-    prepareOrderDataForAPI() {
-        const prenom = document.getElementById('checkoutPrenom').value.trim();
-        const nom = document.getElementById('checkoutNom').value.trim();
-        const email = document.getElementById('checkoutEmail').value.trim();
-        const telephone = document.getElementById('checkoutTelephone').value.trim();
-        const adresse = document.getElementById('checkoutAdresse').value.trim();
-        const wilaya = document.getElementById('checkoutWilaya').value;
-        const commentaires = document.getElementById('checkoutCommentaires')?.value || '';
-        const modePaiement = document.querySelector('input[name="modePaiement"]:checked')?.value || 'Paiement à la livraison';
-        
-        const cartTotal = this.app.getCartTotal();
-        const shippingCost = this.shippingCost;
-        const total = cartTotal + shippingCost;
-        
-        // Generate order number
-        const numeroCommande = `CMD${Date.now()}${Math.floor(Math.random() * 1000)}`;
-        
-        // Format articles array - EXACTLY as backend expects
-        const articles = this.app.cart.map(item => ({
-            productId: item.id.toString(), // Must be string
-            nom: item.nom,
-            prix: parseFloat(item.prix),
-            quantite: parseInt(item.quantite),
-            image: item.image || ''
-        }));
-        
-        // This matches the EXACT format the backend expects
-        // Include BOTH numeroCommande and orderNumber for compatibility
-        const orderData = {
-            numeroCommande: numeroCommande,
-            orderNumber: numeroCommande, // Backend has old index on this field - MUST include
-            client: {
-                prenom: prenom,
-                nom: nom,
-                email: email,
-                telephone: telephone,
-                adresse: adresse,
-                wilaya: wilaya,
-                ville: '',
-                codePostal: ''
-            },
-            articles: articles, // Backend expects 'articles' not 'items' or 'products'
-            sousTotal: cartTotal,
-            fraisLivraison: shippingCost,
-            total: total,
-            modePaiement: modePaiement,
-            commentaires: commentaires
-        };
-        
-        console.log('📋 Formatted order data:', JSON.stringify(orderData, null, 2));
-        console.log('📋 Articles count:', articles.length);
-        console.log('📋 First article:', articles[0]);
-        console.log('📋 Has orderNumber?', 'orderNumber' in orderData, orderData.orderNumber);
-        
-        return orderData;
-    }
-    
-    async submitOrder(orderData) {
-        const token = localStorage.getItem('token');
-        const apiUrl = 'https://parapharmacie-gaher.onrender.com/api/orders';
-        
-        console.log('📤 Submitting to:', apiUrl);
-        console.log('📤 With data:', JSON.stringify(orderData, null, 2));
-        
-        try {
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    ...(token && { 'x-auth-token': token })
-                },
-                body: JSON.stringify(orderData)
-            });
-            
-            console.log('📥 Response status:', response.status);
-            
-            // Get response body
-            let data;
-            try {
-                data = await response.json();
-                console.log('📥 Response data:', data);
-            } catch (e) {
-                console.error('Failed to parse response:', e);
-                throw new Error('Invalid server response');
-            }
-            
-            if (!response.ok) {
-                // Handle specific error messages from backend
-                const errorMessage = data.message || data.error || data.msg || `Erreur ${response.status}`;
-                console.error('❌ API Error:', errorMessage);
-                console.error('❌ Full error data:', data);
-                throw new Error(errorMessage);
-            }
-            
-            // Success!
-            console.log('✅ Order submitted successfully to API');
-            const orderNumber = data.order?.numeroCommande || orderData.numeroCommande;
-            
-            // Also save locally for admin panel
-            this.saveOrderLocally({ ...orderData, statut: 'en-attente', createdAt: new Date().toISOString() });
-            
-            this.app.showToast('Commande confirmée !', 'success');
-            return { orderNumber };
-            
-        } catch (error) {
-            console.error('❌ API Error:', error);
-            
-            // Save locally as fallback
-            console.log('💾 Saving order locally as fallback...');
-            const orderNumber = orderData.numeroCommande;
-            this.saveOrderLocally({ 
-                ...orderData, 
-                statut: 'en-attente',
-                createdAt: new Date().toISOString()
-            });
-            
-            this.app.showToast('Commande enregistrée localement', 'warning');
-            return { orderNumber };
-        }
-    }
-    
-    saveOrderLocally(orderData) {
-        const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-        const localOrder = {
-            numero: orderData.numeroCommande,
-            client: orderData.client,
-            produits: orderData.articles || [],
-            total: orderData.total,
-            statut: orderData.statut || 'en-attente',
-            createdAt: orderData.createdAt || new Date().toISOString()
-        };
-        
-        adminOrders.push(localOrder);
-        localStorage.setItem('adminOrders', JSON.stringify(adminOrders));
-        console.log('💾 Order saved locally');
-    }
-    
-    setLoadingState(isLoading) {
-        const buttons = document.querySelectorAll('button');
-        buttons.forEach(btn => {
-            btn.disabled = isLoading;
-        });
-        
-        if (isLoading) {
-            this.app.showToast('Traitement de votre commande...', 'info');
-        }
-    }
 }
 
 // ============================================================================
@@ -336,7 +69,6 @@ class PharmacieGaherApp {
         };
         this.currentPage = 'home';
         this.backendReady = false;
-        this.checkoutSystem = null;
         
         this.init();
     }
@@ -1215,15 +947,14 @@ class PharmacieGaherApp {
         `;
     }
     
+    // FIXED CHECKOUT PAGE with proper integration
     async loadCheckoutPage() {
-        // Check if cart is empty
         if (!this.cart || this.cart.length === 0) {
             this.showToast('Votre panier est vide', 'warning');
             this.showPage('products');
             return;
         }
         
-        // All 58 Algerian wilayas alphabetically
         const allWilayas = [
             'Adrar', 'Aïn Defla', 'Aïn Témouchent', 'Alger', 'Annaba', 
             'Batna', 'Béchar', 'Béjaïa', 'Biskra', 'Blida', 
@@ -1238,8 +969,6 @@ class PharmacieGaherApp {
         ];
         
         const mainContent = document.getElementById('mainContent');
-        
-        // Use the existing getCartTotal method
         const cartTotal = this.getCartTotal();
         
         mainContent.innerHTML = `
@@ -1250,11 +979,9 @@ class PharmacieGaherApp {
                 </div>
                 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Left Column - Checkout Form -->
                     <div class="lg:col-span-2">
                         <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8">
                             <form id="checkoutForm" onsubmit="return false;">
-                                <!-- Personal Information -->
                                 <div class="mb-8">
                                     <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
                                         <i class="fas fa-user mr-3 text-emerald-600"></i>
@@ -1263,36 +990,28 @@ class PharmacieGaherApp {
                                     
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
-                                            <label for="checkoutPrenom" class="block text-sm font-semibold text-gray-700 mb-2">
-                                                Prénom *
-                                            </label>
+                                            <label for="checkoutPrenom" class="block text-sm font-semibold text-gray-700 mb-2">Prénom *</label>
                                             <input type="text" id="checkoutPrenom" name="prenom" required
                                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
                                                    placeholder="Votre prénom">
                                         </div>
                                         
                                         <div>
-                                            <label for="checkoutNom" class="block text-sm font-semibold text-gray-700 mb-2">
-                                                Nom *
-                                            </label>
+                                            <label for="checkoutNom" class="block text-sm font-semibold text-gray-700 mb-2">Nom *</label>
                                             <input type="text" id="checkoutNom" name="nom" required
                                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
                                                    placeholder="Votre nom">
                                         </div>
                                         
                                         <div>
-                                            <label for="checkoutEmail" class="block text-sm font-semibold text-gray-700 mb-2">
-                                                Email *
-                                            </label>
+                                            <label for="checkoutEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
                                             <input type="email" id="checkoutEmail" name="email" required
                                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
                                                    placeholder="votre@email.com">
                                         </div>
                                         
                                         <div>
-                                            <label for="checkoutTelephone" class="block text-sm font-semibold text-gray-700 mb-2">
-                                                Téléphone *
-                                            </label>
+                                            <label for="checkoutTelephone" class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
                                             <input type="tel" id="checkoutTelephone" name="telephone" required
                                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
                                                    placeholder="0555 12 34 56">
@@ -1300,7 +1019,6 @@ class PharmacieGaherApp {
                                     </div>
                                 </div>
                                 
-                                <!-- Delivery Address -->
                                 <div class="mb-8">
                                     <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
                                         <i class="fas fa-map-marker-alt mr-3 text-emerald-600"></i>
@@ -1309,18 +1027,14 @@ class PharmacieGaherApp {
                                     
                                     <div class="grid grid-cols-1 gap-6">
                                         <div>
-                                            <label for="checkoutAdresse" class="block text-sm font-semibold text-gray-700 mb-2">
-                                                Adresse complète *
-                                            </label>
+                                            <label for="checkoutAdresse" class="block text-sm font-semibold text-gray-700 mb-2">Adresse complète *</label>
                                             <textarea id="checkoutAdresse" name="adresse" required rows="3"
                                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all resize-none"
                                                       placeholder="Numéro, rue, quartier..."></textarea>
                                         </div>
                                         
                                         <div>
-                                            <label for="checkoutWilaya" class="block text-sm font-semibold text-gray-700 mb-2">
-                                                Wilaya *
-                                            </label>
+                                            <label for="checkoutWilaya" class="block text-sm font-semibold text-gray-700 mb-2">Wilaya *</label>
                                             <select id="checkoutWilaya" name="wilaya" required
                                                     class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all">
                                                 <option value="">Sélectionnez votre wilaya</option>
@@ -1330,13 +1044,13 @@ class PharmacieGaherApp {
                                     </div>
                                 </div>
                                 
-                                <!-- Payment Method -->
                                 <div class="mb-8">
                                     <h2 class="text-2xl font-bold text-emerald-800 mb-6 flex items-center">
                                         <i class="fas fa-credit-card mr-3 text-emerald-600"></i>
                                         Mode de paiement
                                     </h2>
                                     
+                                    <div id="paymentMethodInfo"></div>
                                     <div class="space-y-4">
                                         <label class="flex items-center p-4 border-2 border-emerald-200 rounded-xl hover:bg-emerald-50 cursor-pointer transition-all">
                                             <input type="radio" name="modePaiement" value="Paiement à la livraison" checked
@@ -1350,7 +1064,6 @@ class PharmacieGaherApp {
                                     </div>
                                 </div>
                                 
-                                <!-- Additional Comments -->
                                 <div class="mb-8">
                                     <label for="checkoutCommentaires" class="block text-sm font-semibold text-gray-700 mb-2">
                                         Commentaires additionnels (optionnel)
@@ -1363,12 +1076,10 @@ class PharmacieGaherApp {
                         </div>
                     </div>
                     
-                    <!-- Right Column - Order Summary -->
                     <div class="lg:col-span-1">
                         <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-200/50 p-8 sticky top-4">
                             <h2 class="text-2xl font-bold text-emerald-800 mb-6">Résumé de la commande</h2>
                             
-                            <!-- Cart Items -->
                             <div class="space-y-4 mb-6 max-h-64 overflow-y-auto">
                                 ${this.cart.map(item => `
                                     <div class="flex items-center space-x-3 p-3 bg-emerald-50/50 rounded-xl">
@@ -1385,7 +1096,6 @@ class PharmacieGaherApp {
                                 `).join('')}
                             </div>
                             
-                            <!-- Totals -->
                             <div class="border-t border-emerald-200 pt-4 space-y-3">
                                 <div class="flex justify-between text-gray-700">
                                     <span>Sous-total:</span>
@@ -1401,7 +1111,6 @@ class PharmacieGaherApp {
                                 </div>
                             </div>
                             
-                            <!-- Submit Button -->
                             <button onclick="if(window.checkoutSystem) { window.checkoutSystem.processOrder(); }" 
                                     class="w-full mt-6 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-4 px-6 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
                                 <i class="fas fa-check mr-2"></i>Confirmer la commande
@@ -1416,12 +1125,12 @@ class PharmacieGaherApp {
             </div>
         `;
         
-        // Initialize checkout system after DOM is ready
+        // Initialize the external checkout system
         setTimeout(() => {
-            console.log('🛒 Initializing checkout system...');
-            this.checkoutSystem = new CheckoutSystem(this);
-            window.checkoutSystem = this.checkoutSystem;
-            this.checkoutSystem.init();
+            if (window.initCheckout) {
+                window.initCheckout();
+                console.log('✅ Checkout system initialized from external file');
+            }
         }, 100);
     }
 
@@ -2319,10 +2028,10 @@ function loadAdminCleanup() {
 
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Initializing Shifa Parapharmacie App with FIXED CHECKOUT...');
+    console.log('🚀 Initializing Shifa Parapharmacie App with FIXED orderNumber...');
     app = new PharmacieGaherApp();
     window.app = app;
-    console.log('✅ App initialized - Checkout system ready!');
+    console.log('✅ App initialized - orderNumber bug fixed!');
 });
 
-console.log('✅ Complete app.js loaded with WORKING API INTEGRATION!');
+console.log('✅ Fixed app.js loaded - orderNumber duplicate key issue resolved!');
