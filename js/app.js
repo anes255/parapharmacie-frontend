@@ -1728,6 +1728,7 @@ class PharmacieGaherApp {
                                 <tr>
                                     <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">N° Commande</th>
                                     <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">Client</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">Adresse complète</th>
                                     <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">Contact</th>
                                     <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">Date</th>
                                     <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">Articles</th>
@@ -1739,7 +1740,7 @@ class PharmacieGaherApp {
                             <tbody class="divide-y divide-emerald-100">
                                 ${orders.length === 0 ? `
                                     <tr>
-                                        <td colspan="8" class="px-4 py-12 text-center">
+                                        <td colspan="9" class="px-4 py-12 text-center">
                                             <i class="fas fa-shopping-bag text-6xl text-gray-300 mb-4"></i>
                                             <p class="text-gray-500 text-lg font-medium">Aucune commande trouvée</p>
                                             <p class="text-gray-400 text-sm mt-2">Les commandes apparaîtront ici une fois créées</p>
@@ -1766,6 +1767,12 @@ class PharmacieGaherApp {
                                                 <div>
                                                     <p class="font-medium text-gray-900">${order.client?.prenom || ''} ${order.client?.nom || ''}</p>
                                                     <p class="text-xs text-gray-500">${order.client?.wilaya || ''}</p>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <div class="max-w-xs">
+                                                    <p class="text-sm text-gray-700 break-words">${order.client?.adresse || 'N/A'}</p>
+                                                    <p class="text-xs text-gray-500 mt-1">${order.client?.wilaya || ''}</p>
                                                 </div>
                                             </td>
                                             <td class="px-4 py-3">
@@ -2817,8 +2824,8 @@ async function editProduct(productId) {
                             </div>
                             
                             <div class="md:col-span-2">
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                                <textarea id="editProductDescription" rows="3"
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
+                                <textarea id="editProductDescription" rows="3" required
                                           class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">${product.description || ''}</textarea>
                             </div>
                             
@@ -2918,13 +2925,27 @@ async function saveProductEdit(event, productId) {
     if (!window.app || !productId) return;
     
     try {
+        // Validate required fields
+        const nom = document.getElementById('editProductNom').value.trim();
+        const description = document.getElementById('editProductDescription').value.trim();
+        
+        if (!nom) {
+            window.app.showToast('Le nom du produit est requis', 'error');
+            return;
+        }
+        
+        if (!description) {
+            window.app.showToast('La description est requise', 'error');
+            return;
+        }
+        
         const productData = {
-            nom: document.getElementById('editProductNom').value.trim(),
+            nom,
             categorie: document.getElementById('editProductCategorie').value,
             marque: document.getElementById('editProductMarque').value.trim(),
             prix: parseFloat(document.getElementById('editProductPrix').value),
             stock: parseInt(document.getElementById('editProductStock').value),
-            description: document.getElementById('editProductDescription').value.trim(),
+            description,
             image: document.getElementById('editProductImageUrl').value || '',
             enPromotion: document.getElementById('editProductPromotion').checked,
             enVedette: document.getElementById('editProductVedette').checked,
@@ -3110,8 +3131,8 @@ function showAddProductModal() {
                         </div>
                         
                         <div class="md:col-span-2">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                            <textarea id="addProductDescription" rows="3"
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
+                            <textarea id="addProductDescription" rows="3" required
                                       class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
                                       placeholder="Description détaillée du produit..."></textarea>
                         </div>
@@ -3194,13 +3215,27 @@ async function saveNewProduct(event) {
     if (!window.app) return;
     
     try {
+        // Validate required fields
+        const nom = document.getElementById('addProductNom').value.trim();
+        const description = document.getElementById('addProductDescription').value.trim();
+        
+        if (!nom) {
+            window.app.showToast('Le nom du produit est requis', 'error');
+            return;
+        }
+        
+        if (!description) {
+            window.app.showToast('La description est requise', 'error');
+            return;
+        }
+        
         const productData = {
-            nom: document.getElementById('addProductNom').value.trim(),
+            nom,
             categorie: document.getElementById('addProductCategorie').value,
             marque: document.getElementById('addProductMarque').value.trim(),
             prix: parseFloat(document.getElementById('addProductPrix').value),
             stock: parseInt(document.getElementById('addProductStock').value),
-            description: document.getElementById('addProductDescription').value.trim(),
+            description,
             image: document.getElementById('addProductImageUrl').value || '',
             enPromotion: document.getElementById('addProductPromotion').checked,
             enVedette: document.getElementById('addProductVedette').checked,
