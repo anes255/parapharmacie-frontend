@@ -1557,9 +1557,6 @@ class PharmacieGaherApp {
                 products = this.allProducts;
             }
             
-            // Store products for later use
-            this.currentAdminProducts = products;
-            
             adminContent.innerHTML = `
                 <div class="bg-white rounded-2xl shadow-xl border border-emerald-200/50 p-6">
                     <div class="flex items-center justify-between mb-6">
@@ -1645,7 +1642,7 @@ class PharmacieGaherApp {
         }
     }
     
-    // CRITICAL FIX: Add loadAdminOrders method
+    createProductCard(product) {
     async loadAdminOrders() {
         try {
             const adminContent = document.getElementById('adminContent');
@@ -1862,8 +1859,6 @@ class PharmacieGaherApp {
             `;
         }
     }
-    
-    createProductCard(product) {
         const isOutOfStock = product.stock === 0;
         const hasPromotion = product.enPromotion && product.prixOriginal;
         
