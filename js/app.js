@@ -46,6 +46,78 @@ function previewImage(input) {
             placeholder.classList.add('hidden');
             imageUrlInput.value = e.target.result;
         }
+    }
+    
+    createProductCard(product) {
+        const isOutOfStock = product.stock === 0;
+        const hasPromotion = product.enPromotion && product.prixOriginal;
+        
+        let imageUrl;
+        if (product.image && product.image.startsWith('http')) {
+            imageUrl = product.image;
+        } else if (product.image && product.image.startsWith('data:image')) {
+            imageUrl = product.image;
+        } else if (product.image) {
+            imageUrl = `./images/products/${product.image}`;
+        } else {
+            const getCategoryColor = (category) => {
+                const colors = {
+                    'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                    'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
+                    'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                    'Dentaire': '6366f1'
+                };
+                return colors[category] || '10b981';
+            };
+            
+            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+            const categoryColor = getCategoryColor(product.categorie);
+            imageUrl = generatePlaceholder(300, 300, categoryColor, 'ffffff', initials);
+        }
+        
+        return `
+            <div class="product-card bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-2xl overflow-hidden transition-all duration-500 cursor-pointer relative border border-emerald-200/50 hover:border-emerald-400/60 ${isOutOfStock ? 'opacity-75' : ''}"
+                 onclick="app.showPage('product', {id: '${product._id}'})">
+                ${hasPromotion ? `<div class="badge-promotion absolute top-4 left-4 z-20">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
+                ${isOutOfStock ? `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10 rounded-2xl">
+                    <span class="text-white font-bold text-lg">Rupture de stock</span>
+                </div>` : ''}
+                
+                <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden relative">
+                    <img src="${imageUrl}" alt="${product.nom}" 
+                         class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                         onerror="this.src='${generatePlaceholder(300, 300, '10b981', 'ffffff', product.nom.substring(0, 2).toUpperCase())}'">
+                </div>
+                
+                <div class="p-6">
+                    <h3 class="font-bold text-emerald-800 mb-3 text-lg line-clamp-2">${product.nom}</h3>
+                    <p class="text-sm text-emerald-600 mb-4 line-clamp-2">${product.description || 'Description du produit'}</p>
+                    
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            ${hasPromotion ? `
+                                <span class="text-sm text-gray-400 line-through">${product.prixOriginal} DA</span>
+                                <span class="text-xl font-bold text-red-600">${product.prix} DA</span>
+                            ` : `
+                                <span class="text-xl font-bold text-emerald-700">${product.prix} DA</span>
+                            `}
+                        </div>
+                        
+                        ${!isOutOfStock ? `
+                            <button onclick="event.stopPropagation(); addToCartFromCard('${product._id}')" 
+                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-5 py-2 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
+                                <i class="fas fa-cart-plus"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-emerald-600">Stock: ${product.stock}</span>
+                        <span class="text-emerald-700 font-semibold">${product.marque || ''}</span>
+                    </div>
+                </div>
+            </div>
+        `;
     };
     reader.readAsDataURL(file);
 }
@@ -1531,7 +1603,6 @@ class PharmacieGaherApp {
         }
     }
     
-    // CRITICAL FIX: Add loadAdminProducts method
     async loadAdminProducts() {
         try {
             const adminContent = document.getElementById('adminContent');
