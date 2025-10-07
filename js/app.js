@@ -1557,6 +1557,9 @@ class PharmacieGaherApp {
                 products = this.allProducts;
             }
             
+            // Store products for later use
+            this.currentAdminProducts = products;
+            
             adminContent.innerHTML = `
                 <div class="bg-white rounded-2xl shadow-xl border border-emerald-200/50 p-6">
                     <div class="flex items-center justify-between mb-6">
@@ -1646,30 +1649,70 @@ class PharmacieGaherApp {
     async loadAdminOrders() {
         try {
             const adminContent = document.getElementById('adminContent');
-            adminContent.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-4xl text-emerald-600"></i></div>';
+            adminContent.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-4xl text-emerald-600"></i><p class="text-emerald-600 mt-4">Chargement des commandes...</p></div>';
             
             let orders = [];
+            const token = localStorage.getItem('token');
             
-            // Try to load from API
+            if (!token) {
+                throw new Error('Token manquant');
+            }
+            
+            // Try to load from API - try both endpoints
             try {
-                const response = await fetch('https://parapharmacie-gaher.onrender.com/api/admin/orders', {
-                    headers: { 'x-auth-token': localStorage.getItem('token') }
+                console.log('Fetching orders from API...');
+                
+                // First try the main orders endpoint
+                let response = await fetch('https://parapharmacie-gaher.onrender.com/api/orders', {
+                    method: 'GET',
+                    headers: { 
+                        'x-auth-token': token,
+                        'Content-Type': 'application/json'
+                    }
                 });
+                
+                console.log('Orders API response status:', response.status);
+                
+                if (!response.ok) {
+                    // Try alternative admin endpoint
+                    console.log('Trying admin orders endpoint...');
+                    response = await fetch('https://parapharmacie-gaher.onrender.com/api/admin/orders', {
+                        method: 'GET',
+                        headers: { 
+                            'x-auth-token': token,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    console.log('Admin orders API response status:', response.status);
+                }
                 
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('Orders data received:', data);
                     orders = data.orders || [];
+                    console.log(`Loaded ${orders.length} orders from API`);
+                } else {
+                    const errorData = await response.json();
+                    console.error('API error:', errorData);
+                    throw new Error(errorData.message || 'Erreur API');
                 }
-            } catch (error) {
-                console.log('API unavailable');
             }
+            
+            // Always render the orders table (even if empty)
+            console.log('Rendering orders table with', orders.length, 'orders');
             
             adminContent.innerHTML = `
                 <div class="bg-white rounded-2xl shadow-xl border border-emerald-200/50 p-6">
                     <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-2xl font-bold text-emerald-800">Gestion des Commandes</h2>
+                        <div>
+                            <h2 class="text-2xl font-bold text-emerald-800">Gestion des Commandes</h2>
+                            <p class="text-sm text-emerald-600 mt-1">${orders.length} commande(s) trouvée(s)</p>
+                        </div>
                         <div class="flex items-center space-x-4">
-                            <select id="filterOrderStatus" class="form-input" onchange="filterOrders(this.value)">
+                            <button onclick="app.loadAdminOrders()" class="text-emerald-600 hover:text-emerald-800 transition-colors" title="Actualiser">
+                                <i class="fas fa-sync-alt text-xl"></i>
+                            </button>
+                            <select id="filterOrderStatus" class="form-input text-sm" onchange="filterOrders(this.value)">
                                 <option value="">Tous les statuts</option>
                                 <option value="en-attente">En attente</option>
                                 <option value="confirmée">Confirmée</option>
@@ -1687,6 +1730,7 @@ class PharmacieGaherApp {
                                 <tr>
                                     <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">N° Commande</th>
                                     <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">Client</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">Contact</th>
                                     <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">Date</th>
                                     <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">Articles</th>
                                     <th class="px-4 py-3 text-left text-sm font-semibold text-emerald-800">Total</th>
@@ -1697,55 +1741,114 @@ class PharmacieGaherApp {
                             <tbody class="divide-y divide-emerald-100">
                                 ${orders.length === 0 ? `
                                     <tr>
-                                        <td colspan="7" class="px-4 py-8 text-center text-gray-500">
-                                            <i class="fas fa-shopping-bag text-4xl mb-2"></i>
-                                            <p>Aucune commande trouvée</p>
+                                        <td colspan="8" class="px-4 py-12 text-center">
+                                            <i class="fas fa-shopping-bag text-6xl text-gray-300 mb-4"></i>
+                                            <p class="text-gray-500 text-lg font-medium">Aucune commande trouvée</p>
+                                            <p class="text-gray-400 text-sm mt-2">Les commandes apparaîtront ici une fois créées</p>
                                         </td>
                                     </tr>
-                                ` : orders.map(order => `
-                                    <tr class="hover:bg-emerald-50/50 transition-colors">
-                                        <td class="px-4 py-3 font-mono text-sm font-semibold text-gray-900">#${order.numeroCommande}</td>
-                                        <td class="px-4 py-3">
-                                            <div>
-                                                <p class="font-medium text-gray-900">${order.client.prenom} ${order.client.nom}</p>
-                                                <p class="text-xs text-gray-500">${order.client.telephone}</p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-3 text-sm text-gray-700">${new Date(order.dateCommande).toLocaleDateString('fr-FR')}</td>
-                                        <td class="px-4 py-3 text-gray-700">${order.articles?.length || 0} article(s)</td>
-                                        <td class="px-4 py-3 font-bold text-emerald-700">${order.total} DA</td>
-                                        <td class="px-4 py-3">
-                                            <span class="px-2 py-1 rounded-full text-xs font-semibold ${
-                                                order.statut === 'livrée' ? 'bg-green-100 text-green-800' :
-                                                order.statut === 'expédiée' ? 'bg-blue-100 text-blue-800' :
-                                                order.statut === 'annulée' ? 'bg-red-100 text-red-800' :
-                                                'bg-yellow-100 text-yellow-800'
-                                            }">
-                                                ${order.statut}
-                                            </span>
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            <div class="flex items-center space-x-2">
-                                                <button onclick="viewOrderDetails('${order._id}')" class="text-blue-600 hover:text-blue-800" title="Voir détails">
-                                                    <i class="fas fa-eye"></i>
-                                                </button>
-                                                <select onchange="updateOrderStatus('${order._id}', this.value)" 
-                                                        class="text-xs border border-emerald-200 rounded px-2 py-1 focus:outline-none focus:border-emerald-400">
-                                                    <option value="">Changer statut</option>
-                                                    <option value="en-attente">En attente</option>
-                                                    <option value="confirmée">Confirmée</option>
-                                                    <option value="préparée">Préparée</option>
-                                                    <option value="expédiée">Expédiée</option>
-                                                    <option value="livrée">Livrée</option>
-                                                    <option value="annulée">Annulée</option>
-                                                </select>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                `).join('')}
+                                ` : orders.map(order => {
+                                    const orderDate = new Date(order.dateCommande);
+                                    const formattedDate = orderDate.toLocaleDateString('fr-FR', { 
+                                        day: '2-digit', 
+                                        month: '2-digit', 
+                                        year: 'numeric' 
+                                    });
+                                    const formattedTime = orderDate.toLocaleTimeString('fr-FR', { 
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                    });
+                                    
+                                    return `
+                                        <tr class="hover:bg-emerald-50/50 transition-colors">
+                                            <td class="px-4 py-3">
+                                                <span class="font-mono text-sm font-bold text-emerald-700">#${order.numeroCommande || 'N/A'}</span>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <div>
+                                                    <p class="font-medium text-gray-900">${order.client?.prenom || ''} ${order.client?.nom || ''}</p>
+                                                    <p class="text-xs text-gray-500">${order.client?.wilaya || ''}</p>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <div>
+                                                    <p class="text-xs text-gray-600"><i class="fas fa-phone mr-1"></i>${order.client?.telephone || 'N/A'}</p>
+                                                    <p class="text-xs text-gray-600"><i class="fas fa-envelope mr-1"></i>${order.client?.email || 'N/A'}</p>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <div>
+                                                    <p class="text-sm text-gray-700">${formattedDate}</p>
+                                                    <p class="text-xs text-gray-500">${formattedTime}</p>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
+                                                    ${order.articles?.length || 0} article(s)
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <span class="font-bold text-emerald-700 text-lg">${order.total || 0} DA</span>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <span class="px-3 py-1 rounded-full text-xs font-bold ${
+                                                    order.statut === 'livrée' ? 'bg-green-100 text-green-800' :
+                                                    order.statut === 'expédiée' ? 'bg-blue-100 text-blue-800' :
+                                                    order.statut === 'préparée' ? 'bg-purple-100 text-purple-800' :
+                                                    order.statut === 'confirmée' ? 'bg-cyan-100 text-cyan-800' :
+                                                    order.statut === 'annulée' ? 'bg-red-100 text-red-800' :
+                                                    'bg-yellow-100 text-yellow-800'
+                                                }">
+                                                    ${order.statut || 'en-attente'}
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <div class="flex items-center space-x-2">
+                                                    <button onclick="viewOrderDetails('${order._id}')" 
+                                                            class="text-blue-600 hover:text-blue-800 transition-colors p-2 hover:bg-blue-50 rounded" 
+                                                            title="Voir détails">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    <button onclick="deleteOrder('${order._id}')" 
+                                                            class="text-red-600 hover:text-red-800 transition-colors p-2 hover:bg-red-50 rounded" 
+                                                            title="Supprimer">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                    <select onchange="updateOrderStatus('${order._id}', this.value); this.value='';" 
+                                                            class="text-xs border-2 border-emerald-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-emerald-400 hover:border-emerald-300 transition-colors bg-white">
+                                                        <option value="">Changer statut</option>
+                                                        <option value="en-attente">En attente</option>
+                                                        <option value="confirmée">Confirmée</option>
+                                                        <option value="préparée">Préparée</option>
+                                                        <option value="expédiée">Expédiée</option>
+                                                        <option value="livrée">Livrée</option>
+                                                        <option value="annulée">Annulée</option>
+                                                    </select>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
                             </tbody>
                         </table>
                     </div>
+                    
+                    ${orders.length > 0 ? `
+                        <div class="mt-6 flex items-center justify-between border-t border-emerald-200 pt-4">
+                            <p class="text-sm text-gray-600">
+                                Affichage de <span class="font-semibold">${orders.length}</span> commande(s)
+                            </p>
+                            <div class="flex items-center space-x-2">
+                                <button class="px-3 py-1 border border-emerald-200 rounded hover:bg-emerald-50 text-sm text-emerald-700 disabled:opacity-50" disabled>
+                                    Précédent
+                                </button>
+                                <span class="px-3 py-1 bg-emerald-100 text-emerald-800 rounded text-sm font-semibold">1</span>
+                                <button class="px-3 py-1 border border-emerald-200 rounded hover:bg-emerald-50 text-sm text-emerald-700 disabled:opacity-50" disabled>
+                                    Suivant
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
             `;
             
@@ -2323,24 +2426,52 @@ async function updateOrderStatus(orderId, newStatus) {
     if (!newStatus || !window.app) return;
     
     try {
-        const response = await fetch(`https://parapharmacie-gaher.onrender.com/api/admin/orders/${orderId}`, {
+        console.log(`Updating order ${orderId} to status: ${newStatus}`);
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.app.showToast('Session expirée, veuillez vous reconnecter', 'error');
+            return;
+        }
+        
+        // Try main orders endpoint first
+        let response = await fetch(`https://parapharmacie-gaher.onrender.com/api/orders/${orderId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'x-auth-token': localStorage.getItem('token')
+                'x-auth-token': token
             },
             body: JSON.stringify({ statut: newStatus })
         });
         
+        // If that fails, try admin endpoint
+        if (!response.ok) {
+            response = await fetch(`https://parapharmacie-gaher.onrender.com/api/admin/orders/${orderId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-auth-token': token
+                },
+                body: JSON.stringify({ statut: newStatus })
+            });
+        }
+        
+        console.log('Update status response:', response.status);
+        
         if (response.ok) {
+            const data = await response.json();
+            console.log('Update successful:', data);
             window.app.showToast('Statut mis à jour avec succès', 'success');
+            // Reload orders to show updated status
             window.app.loadAdminOrders();
         } else {
-            throw new Error('Erreur lors de la mise à jour');
+            const errorData = await response.json();
+            console.error('Update error:', errorData);
+            throw new Error(errorData.message || 'Erreur lors de la mise à jour');
         }
     } catch (error) {
-        window.app.showToast('Erreur lors de la mise à jour du statut', 'error');
         console.error('Error updating order status:', error);
+        window.app.showToast(error.message || 'Erreur lors de la mise à jour du statut', 'error');
     }
 }
 
@@ -2351,17 +2482,293 @@ function viewOrderDetails(orderId) {
     }
 }
 
-function editProduct(productId) {
-    console.log('Edit product:', productId);
-    if (window.app) {
-        window.app.showToast('Fonctionnalité en cours de développement', 'info');
+async function deleteOrder(orderId) {
+    if (!window.app || !orderId) return;
+    
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ? Cette action est irréversible.')) {
+        return;
+    }
+    
+    try {
+        console.log('Deleting order:', orderId);
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.app.showToast('Session expirée', 'error');
+            return;
+        }
+        
+        // Try main orders endpoint first
+        let response = await fetch(`https://parapharmacie-gaher.onrender.com/api/orders/${orderId}`, {
+            method: 'DELETE',
+            headers: {
+                'x-auth-token': token,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        // If that fails, try admin endpoint
+        if (!response.ok) {
+            response = await fetch(`https://parapharmacie-gaher.onrender.com/api/admin/orders/${orderId}`, {
+                method: 'DELETE',
+                headers: {
+                    'x-auth-token': token,
+                    'Content-Type': 'application/json'
+                }
+            });
+        }
+        
+        console.log('Delete order response:', response.status);
+        
+        if (response.ok) {
+            window.app.showToast('Commande supprimée avec succès', 'success');
+            window.app.loadAdminOrders();
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erreur lors de la suppression');
+        }
+    } catch (error) {
+        console.error('Error deleting order:', error);
+        window.app.showToast(error.message || 'Erreur lors de la suppression de la commande', 'error');
     }
 }
 
-function deleteProduct(productId) {
-    console.log('Delete product:', productId);
-    if (window.app) {
-        window.app.showToast('Fonctionnalité en cours de développement', 'info');
+async function editProduct(productId) {
+    if (!window.app || !productId) return;
+    
+    try {
+        // Find product in current admin products
+        const product = window.app.currentAdminProducts?.find(p => p._id === productId) || 
+                       window.app.allProducts.find(p => p._id === productId);
+        
+        if (!product) {
+            window.app.showToast('Produit non trouvé', 'error');
+            return;
+        }
+        
+        // Create modal HTML
+        const modalHTML = `
+            <div id="editProductModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="closeEditProductModal(event)">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                    <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-6 text-white">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-2xl font-bold">Modifier le produit</h2>
+                            <button onclick="closeEditProductModal()" class="text-white hover:text-emerald-100">
+                                <i class="fas fa-times text-2xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <form id="editProductForm" class="p-6 space-y-4" onsubmit="saveProductEdit(event, '${productId}')">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
+                                <input type="text" id="editProductNom" value="${product.nom || ''}" required
+                                       class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Catégorie *</label>
+                                <select id="editProductCategorie" required
+                                        class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                                    <option value="">Sélectionner...</option>
+                                    ${['Vitalité', 'Sport', 'Visage', 'Cheveux', 'Solaire', 'Intime', 'Soins', 'Bébé', 'Homme', 'Dentaire'].map(cat => 
+                                        `<option value="${cat}" ${product.categorie === cat ? 'selected' : ''}>${cat}</option>`
+                                    ).join('')}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Marque</label>
+                                <input type="text" id="editProductMarque" value="${product.marque || ''}"
+                                       class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prix (DA) *</label>
+                                <input type="number" id="editProductPrix" value="${product.prix || 0}" required min="0"
+                                       class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Stock *</label>
+                                <input type="number" id="editProductStock" value="${product.stock || 0}" required min="0"
+                                       class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                            </div>
+                            
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                                <textarea id="editProductDescription" rows="3"
+                                          class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">${product.description || ''}</textarea>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">En promotion</label>
+                                <div class="flex items-center space-x-4">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="editProductPromotion" ${product.enPromotion ? 'checked' : ''}
+                                               class="w-4 h-4 text-emerald-600 rounded">
+                                        <span class="ml-2 text-sm text-gray-700">Oui</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">En vedette</label>
+                                <div class="flex items-center space-x-4">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="editProductVedette" ${product.enVedette ? 'checked' : ''}
+                                               class="w-4 h-4 text-emerald-600 rounded">
+                                        <span class="ml-2 text-sm text-gray-700">Oui</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Actif</label>
+                                <div class="flex items-center space-x-4">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="editProductActif" ${product.actif !== false ? 'checked' : ''}
+                                               class="w-4 h-4 text-emerald-600 rounded">
+                                        <span class="ml-2 text-sm text-gray-700">Oui</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-end space-x-4 pt-4 border-t">
+                            <button type="button" onclick="closeEditProductModal()" 
+                                    class="px-6 py-2 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                                Annuler
+                            </button>
+                            <button type="submit" 
+                                    class="px-6 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:from-emerald-600 hover:to-green-700 transition-colors">
+                                <i class="fas fa-save mr-2"></i>Enregistrer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('Error opening edit modal:', error);
+        window.app.showToast('Erreur lors de l\'ouverture du formulaire', 'error');
+    }
+}
+
+function closeEditProductModal(event) {
+    if (event && event.target.id !== 'editProductModal') return;
+    
+    const modal = document.getElementById('editProductModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+async function saveProductEdit(event, productId) {
+    event.preventDefault();
+    
+    if (!window.app || !productId) return;
+    
+    try {
+        const productData = {
+            nom: document.getElementById('editProductNom').value.trim(),
+            categorie: document.getElementById('editProductCategorie').value,
+            marque: document.getElementById('editProductMarque').value.trim(),
+            prix: parseFloat(document.getElementById('editProductPrix').value),
+            stock: parseInt(document.getElementById('editProductStock').value),
+            description: document.getElementById('editProductDescription').value.trim(),
+            enPromotion: document.getElementById('editProductPromotion').checked,
+            enVedette: document.getElementById('editProductVedette').checked,
+            actif: document.getElementById('editProductActif').checked
+        };
+        
+        console.log('Updating product:', productId, productData);
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.app.showToast('Session expirée', 'error');
+            return;
+        }
+        
+        const response = await fetch(`https://parapharmacie-gaher.onrender.com/api/admin/products/${productId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            },
+            body: JSON.stringify(productData)
+        });
+        
+        console.log('Update product response:', response.status);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Product updated successfully:', data);
+            window.app.showToast('Produit mis à jour avec succès', 'success');
+            closeEditProductModal();
+            
+            // Reload products
+            await window.app.loadProductsCache();
+            window.app.loadAdminProducts();
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erreur lors de la mise à jour');
+        }
+    } catch (error) {
+        console.error('Error updating product:', error);
+        window.app.showToast(error.message || 'Erreur lors de la mise à jour du produit', 'error');
+    }
+}
+
+async function deleteProduct(productId) {
+    if (!window.app || !productId) return;
+    
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.')) {
+        return;
+    }
+    
+    try {
+        console.log('Deleting product:', productId);
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.app.showToast('Session expirée', 'error');
+            return;
+        }
+        
+        const response = await fetch(`https://parapharmacie-gaher.onrender.com/api/admin/products/${productId}`, {
+            method: 'DELETE',
+            headers: {
+                'x-auth-token': token,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('Delete product response:', response.status);
+        
+        if (response.ok) {
+            window.app.showToast('Produit supprimé avec succès', 'success');
+            
+            // Remove from local storage
+            const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            const updatedProducts = localProducts.filter(p => p._id !== productId);
+            localStorage.setItem('demoProducts', JSON.stringify(updatedProducts));
+            
+            // Reload products
+            await window.app.loadProductsCache();
+            window.app.loadAdminProducts();
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erreur lors de la suppression');
+        }
+    } catch (error) {
+        console.error('Error deleting product:', error);
+        window.app.showToast(error.message || 'Erreur lors de la suppression du produit', 'error');
     }
 }
 
