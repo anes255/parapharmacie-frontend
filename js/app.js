@@ -2464,11 +2464,211 @@ async function updateOrderStatus(orderId, newStatus) {
     }
 }
 
-function viewOrderDetails(orderId) {
-    console.log('View order details:', orderId);
-    if (window.app) {
-        window.app.showToast('Fonctionnalité en cours de développement', 'info');
+async function viewOrderDetails(orderId) {
+    if (!window.app || !orderId) return;
+    
+    try {
+        console.log('Fetching order details for:', orderId);
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.app.showToast('Session expirée', 'error');
+            return;
+        }
+        
+        // Try to fetch order from API
+        let response = await fetch(`https://parapharmacie-gaher.onrender.com/api/orders/${orderId}`, {
+            headers: { 'x-auth-token': token }
+        });
+        
+        if (!response.ok) {
+            // Try admin endpoint
+            response = await fetch(`https://parapharmacie-gaher.onrender.com/api/admin/orders/${orderId}`, {
+                headers: { 'x-auth-token': token }
+            });
+        }
+        
+        if (!response.ok) {
+            throw new Error('Commande non trouvée');
+        }
+        
+        const order = await response.json();
+        console.log('Order details:', order);
+        
+        const orderDate = new Date(order.dateCommande);
+        const formattedDate = orderDate.toLocaleDateString('fr-FR', { 
+            weekday: 'long',
+            day: 'numeric', 
+            month: 'long', 
+            year: 'numeric' 
+        });
+        const formattedTime = orderDate.toLocaleTimeString('fr-FR', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        
+        const statusColors = {
+            'en-attente': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+            'confirmée': 'bg-cyan-100 text-cyan-800 border-cyan-300',
+            'préparée': 'bg-purple-100 text-purple-800 border-purple-300',
+            'expédiée': 'bg-blue-100 text-blue-800 border-blue-300',
+            'livrée': 'bg-green-100 text-green-800 border-green-300',
+            'annulée': 'bg-red-100 text-red-800 border-red-300'
+        };
+        
+        const statusColor = statusColors[order.statut] || statusColors['en-attente'];
+        
+        const modalHTML = `
+            <div id="orderDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="closeOrderDetailsModal(event)">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                    <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-6 text-white">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold">Détails de la commande</h2>
+                                <p class="text-emerald-100 text-sm mt-1">Commande #${order.numeroCommande}</p>
+                            </div>
+                            <button onclick="closeOrderDetailsModal()" class="text-white hover:text-emerald-100">
+                                <i class="fas fa-times text-2xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 space-y-6">
+                        <!-- Status and Date -->
+                        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                            <div>
+                                <p class="text-sm text-gray-600">Date de commande</p>
+                                <p class="font-semibold text-gray-900">${formattedDate} à ${formattedTime}</p>
+                            </div>
+                            <span class="px-4 py-2 rounded-full text-sm font-bold border-2 ${statusColor}">
+                                ${order.statut}
+                            </span>
+                        </div>
+                        
+                        <!-- Customer Information -->
+                        <div class="border-2 border-emerald-100 rounded-lg p-6">
+                            <h3 class="text-lg font-bold text-emerald-800 mb-4 flex items-center">
+                                <i class="fas fa-user mr-2"></i>
+                                Informations client
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-sm text-gray-600">Nom complet</p>
+                                    <p class="font-semibold text-gray-900">${order.client.prenom} ${order.client.nom}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600">Email</p>
+                                    <p class="font-semibold text-gray-900">${order.client.email}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600">Téléphone</p>
+                                    <p class="font-semibold text-gray-900">${order.client.telephone}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600">Wilaya</p>
+                                    <p class="font-semibold text-gray-900">${order.client.wilaya}</p>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <p class="text-sm text-gray-600">Adresse de livraison</p>
+                                    <p class="font-semibold text-gray-900">${order.client.adresse}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Order Items -->
+                        <div class="border-2 border-emerald-100 rounded-lg p-6">
+                            <h3 class="text-lg font-bold text-emerald-800 mb-4 flex items-center">
+                                <i class="fas fa-shopping-bag mr-2"></i>
+                                Articles commandés (${order.articles?.length || 0})
+                            </h3>
+                            <div class="space-y-3">
+                                ${order.articles?.map(article => {
+                                    const articleImage = article.image || generatePlaceholder(80, 80, '10b981', 'ffffff', article.nom.substring(0, 2).toUpperCase());
+                                    return `
+                                        <div class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                                            <img src="${articleImage}" alt="${article.nom}" 
+                                                 class="w-20 h-20 object-cover rounded-lg border-2 border-emerald-200">
+                                            <div class="flex-1">
+                                                <h4 class="font-semibold text-gray-900">${article.nom}</h4>
+                                                <p class="text-sm text-gray-600">Quantité: ${article.quantite} × ${article.prix} DA</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="font-bold text-emerald-700 text-lg">${article.quantite * article.prix} DA</p>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('') || '<p class="text-gray-500">Aucun article</p>'}
+                            </div>
+                        </div>
+                        
+                        <!-- Order Summary -->
+                        <div class="border-2 border-emerald-100 rounded-lg p-6 bg-emerald-50">
+                            <h3 class="text-lg font-bold text-emerald-800 mb-4 flex items-center">
+                                <i class="fas fa-calculator mr-2"></i>
+                                Résumé financier
+                            </h3>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-700">Sous-total:</span>
+                                    <span class="font-semibold text-gray-900">${order.sousTotal || 0} DA</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-700">Frais de livraison:</span>
+                                    <span class="font-semibold text-gray-900">${order.fraisLivraison || 0} DA</span>
+                                </div>
+                                <div class="flex justify-between items-center pt-3 border-t-2 border-emerald-200">
+                                    <span class="text-lg font-bold text-emerald-800">Total:</span>
+                                    <span class="text-2xl font-bold text-emerald-700">${order.total || 0} DA</span>
+                                </div>
+                                <div class="flex justify-between items-center mt-4">
+                                    <span class="text-gray-700">Mode de paiement:</span>
+                                    <span class="font-semibold text-gray-900">${order.modePaiement || 'Paiement à la livraison'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${order.commentaires ? `
+                            <div class="border-2 border-gray-200 rounded-lg p-4 bg-gray-50">
+                                <h4 class="font-semibold text-gray-700 mb-2">Commentaires:</h4>
+                                <p class="text-gray-600">${order.commentaires}</p>
+                            </div>
+                        ` : ''}
+                        
+                        <!-- Action Buttons -->
+                        <div class="flex items-center justify-end space-x-4 pt-4 border-t">
+                            <button onclick="closeOrderDetailsModal()" 
+                                    class="px-6 py-2 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                                Fermer
+                            </button>
+                            <button onclick="printOrder('${orderId}')" 
+                                    class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                <i class="fas fa-print mr-2"></i>Imprimer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('Error fetching order details:', error);
+        window.app.showToast(error.message || 'Erreur lors du chargement des détails', 'error');
     }
+}
+
+function closeOrderDetailsModal(event) {
+    if (event && event.target.id !== 'orderDetailsModal') return;
+    
+    const modal = document.getElementById('orderDetailsModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function printOrder(orderId) {
+    window.print();
 }
 
 async function deleteOrder(orderId) {
@@ -2534,6 +2734,17 @@ async function editProduct(productId) {
             return;
         }
         
+        // Get current image URL
+        let currentImageUrl = '';
+        if (product.image && product.image.startsWith('data:image')) {
+            currentImageUrl = product.image;
+        } else if (product.image && product.image.startsWith('http')) {
+            currentImageUrl = product.image;
+        } else {
+            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+            currentImageUrl = generatePlaceholder(128, 128, '10b981', 'ffffff', initials);
+        }
+        
         // Create modal HTML
         const modalHTML = `
             <div id="editProductModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="closeEditProductModal(event)">
@@ -2549,6 +2760,27 @@ async function editProduct(productId) {
                     
                     <form id="editProductForm" class="p-6 space-y-4" onsubmit="saveProductEdit(event, '${productId}')">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Image du produit</label>
+                                <div class="flex items-center space-x-4">
+                                    <div class="relative w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
+                                        <img id="editProductImagePreview" src="${currentImageUrl}" alt="Preview" class="w-full h-full object-cover">
+                                        <div id="editProductImagePlaceholder" class="w-full h-full flex items-center justify-center bg-gray-50 hidden">
+                                            <i class="fas fa-image text-4xl text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <input type="file" id="editProductImageFile" accept="image/*" class="hidden" onchange="previewEditProductImage(this)">
+                                        <button type="button" onclick="document.getElementById('editProductImageFile').click()" 
+                                                class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                                            <i class="fas fa-upload mr-2"></i>Changer l'image
+                                        </button>
+                                        <p class="text-xs text-gray-500 mt-2">JPG, PNG (Max 2MB)</p>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="editProductImageUrl" value="${product.image || ''}">
+                            </div>
+                            
                             <div class="md:col-span-2">
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
                                 <input type="text" id="editProductNom" value="${product.nom || ''}" required
@@ -2648,6 +2880,29 @@ async function editProduct(productId) {
     }
 }
 
+function previewEditProductImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+        window.app.showToast('Image trop volumineuse. Maximum 2MB', 'error');
+        input.value = '';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const preview = document.getElementById('editProductImagePreview');
+        const imageUrlInput = document.getElementById('editProductImageUrl');
+        
+        if (preview && imageUrlInput) {
+            preview.src = e.target.result;
+            imageUrlInput.value = e.target.result;
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
 function closeEditProductModal(event) {
     if (event && event.target.id !== 'editProductModal') return;
     
@@ -2670,6 +2925,7 @@ async function saveProductEdit(event, productId) {
             prix: parseFloat(document.getElementById('editProductPrix').value),
             stock: parseInt(document.getElementById('editProductStock').value),
             description: document.getElementById('editProductDescription').value.trim(),
+            image: document.getElementById('editProductImageUrl').value || '',
             enPromotion: document.getElementById('editProductPromotion').checked,
             enVedette: document.getElementById('editProductVedette').checked,
             actif: document.getElementById('editProductActif').checked
@@ -2697,6 +2953,15 @@ async function saveProductEdit(event, productId) {
         if (response.ok) {
             const data = await response.json();
             console.log('Product updated successfully:', data);
+            
+            // Update in local storage
+            const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            const productIndex = localProducts.findIndex(p => p._id === productId);
+            if (productIndex > -1) {
+                localProducts[productIndex] = { ...localProducts[productIndex], ...productData };
+                localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+            }
+            
             window.app.showToast('Produit mis à jour avec succès', 'success');
             closeEditProductModal();
             
@@ -2761,8 +3026,228 @@ async function deleteProduct(productId) {
 }
 
 function showAddProductModal() {
-    if (window.app) {
-        window.app.showToast('Fonctionnalité en cours de développement', 'info');
+    if (!window.app) return;
+    
+    const modalHTML = `
+        <div id="addProductModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="closeAddProductModal(event)">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-6 text-white">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-2xl font-bold">Ajouter un nouveau produit</h2>
+                        <button onclick="closeAddProductModal()" class="text-white hover:text-emerald-100">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <form id="addProductForm" class="p-6 space-y-4" onsubmit="saveNewProduct(event)">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Image du produit</label>
+                            <div class="flex items-center space-x-4">
+                                <div class="relative w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
+                                    <img id="addProductImagePreview" src="" alt="Preview" class="w-full h-full object-cover hidden">
+                                    <div id="addProductImagePlaceholder" class="w-full h-full flex items-center justify-center bg-gray-50">
+                                        <i class="fas fa-image text-4xl text-gray-300"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <input type="file" id="addProductImageFile" accept="image/*" class="hidden" onchange="previewAddProductImage(this)">
+                                    <button type="button" onclick="document.getElementById('addProductImageFile').click()" 
+                                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                                        <i class="fas fa-upload mr-2"></i>Choisir une image
+                                    </button>
+                                    <p class="text-xs text-gray-500 mt-2">JPG, PNG (Max 2MB)</p>
+                                </div>
+                            </div>
+                            <input type="hidden" id="addProductImageUrl" value="">
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
+                            <input type="text" id="addProductNom" required
+                                   class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
+                                   placeholder="Ex: Vitamine C 1000mg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Catégorie *</label>
+                            <select id="addProductCategorie" required
+                                    class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                                <option value="">Sélectionner...</option>
+                                <option value="Vitalité">Vitalité</option>
+                                <option value="Sport">Sport</option>
+                                <option value="Visage">Visage</option>
+                                <option value="Cheveux">Cheveux</option>
+                                <option value="Solaire">Solaire</option>
+                                <option value="Intime">Intime</option>
+                                <option value="Soins">Soins</option>
+                                <option value="Bébé">Bébé</option>
+                                <option value="Homme">Homme</option>
+                                <option value="Dentaire">Dentaire</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Marque</label>
+                            <input type="text" id="addProductMarque"
+                                   class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
+                                   placeholder="Ex: Nature's Bounty">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Prix (DA) *</label>
+                            <input type="number" id="addProductPrix" required min="0" step="0.01"
+                                   class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
+                                   placeholder="0.00">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Stock *</label>
+                            <input type="number" id="addProductStock" required min="0"
+                                   class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
+                                   placeholder="0">
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                            <textarea id="addProductDescription" rows="3"
+                                      class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
+                                      placeholder="Description détaillée du produit..."></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Options</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="addProductPromotion" class="w-4 h-4 text-emerald-600 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">En promotion</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="addProductVedette" class="w-4 h-4 text-emerald-600 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">En vedette</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="addProductActif" checked class="w-4 h-4 text-emerald-600 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">Actif</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-end space-x-4 pt-4 border-t">
+                        <button type="button" onclick="closeAddProductModal()" 
+                                class="px-6 py-2 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                            Annuler
+                        </button>
+                        <button type="submit" 
+                                class="px-6 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:from-emerald-600 hover:to-green-700 transition-colors">
+                            <i class="fas fa-plus mr-2"></i>Ajouter le produit
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+function closeAddProductModal(event) {
+    if (event && event.target.id !== 'addProductModal') return;
+    
+    const modal = document.getElementById('addProductModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function previewAddProductImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+        window.app.showToast('Image trop volumineuse. Maximum 2MB', 'error');
+        input.value = '';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const preview = document.getElementById('addProductImagePreview');
+        const placeholder = document.getElementById('addProductImagePlaceholder');
+        const imageUrlInput = document.getElementById('addProductImageUrl');
+        
+        if (preview && placeholder && imageUrlInput) {
+            preview.src = e.target.result;
+            preview.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            imageUrlInput.value = e.target.result;
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+async function saveNewProduct(event) {
+    event.preventDefault();
+    
+    if (!window.app) return;
+    
+    try {
+        const productData = {
+            nom: document.getElementById('addProductNom').value.trim(),
+            categorie: document.getElementById('addProductCategorie').value,
+            marque: document.getElementById('addProductMarque').value.trim(),
+            prix: parseFloat(document.getElementById('addProductPrix').value),
+            stock: parseInt(document.getElementById('addProductStock').value),
+            description: document.getElementById('addProductDescription').value.trim(),
+            image: document.getElementById('addProductImageUrl').value || '',
+            enPromotion: document.getElementById('addProductPromotion').checked,
+            enVedette: document.getElementById('addProductVedette').checked,
+            actif: document.getElementById('addProductActif').checked
+        };
+        
+        console.log('Creating new product:', productData);
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.app.showToast('Session expirée', 'error');
+            return;
+        }
+        
+        const response = await fetch('https://parapharmacie-gaher.onrender.com/api/admin/products', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            },
+            body: JSON.stringify(productData)
+        });
+        
+        console.log('Create product response:', response.status);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Product created successfully:', data);
+            
+            // Add to local storage
+            const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            localProducts.push(data.product);
+            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+            
+            window.app.showToast('Produit ajouté avec succès', 'success');
+            closeAddProductModal();
+            
+            // Reload products
+            await window.app.loadProductsCache();
+            window.app.loadAdminProducts();
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erreur lors de la création');
+        }
+    } catch (error) {
+        console.error('Error creating product:', error);
+        window.app.showToast(error.message || 'Erreur lors de l\'ajout du produit', 'error');
     }
 }
 
