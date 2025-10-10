@@ -1,5 +1,5 @@
 // Fixed Checkout System for Shifa Parapharmacie
-// This version ensures proper orderNumber handling for MongoDB
+// Email field removed from checkout
 
 class CheckoutSystem {
     constructor() {
@@ -68,7 +68,7 @@ class CheckoutSystem {
         }
     }
 
-    // Validate individual form field
+    // Validate individual form field (EMAIL REMOVED)
     validateField(field) {
         const value = field.value.trim();
         let isValid = true;
@@ -83,16 +83,6 @@ class CheckoutSystem {
                 } else if (value.length < 2) {
                     isValid = false;
                     errorMessage = 'Minimum 2 caractères';
-                }
-                break;
-
-            case 'checkoutEmail':
-                if (!value) {
-                    isValid = false;
-                    errorMessage = 'Email requis';
-                } else if (!this.validateEmail(value)) {
-                    isValid = false;
-                    errorMessage = 'Format d\'email invalide';
                 }
                 break;
 
@@ -292,12 +282,11 @@ class CheckoutSystem {
         }
     }
 
-    // Validate entire form
+    // Validate entire form (EMAIL REMOVED)
     validateForm() {
         const requiredFields = [
             'checkoutPrenom',
             'checkoutNom', 
-            'checkoutEmail',
             'checkoutTelephone',
             'checkoutAdresse',
             'checkoutWilaya'
@@ -315,7 +304,7 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // MAIN FUNCTION - Process the order with FIXED orderNumber handling
+    // MAIN FUNCTION - Process the order
     async processOrder() {
         try {
             if (this.isProcessing) {
@@ -343,7 +332,7 @@ class CheckoutSystem {
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
             }
 
-            // Gather form data with FIXED orderNumber
+            // Gather form data
             const orderData = this.gatherOrderData();
             
             console.log('📦 Order data prepared:', orderData);
@@ -403,11 +392,10 @@ class CheckoutSystem {
         }
     }
 
-    // FIXED: Gather order data with proper orderNumber
+    // Gather order data (EMAIL REMOVED)
     gatherOrderData() {
         const prenom = document.getElementById('checkoutPrenom')?.value.trim();
         const nom = document.getElementById('checkoutNom')?.value.trim();
-        const email = document.getElementById('checkoutEmail')?.value.trim();
         const telephone = document.getElementById('checkoutTelephone')?.value.trim();
         const adresse = document.getElementById('checkoutAdresse')?.value.trim();
         const wilaya = document.getElementById('checkoutWilaya')?.value;
@@ -421,16 +409,14 @@ class CheckoutSystem {
         // Generate unique order number
         const orderNumber = this.generateOrderNumber();
 
-        // CRITICAL FIX: Include BOTH numeroCommande AND orderNumber with same value
-        // This ensures compatibility with backend index on orderNumber field
+        // Build order data without email
         const orderData = {
             numeroCommande: orderNumber,
-            orderNumber: orderNumber,  // REQUIRED for MongoDB unique index
+            orderNumber: orderNumber,
             client: {
                 userId: window.app?.currentUser?.id || null,
                 prenom,
                 nom,
-                email: email.toLowerCase(),
                 telephone: telephone.replace(/\s+/g, ''),
                 adresse,
                 wilaya
@@ -536,11 +522,7 @@ class CheckoutSystem {
         return `${prefix}${timestamp}${random}`;
     }
 
-    // Email validation
-    validateEmail(email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-    }
+    // Email validation removed - no longer needed
 
     // Phone validation (Algerian format)
     validatePhone(phone) {
@@ -558,7 +540,7 @@ function initCheckout() {
     checkoutSystem = new CheckoutSystem();
     checkoutSystem.init();
     window.checkoutSystem = checkoutSystem;
-    console.log('✅ Checkout system initialized with fixed orderNumber handling');
+    console.log('✅ Checkout system initialized (Email removed)');
 }
 
 // Global functions for checkout
@@ -587,4 +569,4 @@ window.checkoutSystem = checkoutSystem;
 window.validateCheckoutField = validateCheckoutField;
 window.processCheckoutOrder = processCheckoutOrder;
 
-console.log('✅ Fixed checkout.js loaded - orderNumber issue resolved!');
+console.log('✅ Fixed checkout.js loaded - Email field removed!');
