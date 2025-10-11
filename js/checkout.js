@@ -1,5 +1,5 @@
 // Fixed Checkout System for Shifa Parapharmacie
-// EMAIL FIELD COMPLETELY REMOVED - Customers only provide: Name, Phone, Address, Wilaya
+// This version ensures proper orderNumber handling for MongoDB
 
 class CheckoutSystem {
     constructor() {
@@ -68,7 +68,7 @@ class CheckoutSystem {
         }
     }
 
-    // Validate individual form field (NO EMAIL VALIDATION)
+    // Validate individual form field
     validateField(field) {
         const value = field.value.trim();
         let isValid = true;
@@ -282,14 +282,13 @@ class CheckoutSystem {
         }
     }
 
-    // Validate entire form (NO EMAIL REQUIRED)
+    // Validate entire form
     validateForm() {
         const requiredFields = [
             'checkoutPrenom',
             'checkoutNom', 
             'checkoutTelephone',
-            'checkoutAdresse',
-            'checkoutWilaya'
+            'checkoutAdresse'
         ];
 
         let isValid = true;
@@ -304,7 +303,7 @@ class CheckoutSystem {
         return isValid;
     }
 
-    // MAIN FUNCTION - Process the order
+    // MAIN FUNCTION - Process the order with FIXED orderNumber handling
     async processOrder() {
         try {
             if (this.isProcessing) {
@@ -332,7 +331,7 @@ class CheckoutSystem {
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
             }
 
-            // Gather form data (WITHOUT EMAIL)
+            // Gather form data with FIXED orderNumber
             const orderData = this.gatherOrderData();
             
             console.log('📦 Order data prepared:', orderData);
@@ -392,7 +391,7 @@ class CheckoutSystem {
         }
     }
 
-    // Gather order data (NO EMAIL - ONLY NAME, PHONE, ADDRESS, WILAYA)
+    // FIXED: Gather order data with proper orderNumber
     gatherOrderData() {
         const prenom = document.getElementById('checkoutPrenom')?.value.trim();
         const nom = document.getElementById('checkoutNom')?.value.trim();
@@ -409,15 +408,15 @@ class CheckoutSystem {
         // Generate unique order number
         const orderNumber = this.generateOrderNumber();
 
-        // Build order data WITHOUT EMAIL
+        // CRITICAL FIX: Include BOTH numeroCommande AND orderNumber with same value
+        // This ensures compatibility with backend index on orderNumber field
         const orderData = {
             numeroCommande: orderNumber,
-            orderNumber: orderNumber,  // For MongoDB unique index
+            orderNumber: orderNumber,  // REQUIRED for MongoDB unique index
             client: {
                 userId: window.app?.currentUser?.id || null,
                 prenom,
                 nom,
-                // NO EMAIL FIELD
                 telephone: telephone.replace(/\s+/g, ''),
                 adresse,
                 wilaya
@@ -523,6 +522,12 @@ class CheckoutSystem {
         return `${prefix}${timestamp}${random}`;
     }
 
+    // Email validation
+    validateEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+
     // Phone validation (Algerian format)
     validatePhone(phone) {
         const cleanPhone = phone.replace(/\s+/g, '');
@@ -539,7 +544,7 @@ function initCheckout() {
     checkoutSystem = new CheckoutSystem();
     checkoutSystem.init();
     window.checkoutSystem = checkoutSystem;
-    console.log('✅ Checkout system initialized - NO EMAIL REQUIRED');
+    console.log('✅ Checkout system initialized with fixed orderNumber handling');
 }
 
 // Global functions for checkout
@@ -568,4 +573,4 @@ window.checkoutSystem = checkoutSystem;
 window.validateCheckoutField = validateCheckoutField;
 window.processCheckoutOrder = processCheckoutOrder;
 
-console.log('✅ Checkout.js loaded - Email field completely removed!');
+console.log('✅ Fixed checkout.js loaded - orderNumber issue resolved!');
