@@ -1,5 +1,5 @@
 // Fixed Checkout System for Shifa Parapharmacie
-// Email field removed from checkout
+// EMAIL FIELD COMPLETELY REMOVED - Customers only provide: Name, Phone, Address, Wilaya
 
 class CheckoutSystem {
     constructor() {
@@ -68,7 +68,7 @@ class CheckoutSystem {
         }
     }
 
-    // Validate individual form field (EMAIL REMOVED)
+    // Validate individual form field (NO EMAIL VALIDATION)
     validateField(field) {
         const value = field.value.trim();
         let isValid = true;
@@ -282,7 +282,7 @@ class CheckoutSystem {
         }
     }
 
-    // Validate entire form (EMAIL REMOVED)
+    // Validate entire form (NO EMAIL REQUIRED)
     validateForm() {
         const requiredFields = [
             'checkoutPrenom',
@@ -332,7 +332,7 @@ class CheckoutSystem {
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Traitement en cours...';
             }
 
-            // Gather form data
+            // Gather form data (WITHOUT EMAIL)
             const orderData = this.gatherOrderData();
             
             console.log('📦 Order data prepared:', orderData);
@@ -392,7 +392,7 @@ class CheckoutSystem {
         }
     }
 
-    // Gather order data (EMAIL REMOVED)
+    // Gather order data (NO EMAIL - ONLY NAME, PHONE, ADDRESS, WILAYA)
     gatherOrderData() {
         const prenom = document.getElementById('checkoutPrenom')?.value.trim();
         const nom = document.getElementById('checkoutNom')?.value.trim();
@@ -409,14 +409,15 @@ class CheckoutSystem {
         // Generate unique order number
         const orderNumber = this.generateOrderNumber();
 
-        // Build order data without email
+        // Build order data WITHOUT EMAIL
         const orderData = {
             numeroCommande: orderNumber,
-            orderNumber: orderNumber,
+            orderNumber: orderNumber,  // For MongoDB unique index
             client: {
                 userId: window.app?.currentUser?.id || null,
                 prenom,
                 nom,
+                // NO EMAIL FIELD
                 telephone: telephone.replace(/\s+/g, ''),
                 adresse,
                 wilaya
@@ -522,8 +523,6 @@ class CheckoutSystem {
         return `${prefix}${timestamp}${random}`;
     }
 
-    // Email validation removed - no longer needed
-
     // Phone validation (Algerian format)
     validatePhone(phone) {
         const cleanPhone = phone.replace(/\s+/g, '');
@@ -540,7 +539,7 @@ function initCheckout() {
     checkoutSystem = new CheckoutSystem();
     checkoutSystem.init();
     window.checkoutSystem = checkoutSystem;
-    console.log('✅ Checkout system initialized (Email removed)');
+    console.log('✅ Checkout system initialized - NO EMAIL REQUIRED');
 }
 
 // Global functions for checkout
@@ -569,4 +568,4 @@ window.checkoutSystem = checkoutSystem;
 window.validateCheckoutField = validateCheckoutField;
 window.processCheckoutOrder = processCheckoutOrder;
 
-console.log('✅ Fixed checkout.js loaded - Email field removed!');
+console.log('✅ Checkout.js loaded - Email field completely removed!');
