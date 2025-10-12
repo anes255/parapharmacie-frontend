@@ -385,7 +385,313 @@ function loadRelatedProducts(currentProduct) {
         }
     }
 }
+// Add these modifications to your existing products.js file
 
+// Helper function to create URL slug
+function createProductSlug(productName) {
+    return productName
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+// Helper function to get product URL
+function getProductUrl(product) {
+    const slug = createProductSlug(product.nom);
+    return `/produit/${product._id}-${slug}`;
+}
+
+// MODIFY the createProductCard method in your app.js to use proper links:
+PharmacieGaherApp.prototype.createProductCard = function(product) {
+    const isOutOfStock = product.stock === 0;
+    const hasPromotion = product.enPromotion && product.prixOriginal;
+    const productUrl = getProductUrl(product);
+    
+    // Generate image URL
+    let imageUrl;
+    if (product.image && product.image.startsWith('http')) {
+        imageUrl = product.image;
+    } else if (product.image && product.image.startsWith('data:image')) {
+        imageUrl = product.image;
+    } else if (product.image) {
+        imageUrl = `./images/products/${product.image}`;
+    } else {
+        const getCategoryColor = (category) => {
+            const colors = {
+                'Vitalité': '10b981', 'Sport': 'f43f5e', 'Visage': 'ec4899',
+                'Cheveux': 'f59e0b', 'Solaire': 'f97316', 'Intime': 'ef4444',
+                'Bébé': '06b6d4', 'Homme': '3b82f6', 'Soins': '22c55e',
+                'Dentaire': '6366f1'
+            };
+            return colors[category] || '10b981';
+        };
+        
+        const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+        const categoryColor = getCategoryColor(product.categorie);
+        imageUrl = `https://via.placeholder.com/300x300/${categoryColor}/ffffff?text=${encodeURIComponent(initials)}`;
+    }
+    
+    return `
+        <div class="product-card bg-gradient-to-br from-white/90 to-emerald-50/80 backdrop-blur-sm rounded-2xl overflow-hidden transition-all duration-500 cursor-pointer relative border border-emerald-200/50 hover:border-emerald-400/60 ${isOutOfStock ? 'opacity-75' : ''}">
+            <!-- Use a proper link instead of onclick -->
+            <a href="${productUrl}" data-route class="block" onclick="event.preventDefault(); window.seoRouter.navigate('${productUrl}');">
+                ${hasPromotion ? `<div class="badge-promotion absolute top-4 left-4 z-20">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
+                ${isOutOfStock ? `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10 rounded-2xl">
+                    <span class="text-white font-bold text-lg">Rupture de stock</span>
+                </div>` : ''}
+                
+                <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden relative">
+                    <img src="${imageUrl}" alt="${product.nom}" 
+                         class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                         onerror="this.src='https://via.placeholder.com/300x300/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
+                </div>
+                
+                <div class="p-6">
+                    <h3 class="font-bold text-emerald-800 mb-3 text-lg line-clamp-2">${product.nom}</h3>
+                    <p class="text-sm text-emerald-600 mb-4 line-clamp-2">${product.description || 'Description du produit'}</p>
+                    
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            ${hasPromotion ? `
+                                <span class="text-sm text-gray-400 line-through">${product.prixOriginal} DA</span>
+                                <span class="text-xl font-bold text-red-600">${product.prix} DA</span>
+                            ` : `
+                                <span class="text-xl font-bold text-emerald-700">${product.prix} DA</span>
+                            `}
+                        </div>
+                        
+                        ${!isOutOfStock ? `
+                            <button onclick="event.preventDefault(); event.stopPropagation(); addToCartFromCard('${product._id}')" 
+                                    class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-5 py-2 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
+                                <i class="fas fa-cart-plus"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-emerald-600">Stock: ${product.stock}</span>
+                        <span class="text-emerald-700 font-semibold">${product.marque || ''}</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+    `;
+};
+
+// MODIFY renderProductDetail to include breadcrumbs with proper links
+PharmacieGaherApp.prototype.renderProductDetail = function(product) {
+    const mainContent = document.getElementById('mainContent');
+    const productUrl = getProductUrl(product);
+    const categorySlug = createProductSlug(product.categorie);
+    
+    const isOutOfStock = product.stock === 0;
+    const hasPromotion = product.enPromotion && product.prixOriginal;
+    
+    // Generate image URL
+    let imageUrl;
+    if (product.image && (product.image.startsWith('http') || product.image.startsWith('data:image'))) {
+        imageUrl = product.image;
+    } else {
+        const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+        imageUrl = `https://via.placeholder.com/600x600/10b981/ffffff?text=${encodeURIComponent(initials)}`;
+    }
+    
+    mainContent.innerHTML = `
+        <div class="container mx-auto px-4 py-8">
+            <!-- Breadcrumb with SEO-friendly links -->
+            <nav class="mb-8" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2 text-sm" itemscope itemtype="https://schema.org/BreadcrumbList">
+                    <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                        <a href="/" data-route onclick="event.preventDefault(); window.seoRouter.navigate('/');" 
+                           class="text-emerald-600 hover:text-emerald-700" itemprop="item">
+                            <span itemprop="name">Accueil</span>
+                        </a>
+                        <meta itemprop="position" content="1" />
+                    </li>
+                    <li><span class="text-gray-500">/</span></li>
+                    <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                        <a href="/produits" data-route onclick="event.preventDefault(); window.seoRouter.navigate('/produits');" 
+                           class="text-emerald-600 hover:text-emerald-700" itemprop="item">
+                            <span itemprop="name">Produits</span>
+                        </a>
+                        <meta itemprop="position" content="2" />
+                    </li>
+                    <li><span class="text-gray-500">/</span></li>
+                    <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                        <a href="/categorie/${categorySlug}" data-route 
+                           onclick="event.preventDefault(); window.seoRouter.navigate('/categorie/${categorySlug}');" 
+                           class="text-emerald-600 hover:text-emerald-700" itemprop="item">
+                            <span itemprop="name">${product.categorie}</span>
+                        </a>
+                        <meta itemprop="position" content="3" />
+                    </li>
+                    <li><span class="text-gray-500">/</span></li>
+                    <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                        <span class="text-gray-900" itemprop="name">${product.nom}</span>
+                        <meta itemprop="position" content="4" />
+                    </li>
+                </ol>
+            </nav>
+            
+            <!-- Social Share Buttons -->
+            <div class="mb-6 flex gap-3">
+                <button onclick="shareOnFacebook('${productUrl}')" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all">
+                    <i class="fab fa-facebook-f mr-2"></i>Partager
+                </button>
+                <button onclick="shareOnTwitter('${productUrl}', '${product.nom}')" 
+                        class="px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-all">
+                    <i class="fab fa-twitter mr-2"></i>Tweet
+                </button>
+                <button onclick="shareOnWhatsApp('${productUrl}', '${product.nom}')" 
+                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all">
+                    <i class="fab fa-whatsapp mr-2"></i>WhatsApp
+                </button>
+                <button onclick="copyProductLink('${productUrl}')" 
+                        class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all">
+                    <i class="fas fa-link mr-2"></i>Copier le lien
+                </button>
+            </div>
+            
+            <!-- Product Detail Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <!-- Product Image -->
+                <div class="space-y-4">
+                    <div class="aspect-square bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl overflow-hidden relative">
+                        ${hasPromotion ? `<div class="absolute top-4 left-4 z-10 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">-${product.pourcentagePromotion || Math.round((product.prixOriginal - product.prix) / product.prixOriginal * 100)}%</div>` : ''}
+                        ${isOutOfStock ? `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+                            <span class="text-white font-bold text-2xl">Rupture de stock</span>
+                        </div>` : ''}
+                        <img src="${imageUrl}" alt="${product.nom}" 
+                             class="w-full h-full object-cover"
+                             onerror="this.src='https://via.placeholder.com/600x600/10b981/ffffff?text=${encodeURIComponent(product.nom.substring(0, 2).toUpperCase())}'">
+                    </div>
+                </div>
+                
+                <!-- Product Info -->
+                <div class="space-y-6">
+                    <div>
+                        <h1 class="text-3xl font-bold text-emerald-800 mb-2">${product.nom}</h1>
+                        <p class="text-emerald-600">${product.marque || ''}</p>
+                        <span class="inline-block bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium mt-2">${product.categorie}</span>
+                    </div>
+                    
+                    <!-- Price -->
+                    <div class="space-y-2">
+                        ${hasPromotion ? `
+                            <div class="flex items-center space-x-3">
+                                <span class="text-3xl font-bold text-red-600">${product.prix} DA</span>
+                                <span class="text-xl text-gray-400 line-through">${product.prixOriginal} DA</span>
+                            </div>
+                            <p class="text-green-600 font-medium">Économisez ${product.prixOriginal - product.prix} DA</p>
+                        ` : `
+                            <div class="text-3xl font-bold text-emerald-700">${product.prix} DA</div>
+                        `}
+                    </div>
+                    
+                    <!-- Description -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Description</h3>
+                        <p class="text-gray-600 leading-relaxed">${product.description || 'Description non disponible'}</p>
+                    </div>
+                    
+                    <!-- Additional Info -->
+                    ${product.ingredients ? `
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Ingrédients</h3>
+                            <p class="text-gray-600">${product.ingredients}</p>
+                        </div>
+                    ` : ''}
+                    
+                    ${product.modeEmploi ? `
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Mode d'emploi</h3>
+                            <p class="text-gray-600">${product.modeEmploi}</p>
+                        </div>
+                    ` : ''}
+                    
+                    ${product.precautions ? `
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Précautions</h3>
+                            <p class="text-gray-600">${product.precautions}</p>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- Stock Info -->
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center">
+                            <span class="text-gray-600 mr-2">Stock:</span>
+                            <span class="font-medium ${product.stock > 10 ? 'text-green-600' : product.stock > 0 ? 'text-yellow-600' : 'text-red-600'}">
+                                ${product.stock > 0 ? `${product.stock} unités` : 'Rupture de stock'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Add to Cart -->
+                    ${!isOutOfStock ? `
+                        <div class="space-y-4">
+                            <div class="flex items-center space-x-4">
+                                <label class="text-gray-700 font-medium">Quantité:</label>
+                                <div class="flex items-center border border-gray-300 rounded-lg">
+                                    <button onclick="decreaseQuantity()" class="px-3 py-2 text-gray-600 hover:bg-gray-100">-</button>
+                                    <input type="number" id="productQuantity" value="1" min="1" max="${product.stock}" 
+                                           class="w-16 text-center border-0 focus:ring-0">
+                                    <button onclick="increaseQuantity()" class="px-3 py-2 text-gray-600 hover:bg-gray-100">+</button>
+                                </div>
+                            </div>
+                            
+                            <button onclick="addProductToCart('${product._id}')" 
+                                    class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg">
+                                <i class="fas fa-cart-plus mr-2"></i>Ajouter au panier
+                            </button>
+                        </div>
+                    ` : `
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <p class="text-red-800 font-medium">Ce produit est actuellement en rupture de stock</p>
+                        </div>
+                    `}
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+// Social sharing functions
+function shareOnFacebook(url) {
+    const fullUrl = window.location.origin + url;
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(fullUrl)}`, '_blank');
+}
+
+function shareOnTwitter(url, text) {
+    const fullUrl = window.location.origin + url;
+    window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(fullUrl)}&text=${encodeURIComponent(text)}`, '_blank');
+}
+
+function shareOnWhatsApp(url, text) {
+    const fullUrl = window.location.origin + url;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + fullUrl)}`, '_blank');
+}
+
+function copyProductLink(url) {
+    const fullUrl = window.location.origin + url;
+    navigator.clipboard.writeText(fullUrl).then(() => {
+        if (window.app) {
+            window.app.showToast('Lien copié dans le presse-papier!', 'success');
+        }
+    });
+}
+
+// Export functions
+window.shareOnFacebook = shareOnFacebook;
+window.shareOnTwitter = shareOnTwitter;
+window.shareOnWhatsApp = shareOnWhatsApp;
+window.copyProductLink = copyProductLink;
+window.getProductUrl = getProductUrl;
+window.createProductSlug = createProductSlug;
+
+console.log('✅ SEO Products updates loaded');
 /**
  * Adjust product quantity
  */
@@ -413,3 +719,4 @@ function addProductToCart(productId) {
 }
 
 console.log('✅ Products.js loaded successfully');
+
