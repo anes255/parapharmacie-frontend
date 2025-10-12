@@ -977,14 +977,7 @@ class PharmacieGaherApp {
                                                    placeholder="Votre nom">
                                         </div>
                                         
-                                        <div>
-                                            <label for="checkoutEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                                            <input type="email" id="checkoutEmail" name="email" required
-                                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
-                                                   placeholder="votre@email.com">
-                                        </div>
-                                        
-                                        <div>
+                                        <div class="md:col-span-2">
                                             <label for="checkoutTelephone" class="block text-sm font-semibold text-gray-700 mb-2">Téléphone *</label>
                                             <input type="tel" id="checkoutTelephone" name="telephone" required
                                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-400 focus:outline-none transition-all"
@@ -1108,7 +1101,6 @@ class PharmacieGaherApp {
             const requiredFields = [
                 { id: 'checkoutPrenom', name: 'Prénom' },
                 { id: 'checkoutNom', name: 'Nom' },
-                { id: 'checkoutEmail', name: 'Email' },
                 { id: 'checkoutTelephone', name: 'Téléphone' },
                 { id: 'checkoutAdresse', name: 'Adresse' },
                 { id: 'checkoutWilaya', name: 'Wilaya' }
@@ -1121,14 +1113,6 @@ class PharmacieGaherApp {
                     element?.focus();
                     return;
                 }
-            }
-            
-            // Validate email
-            const email = document.getElementById('checkoutEmail').value;
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                this.showToast('Email invalide', 'error');
-                return;
             }
             
             // Check cart
@@ -1170,7 +1154,6 @@ class PharmacieGaherApp {
                 client: {
                     prenom,
                     nom,
-                    email: email.toLowerCase(),
                     telephone: telephone.replace(/\s+/g, ''),
                     adresse,
                     wilaya
@@ -1277,7 +1260,7 @@ class PharmacieGaherApp {
                         <div class="bg-emerald-50 rounded-2xl p-8 mb-8">
                             <h2 class="text-2xl font-bold text-emerald-800 mb-4">Numéro de commande</h2>
                             <p class="text-4xl font-bold text-emerald-600 mb-4">#${orderNumber}</p>
-                            <p class="text-gray-700">Vous recevrez un email de confirmation à l'adresse fournie</p>
+                            <p class="text-gray-700">Notre équipe vous contactera pour confirmer la livraison</p>
                         </div>
                         
                         <div class="space-y-4">
@@ -1349,8 +1332,8 @@ class PharmacieGaherApp {
                                     </div>
                                     <div>
                                         <h3 class="font-semibold text-gray-900">Email</h3>
-                                        <a href="mailto:pharmaciegaher@gmail.com" class="text-primary hover:text-secondary">
-                                            pharmaciegaher@gmail.com
+                                        <a href="mailto:contact@parapharmacieshifa.dz" class="text-primary hover:text-secondary">
+                                            contact@parapharmacieshifa.dz
                                         </a>
                                     </div>
                                 </div>
@@ -1778,7 +1761,6 @@ class PharmacieGaherApp {
                                             <td class="px-4 py-3">
                                                 <div>
                                                     <p class="text-xs text-gray-600"><i class="fas fa-phone mr-1"></i>${order.client?.telephone || 'N/A'}</p>
-                                                    <p class="text-xs text-gray-600"><i class="fas fa-envelope mr-1"></i>${order.client?.email || 'N/A'}</p>
                                                 </div>
                                             </td>
                                             <td class="px-4 py-3">
@@ -2562,10 +2544,6 @@ async function viewOrderDetails(orderId) {
                                 <div>
                                     <p class="text-sm text-gray-600">Nom complet</p>
                                     <p class="font-semibold text-gray-900">${order.client.prenom} ${order.client.nom}</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-600">Email</p>
-                                    <p class="font-semibold text-gray-900">${order.client.email}</p>
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-600">Téléphone</p>
