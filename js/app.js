@@ -73,20 +73,23 @@ class PharmacieGaherApp {
         this.init();
     }
     
-    async init() {
-        try {
-            await this.wakeUpBackend();
-            await this.checkAuth();
-            await this.loadProductsCache();
-            this.initUI();
-            await this.showPage('home');
-            this.updateCartUI();
-            this.initSearch();
-        } catch (error) {
-            console.error('Erreur initialisation app:', error);
-            this.showToast('Erreur de chargement de l\'application', 'error');
-        }
+   // In app.js, update the init() method
+async init() {
+    try {
+        await this.checkAuth();
+        await this.loadProductsCache();
+        this.initUI();
+        
+        // Initialize SEO Router
+        window.seoRouter = new SEORouter(this);
+        
+        this.updateCartUI();
+        this.initSearch();
+    } catch (error) {
+        console.error('Erreur initialisation app:', error);
+        this.showToast('Erreur de chargement de l\'application', 'error');
     }
+}
     
     async wakeUpBackend() {
         const loadingScreen = document.getElementById('serverLoadingScreen');
@@ -3281,3 +3284,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 console.log('Complete app.js loaded with FIXED admin sections!');
+
