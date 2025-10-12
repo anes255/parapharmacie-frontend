@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /js/
+Allow: /css/
+Allow: /images/
+
+Disallow: /admin
+Disallow: /js/config.js
+
+Sitemap: https://parapharmacieshifa.com/sitemap.xml
