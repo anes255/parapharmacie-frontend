@@ -1,5 +1,5 @@
 // ============================================================================
-// COMPLETE PharmacieGaherApp - Email Removed from Checkout
+// COMPLETE PharmacieGaherApp - FULLY FIXED with Admin Sections
 // ============================================================================
 
 // UTILITY: Generate placeholder image using canvas
@@ -1097,7 +1097,7 @@ class PharmacieGaherApp {
         try {
             console.log('Processing checkout order...');
             
-            // Validate form (EMAIL REMOVED)
+            // Validate form
             const requiredFields = [
                 { id: 'checkoutPrenom', name: 'Prénom' },
                 { id: 'checkoutNom', name: 'Nom' },
@@ -1135,7 +1135,7 @@ class PharmacieGaherApp {
             
             console.log('Generated orderNumber:', orderNumber);
             
-            // Prepare order data (EMAIL REMOVED)
+            // Prepare order data
             const prenom = document.getElementById('checkoutPrenom').value.trim();
             const nom = document.getElementById('checkoutNom').value.trim();
             const telephone = document.getElementById('checkoutTelephone').value.trim();
@@ -1260,7 +1260,7 @@ class PharmacieGaherApp {
                         <div class="bg-emerald-50 rounded-2xl p-8 mb-8">
                             <h2 class="text-2xl font-bold text-emerald-800 mb-4">Numéro de commande</h2>
                             <p class="text-4xl font-bold text-emerald-600 mb-4">#${orderNumber}</p>
-                            <p class="text-gray-700">Vous serez contacté sous peu pour confirmer la livraison</p>
+                            <p class="text-gray-700">Notre équipe vous contactera pour confirmer la livraison</p>
                         </div>
                         
                         <div class="space-y-4">
@@ -1332,8 +1332,8 @@ class PharmacieGaherApp {
                                     </div>
                                     <div>
                                         <h3 class="font-semibold text-gray-900">Email</h3>
-                                        <a href="mailto:parapharmacieshifa@gmail.com" class="text-primary hover:text-secondary">
-                                            parapharmacieshifa@gmail.com
+                                        <a href="mailto:contact@parapharmacieshifa.dz" class="text-primary hover:text-secondary">
+                                            contact@parapharmacieshifa.dz
                                         </a>
                                     </div>
                                 </div>
@@ -2193,7 +2193,7 @@ class PharmacieGaherApp {
 }
 
 // ============================================================================
-// GLOBAL FUNCTIONS (Remaining helper functions - admin functions, etc.)
+// GLOBAL FUNCTIONS
 // ============================================================================
 
 function addToCartFromCard(productId, quantity = 1) {
@@ -2534,7 +2534,7 @@ async function viewOrderDetails(orderId) {
                             </span>
                         </div>
                         
-                        <!-- Customer Information (EMAIL REMOVED) -->
+                        <!-- Customer Information -->
                         <div class="border-2 border-emerald-100 rounded-lg p-6">
                             <h3 class="text-lg font-bold text-emerald-800 mb-4 flex items-center">
                                 <i class="fas fa-user mr-2"></i>
@@ -2707,8 +2707,562 @@ async function deleteOrder(orderId) {
     }
 }
 
-// Additional admin functions for products (editProduct, deleteProduct, etc.) would continue here...
-// Due to length constraints, I'm providing the core structure. The remaining functions follow the same pattern.
+async function editProduct(productId) {
+    if (!window.app || !productId) return;
+    
+    try {
+        // Find product
+        const product = window.app.allProducts.find(p => p._id === productId);
+        
+        if (!product) {
+            window.app.showToast('Produit non trouvé', 'error');
+            return;
+        }
+        
+        // Get current image URL
+        let currentImageUrl = '';
+        if (product.image && product.image.startsWith('data:image')) {
+            currentImageUrl = product.image;
+        } else if (product.image && product.image.startsWith('http')) {
+            currentImageUrl = product.image;
+        } else {
+            const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
+            currentImageUrl = generatePlaceholder(128, 128, '10b981', 'ffffff', initials);
+        }
+        
+        // Create modal HTML
+        const modalHTML = `
+            <div id="editProductModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="closeEditProductModal(event)">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                    <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-6 text-white">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-2xl font-bold">Modifier le produit</h2>
+                            <button onclick="closeEditProductModal()" class="text-white hover:text-emerald-100">
+                                <i class="fas fa-times text-2xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <form id="editProductForm" class="p-6 space-y-4" onsubmit="saveProductEdit(event, '${productId}')">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Image du produit</label>
+                                <div class="flex items-center space-x-4">
+                                    <div class="relative w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
+                                        <img id="editProductImagePreview" src="${currentImageUrl}" alt="Preview" class="w-full h-full object-cover">
+                                        <div id="editProductImagePlaceholder" class="w-full h-full flex items-center justify-center bg-gray-50 hidden">
+                                            <i class="fas fa-image text-4xl text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <input type="file" id="editProductImageFile" accept="image/*" class="hidden" onchange="previewEditProductImage(this)">
+                                        <button type="button" onclick="document.getElementById('editProductImageFile').click()" 
+                                                class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                                            <i class="fas fa-upload mr-2"></i>Changer l'image
+                                        </button>
+                                        <p class="text-xs text-gray-500 mt-2">JPG, PNG (Max 2MB)</p>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="editProductImageUrl" value="${product.image || ''}">
+                            </div>
+                            
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
+                                <input type="text" id="editProductNom" value="${product.nom || ''}" required
+                                       class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Catégorie *</label>
+                                <select id="editProductCategorie" required
+                                        class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                                    <option value="">Sélectionner...</option>
+                                    ${['Vitalité', 'Sport', 'Visage', 'Cheveux', 'Solaire', 'Intime', 'Soins', 'Bébé', 'Homme', 'Dentaire'].map(cat => 
+                                        `<option value="${cat}" ${product.categorie === cat ? 'selected' : ''}>${cat}</option>`
+                                    ).join('')}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Marque</label>
+                                <input type="text" id="editProductMarque" value="${product.marque || ''}"
+                                       class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Prix (DA) *</label>
+                                <input type="number" id="editProductPrix" value="${product.prix || 0}" required min="0"
+                                       class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Stock *</label>
+                                <input type="number" id="editProductStock" value="${product.stock || 0}" required min="0"
+                                       class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                            </div>
+                            
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
+                                <textarea id="editProductDescription" rows="3" required
+                                          class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">${product.description || ''}</textarea>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">En promotion</label>
+                                <div class="flex items-center space-x-4">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="editProductPromotion" ${product.enPromotion ? 'checked' : ''}
+                                               class="w-4 h-4 text-emerald-600 rounded">
+                                        <span class="ml-2 text-sm text-gray-700">Oui</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">En vedette</label>
+                                <div class="flex items-center space-x-4">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="editProductVedette" ${product.enVedette ? 'checked' : ''}
+                                               class="w-4 h-4 text-emerald-600 rounded">
+                                        <span class="ml-2 text-sm text-gray-700">Oui</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Actif</label>
+                                <div class="flex items-center space-x-4">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="editProductActif" ${product.actif !== false ? 'checked' : ''}
+                                               class="w-4 h-4 text-emerald-600 rounded">
+                                        <span class="ml-2 text-sm text-gray-700">Oui</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-end space-x-4 pt-4 border-t">
+                            <button type="button" onclick="closeEditProductModal()" 
+                                    class="px-6 py-2 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                                Annuler
+                            </button>
+                            <button type="submit" 
+                                    class="px-6 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:from-emerald-600 hover:to-green-700 transition-colors">
+                                <i class="fas fa-save mr-2"></i>Enregistrer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('Error opening edit modal:', error);
+        window.app.showToast('Erreur lors de l\'ouverture du formulaire', 'error');
+    }
+}
+
+function previewEditProductImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+        window.app.showToast('Image trop volumineuse. Maximum 2MB', 'error');
+        input.value = '';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const preview = document.getElementById('editProductImagePreview');
+        const imageUrlInput = document.getElementById('editProductImageUrl');
+        
+        if (preview && imageUrlInput) {
+            preview.src = e.target.result;
+            imageUrlInput.value = e.target.result;
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function closeEditProductModal(event) {
+    if (event && event.target.id !== 'editProductModal') return;
+    
+    const modal = document.getElementById('editProductModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+async function saveProductEdit(event, productId) {
+    event.preventDefault();
+    
+    if (!window.app || !productId) return;
+    
+    try {
+        // Validate required fields
+        const nom = document.getElementById('editProductNom').value.trim();
+        const description = document.getElementById('editProductDescription').value.trim();
+        
+        if (!nom) {
+            window.app.showToast('Le nom du produit est requis', 'error');
+            return;
+        }
+        
+        if (!description) {
+            window.app.showToast('La description est requise', 'error');
+            return;
+        }
+        
+        const productData = {
+            nom,
+            categorie: document.getElementById('editProductCategorie').value,
+            marque: document.getElementById('editProductMarque').value.trim(),
+            prix: parseFloat(document.getElementById('editProductPrix').value),
+            stock: parseInt(document.getElementById('editProductStock').value),
+            description,
+            image: document.getElementById('editProductImageUrl').value || '',
+            enPromotion: document.getElementById('editProductPromotion').checked,
+            enVedette: document.getElementById('editProductVedette').checked,
+            actif: document.getElementById('editProductActif').checked
+        };
+        
+        console.log('Updating product:', productId, productData);
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.app.showToast('Session expirée', 'error');
+            return;
+        }
+        
+        const response = await fetch(`https://parapharmacie-gaher.onrender.com/api/admin/products/${productId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            },
+            body: JSON.stringify(productData)
+        });
+        
+        console.log('Update product response:', response.status);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Product updated successfully:', data);
+            
+            // Update in local storage
+            const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            const productIndex = localProducts.findIndex(p => p._id === productId);
+            if (productIndex > -1) {
+                localProducts[productIndex] = { ...localProducts[productIndex], ...productData };
+                localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+            }
+            
+            window.app.showToast('Produit mis à jour avec succès', 'success');
+            closeEditProductModal();
+            
+            // Reload products
+            await window.app.loadProductsCache();
+            window.app.loadAdminProducts();
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erreur lors de la mise à jour');
+        }
+    } catch (error) {
+        console.error('Error updating product:', error);
+        window.app.showToast(error.message || 'Erreur lors de la mise à jour du produit', 'error');
+    }
+}
+
+async function deleteProduct(productId) {
+    if (!window.app || !productId) return;
+    
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.')) {
+        return;
+    }
+    
+    try {
+        console.log('Deleting product:', productId);
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.app.showToast('Session expirée', 'error');
+            return;
+        }
+        
+        const response = await fetch(`https://parapharmacie-gaher.onrender.com/api/admin/products/${productId}`, {
+            method: 'DELETE',
+            headers: {
+                'x-auth-token': token,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('Delete product response:', response.status);
+        
+        if (response.ok) {
+            window.app.showToast('Produit supprimé avec succès', 'success');
+            
+            // Remove from local storage
+            const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            const updatedProducts = localProducts.filter(p => p._id !== productId);
+            localStorage.setItem('demoProducts', JSON.stringify(updatedProducts));
+            
+            // Reload products
+            await window.app.loadProductsCache();
+            window.app.loadAdminProducts();
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erreur lors de la suppression');
+        }
+    } catch (error) {
+        console.error('Error deleting product:', error);
+        window.app.showToast(error.message || 'Erreur lors de la suppression du produit', 'error');
+    }
+}
+
+function showAddProductModal() {
+    if (!window.app) return;
+    
+    const modalHTML = `
+        <div id="addProductModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="closeAddProductModal(event)">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-6 text-white">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-2xl font-bold">Ajouter un nouveau produit</h2>
+                        <button onclick="closeAddProductModal()" class="text-white hover:text-emerald-100">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <form id="addProductForm" class="p-6 space-y-4" onsubmit="saveNewProduct(event)">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Image du produit</label>
+                            <div class="flex items-center space-x-4">
+                                <div class="relative w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
+                                    <img id="addProductImagePreview" src="" alt="Preview" class="w-full h-full object-cover hidden">
+                                    <div id="addProductImagePlaceholder" class="w-full h-full flex items-center justify-center bg-gray-50">
+                                        <i class="fas fa-image text-4xl text-gray-300"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <input type="file" id="addProductImageFile" accept="image/*" class="hidden" onchange="previewAddProductImage(this)">
+                                    <button type="button" onclick="document.getElementById('addProductImageFile').click()" 
+                                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                                        <i class="fas fa-upload mr-2"></i>Choisir une image
+                                    </button>
+                                    <p class="text-xs text-gray-500 mt-2">JPG, PNG (Max 2MB)</p>
+                                </div>
+                            </div>
+                            <input type="hidden" id="addProductImageUrl" value="">
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Nom du produit *</label>
+                            <input type="text" id="addProductNom" required
+                                   class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
+                                   placeholder="Ex: Vitamine C 1000mg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Catégorie *</label>
+                            <select id="addProductCategorie" required
+                                    class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none">
+                                <option value="">Sélectionner...</option>
+                                <option value="Vitalité">Vitalité</option>
+                                <option value="Sport">Sport</option>
+                                <option value="Visage">Visage</option>
+                                <option value="Cheveux">Cheveux</option>
+                                <option value="Solaire">Solaire</option>
+                                <option value="Intime">Intime</option>
+                                <option value="Soins">Soins</option>
+                                <option value="Bébé">Bébé</option>
+                                <option value="Homme">Homme</option>
+                                <option value="Dentaire">Dentaire</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Marque</label>
+                            <input type="text" id="addProductMarque"
+                                   class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
+                                   placeholder="Ex: Nature's Bounty">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Prix (DA) *</label>
+                            <input type="number" id="addProductPrix" required min="0" step="0.01"
+                                   class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
+                                   placeholder="0.00">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Stock *</label>
+                            <input type="number" id="addProductStock" required min="0"
+                                   class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
+                                   placeholder="0">
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
+                            <textarea id="addProductDescription" rows="3" required
+                                      class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-emerald-400 focus:outline-none"
+                                      placeholder="Description détaillée du produit..."></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Options</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="addProductPromotion" class="w-4 h-4 text-emerald-600 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">En promotion</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="addProductVedette" class="w-4 h-4 text-emerald-600 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">En vedette</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="addProductActif" checked class="w-4 h-4 text-emerald-600 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">Actif</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-end space-x-4 pt-4 border-t">
+                        <button type="button" onclick="closeAddProductModal()" 
+                                class="px-6 py-2 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                            Annuler
+                        </button>
+                        <button type="submit" 
+                                class="px-6 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:from-emerald-600 hover:to-green-700 transition-colors">
+                            <i class="fas fa-plus mr-2"></i>Ajouter le produit
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+function closeAddProductModal(event) {
+    if (event && event.target.id !== 'addProductModal') return;
+    
+    const modal = document.getElementById('addProductModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function previewAddProductImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+        window.app.showToast('Image trop volumineuse. Maximum 2MB', 'error');
+        input.value = '';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const preview = document.getElementById('addProductImagePreview');
+        const placeholder = document.getElementById('addProductImagePlaceholder');
+        const imageUrlInput = document.getElementById('addProductImageUrl');
+        
+        if (preview && placeholder && imageUrlInput) {
+            preview.src = e.target.result;
+            preview.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            imageUrlInput.value = e.target.result;
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+async function saveNewProduct(event) {
+    event.preventDefault();
+    
+    if (!window.app) return;
+    
+    try {
+        // Validate required fields
+        const nom = document.getElementById('addProductNom').value.trim();
+        const description = document.getElementById('addProductDescription').value.trim();
+        
+        if (!nom) {
+            window.app.showToast('Le nom du produit est requis', 'error');
+            return;
+        }
+        
+        if (!description) {
+            window.app.showToast('La description est requise', 'error');
+            return;
+        }
+        
+        const productData = {
+            nom,
+            categorie: document.getElementById('addProductCategorie').value,
+            marque: document.getElementById('addProductMarque').value.trim(),
+            prix: parseFloat(document.getElementById('addProductPrix').value),
+            stock: parseInt(document.getElementById('addProductStock').value),
+            description,
+            image: document.getElementById('addProductImageUrl').value || '',
+            enPromotion: document.getElementById('addProductPromotion').checked,
+            enVedette: document.getElementById('addProductVedette').checked,
+            actif: document.getElementById('addProductActif').checked
+        };
+        
+        console.log('Creating new product:', productData);
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.app.showToast('Session expirée', 'error');
+            return;
+        }
+        
+        const response = await fetch('https://parapharmacie-gaher.onrender.com/api/admin/products', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            },
+            body: JSON.stringify(productData)
+        });
+        
+        console.log('Create product response:', response.status);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Product created successfully:', data);
+            
+            // Add to local storage
+            const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+            localProducts.push(data.product);
+            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
+            
+            window.app.showToast('Produit ajouté avec succès', 'success');
+            closeAddProductModal();
+            
+            // Reload products
+            await window.app.loadProductsCache();
+            window.app.loadAdminProducts();
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erreur lors de la création');
+        }
+    } catch (error) {
+        console.error('Error creating product:', error);
+        window.app.showToast(error.message || 'Erreur lors de l\'ajout du produit', 'error');
+    }
+}
 
 function filterOrders(status) {
     console.log('Filter orders by status:', status);
@@ -2720,10 +3274,10 @@ function filterOrders(status) {
 
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Initializing Shifa Parapharmacie App - Email removed from checkout');
+    console.log('Initializing Shifa Parapharmacie App - Complete with Admin Features');
     app = new PharmacieGaherApp();
     window.app = app;
-    console.log('App initialized successfully!');
+    console.log('App initialized with working admin products and orders sections!');
 });
 
-console.log('✅ app.js loaded - Email removed from checkout!');
+console.log('Complete app.js loaded with FIXED admin sections!');
