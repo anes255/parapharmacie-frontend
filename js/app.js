@@ -3201,4 +3201,5 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing Shifa Parapharmacie App - FIXED VERSION');
     app = new PharmacieGaherApp();
     window.app = app;
-    console.log('App initialized successfully with fixed loading!
+    
+
