@@ -1,5 +1,5 @@
 // ============================================================================
-// COMPLETE PharmacieGaherApp - FIXED - Site Starting Issue Resolved
+// COMPLETE PharmacieGaherApp - FIXED - SEO Compatible Version
 // ============================================================================
 
 // UTILITY: Generate placeholder image using canvas
@@ -93,12 +93,12 @@ class PharmacieGaherApp {
             if (typeof SEORouter !== 'undefined') {
                 try {
                     window.seoRouter = new SEORouter(this);
-                    console.log('SEO Router initialized');
+                    console.log('✅ SEO Router initialized successfully');
                 } catch (error) {
-                    console.log('SEO Router initialization failed:', error);
+                    console.log('⚠️  SEO Router initialization failed:', error);
                 }
             } else {
-                console.log('SEO Router not available, continuing without it');
+                console.log('ℹ️  SEO Router not available, continuing without it');
             }
             
             // Update cart UI
@@ -107,16 +107,18 @@ class PharmacieGaherApp {
             // Initialize search
             this.initSearch();
             
-            // Load home page
-            await this.loadHomePage();
+            // Load home page (or let SEO router handle the route)
+            if (!window.seoRouter) {
+                await this.loadHomePage();
+            }
             
             // Hide loading
             this.hideLoading();
             
-            console.log('App initialized successfully!');
+            console.log('✅ App initialized successfully!');
             
         } catch (error) {
-            console.error('Error initializing app:', error);
+            console.error('❌ Error initializing app:', error);
             this.hideLoading();
             this.showToast('Erreur de chargement de l\'application', 'error');
         }
@@ -357,6 +359,37 @@ class PharmacieGaherApp {
         }
     }
     
+    // SEO COMPATIBLE METHOD - Product Not Found
+    showProductNotFound() {
+        const mainContent = document.getElementById('mainContent');
+        mainContent.innerHTML = `
+            <div class="container mx-auto px-4 py-16">
+                <div class="max-w-2xl mx-auto text-center">
+                    <div class="mb-8">
+                        <i class="fas fa-exclamation-triangle text-8xl text-yellow-500 mb-6"></i>
+                    </div>
+                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Produit non trouvé</h1>
+                    <p class="text-xl text-gray-600 mb-8">
+                        Désolé, ce produit n'existe pas ou n'est plus disponible.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button onclick="app.showPage('products')" class="btn-primary">
+                            <i class="fas fa-shopping-bag mr-2"></i>
+                            Voir tous les produits
+                        </button>
+                        <button onclick="app.showPage('home')" class="btn-secondary">
+                            <i class="fas fa-home mr-2"></i>
+                            Retour à l'accueil
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Update page title for SEO
+        document.title = 'Produit non trouvé - Shifa Parapharmacie';
+    }
+    
     async loadHomePage() {
         const mainContent = document.getElementById('mainContent');
         mainContent.innerHTML = `
@@ -423,6 +456,9 @@ class PharmacieGaherApp {
         await this.loadCategories();
         await this.loadFeaturedProducts();
         await this.loadPromotionProducts();
+        
+        // Update page title for SEO
+        document.title = 'Shifa - Parapharmacie | Produits de santé et beauté en Algérie';
     }
     
     async loadCategories() {
@@ -544,14 +580,22 @@ class PharmacieGaherApp {
         `;
         
         this.currentFilteredProducts = filteredProducts;
+        
+        // Update page title for SEO
+        if (params.categorie) {
+            document.title = `${params.categorie} - Shifa Parapharmacie`;
+        } else if (params.search) {
+            document.title = `Recherche: ${params.search} - Shifa Parapharmacie`;
+        } else {
+            document.title = 'Produits - Shifa Parapharmacie';
+        }
     }
     
     async loadProductPage(productId) {
         const product = this.allProducts.find(p => p._id === productId);
         
         if (!product) {
-            this.showToast('Produit non trouvé', 'error');
-            this.showPage('products');
+            this.showProductNotFound();
             return;
         }
         
@@ -642,6 +686,9 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
+        
+        // Update page title for SEO
+        document.title = `${product.nom} - ${product.marque || 'Shifa Parapharmacie'}`;
     }
     
     async loadLoginPage() {
@@ -695,6 +742,9 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
+        
+        // Update page title for SEO
+        document.title = 'Connexion - Shifa Parapharmacie';
     }
     
     async loadRegisterPage() {
@@ -774,6 +824,9 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
+        
+        // Update page title for SEO
+        document.title = 'Inscription - Shifa Parapharmacie';
     }
     
     async loadProfilePage() {
@@ -873,6 +926,9 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
+        
+        // Update page title for SEO
+        document.title = 'Mon Profil - Shifa Parapharmacie';
     }
     
     async loadCheckoutPage() {
@@ -1044,6 +1100,9 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
+        
+        // Update page title for SEO
+        document.title = 'Finaliser la commande - Shifa Parapharmacie';
     }
     
     async processCheckoutOrder() {
@@ -1241,6 +1300,9 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
+        
+        // Update page title for SEO
+        document.title = `Commande Confirmée #${orderNumber} - Shifa Parapharmacie`;
     }
     
     async loadContactPage() {
@@ -1323,6 +1385,9 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
+        
+        // Update page title for SEO
+        document.title = 'Contact - Shifa Parapharmacie';
     }
     
     async loadAdminPage() {
@@ -1377,6 +1442,9 @@ class PharmacieGaherApp {
         `;
         
         await this.loadAdminDashboard();
+        
+        // Update page title for SEO
+        document.title = 'Administration - Shifa Parapharmacie';
     }
     
     async loadAdminDashboard() {
@@ -2146,7 +2214,7 @@ class PharmacieGaherApp {
 }
 
 // ============================================================================
-// GLOBAL FUNCTIONS (keeping identical to your original file)
+// GLOBAL FUNCTIONS (Complete and identical to original)
 // ============================================================================
 
 function addToCartFromCard(productId, quantity = 1) {
@@ -3198,8 +3266,7 @@ function filterOrders(status) {
 
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Initializing Shifa Parapharmacie App - FIXED VERSION');
+    console.log('✅ Initializing Shifa Parapharmacie App - SEO Compatible Version');
     app = new PharmacieGaherApp();
     window.app = app;
-    
-
+});
