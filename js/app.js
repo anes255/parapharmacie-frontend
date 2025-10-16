@@ -78,15 +78,16 @@ class PharmacieGaherApp {
             console.log('Initializing Shifa Parapharmacie App...');
             
             // Show loading
-            this.showLoading();
+            this.showLoading('Chargement de l\'application...');
             
-            // Check authentication
+            // Check authentication (with timeout, non-blocking)
             console.log('Step 1: Checking authentication...');
             await this.checkAuth();
             console.log('✅ Authentication checked');
             
-            // Load products cache
+            // Load products cache (local first, API in background)
             console.log('Step 2: Loading products...');
+            this.showLoading('Chargement des produits...');
             await this.loadProductsCache();
             console.log('✅ Products loaded:', this.allProducts.length, 'products');
             
@@ -107,6 +108,7 @@ class PharmacieGaherApp {
             
             // Load home page first
             console.log('Step 6: Loading home page...');
+            this.showLoading('Préparation de la page...');
             await this.loadHomePage();
             console.log('✅ Home page loaded');
             
@@ -127,12 +129,20 @@ class PharmacieGaherApp {
             this.hideLoading();
             
             console.log('✅ App initialized successfully!');
+            console.log('ℹ️  Server may be waking up - products will sync in background');
             
         } catch (error) {
             console.error('❌ Error initializing app:', error);
             console.error('Error stack:', error.stack);
             this.hideLoading();
-            this.showToast('Erreur de chargement de l\'application', 'error');
+            
+            // Show error but still try to load the page
+            this.showToast('Application chargée avec des données en cache', 'warning');
+            try {
+                await this.loadHomePage();
+            } catch (e) {
+                console.error('Failed to load home page:', e);
+            }
         }
     }
     
@@ -140,9 +150,16 @@ class PharmacieGaherApp {
         const token = localStorage.getItem('token');
         if (token) {
             try {
+                // Don't wait too long for auth check
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+                
                 const response = await fetch('https://parapharmacie-gaher.onrender.com/api/auth/profile', {
-                    headers: { 'x-auth-token': token }
+                    headers: { 'x-auth-token': token },
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
                 
                 if (response.ok) {
                     this.currentUser = await response.json();
@@ -151,7 +168,7 @@ class PharmacieGaherApp {
                     localStorage.removeItem('token');
                 }
             } catch (error) {
-                console.log('Auth check failed, continuing as guest');
+                console.log('Auth check failed (server may be sleeping), continuing as guest');
                 localStorage.removeItem('token');
             }
         }
@@ -239,29 +256,60 @@ class PharmacieGaherApp {
     
     async loadProductsCache() {
         try {
+            // Always load local products first
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             this.allProducts = [...localProducts];
             
-            try {
-                const response = await fetch('https://parapharmacie-gaher.onrender.com/api/products');
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.products && data.products.length > 0) {
-                        const localIds = localProducts.map(p => p._id);
-                        const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
+            console.log('Loaded', localProducts.length, 'products from cache');
+            
+            // Try to fetch from API in background (non-blocking)
+            this.fetchProductsFromAPI();
+            
+        } catch (error) {
+            console.log('Error loading products from cache:', error);
+            this.allProducts = [];
+        }
+    }
+    
+    async fetchProductsFromAPI() {
+        try {
+            // Add timeout to prevent long waits
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
+            const response = await fetch('https://parapharmacie-gaher.onrender.com/api/products', {
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.products && data.products.length > 0) {
+                    const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+                    const localIds = localProducts.map(p => p._id);
+                    const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
+                    
+                    if (newApiProducts.length > 0) {
+                        this.allProducts = [...localProducts, ...newApiProducts];
+                        localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
+                        console.log('✅ Synced', newApiProducts.length, 'new products from API');
                         
-                        if (newApiProducts.length > 0) {
-                            this.allProducts = [...localProducts, ...newApiProducts];
-                            localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
+                        // Refresh UI if we're on a relevant page
+                        if (this.currentPage === 'home') {
+                            this.refreshHomePage();
+                        } else if (this.currentPage === 'products') {
+                            this.showPage('products');
                         }
                     }
                 }
-            } catch (error) {
-                console.log('API unavailable, using local products only');
             }
-            
         } catch (error) {
-            this.allProducts = [];
+            if (error.name === 'AbortError') {
+                console.log('⏱️ API request timeout (server may be sleeping) - using cached products');
+            } else {
+                console.log('ℹ️ API unavailable - using cached products only');
+            }
         }
     }
     
@@ -2171,9 +2219,14 @@ class PharmacieGaherApp {
         }
     }
     
-    showLoading() {
+    showLoading(message = 'Chargement...') {
         const spinner = document.getElementById('loadingSpinner');
         if (spinner) {
+            // Update loading text if there's a message element
+            const loadingText = spinner.querySelector('span');
+            if (loadingText) {
+                loadingText.textContent = message;
+            }
             spinner.classList.remove('hidden');
         }
     }
