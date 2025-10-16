@@ -81,17 +81,39 @@ class PharmacieGaherApp {
             this.showLoading();
             
             // Check authentication
+            console.log('Step 1: Checking authentication...');
             await this.checkAuth();
+            console.log('✅ Authentication checked');
             
             // Load products cache
+            console.log('Step 2: Loading products...');
             await this.loadProductsCache();
+            console.log('✅ Products loaded:', this.allProducts.length, 'products');
             
             // Initialize UI
+            console.log('Step 3: Initializing UI...');
             this.initUI();
+            console.log('✅ UI initialized');
             
-            // Initialize SEO Router if available
+            // Update cart UI
+            console.log('Step 4: Updating cart...');
+            this.updateCartUI();
+            console.log('✅ Cart updated');
+            
+            // Initialize search
+            console.log('Step 5: Initializing search...');
+            this.initSearch();
+            console.log('✅ Search initialized');
+            
+            // Load home page first
+            console.log('Step 6: Loading home page...');
+            await this.loadHomePage();
+            console.log('✅ Home page loaded');
+            
+            // Initialize SEO Router if available (after initial page load)
             if (typeof SEORouter !== 'undefined') {
                 try {
+                    console.log('Step 7: Initializing SEO Router...');
                     window.seoRouter = new SEORouter(this);
                     console.log('✅ SEO Router initialized successfully');
                 } catch (error) {
@@ -101,17 +123,6 @@ class PharmacieGaherApp {
                 console.log('ℹ️  SEO Router not available, continuing without it');
             }
             
-            // Update cart UI
-            this.updateCartUI();
-            
-            // Initialize search
-            this.initSearch();
-            
-            // Load home page (or let SEO router handle the route)
-            if (!window.seoRouter) {
-                await this.loadHomePage();
-            }
-            
             // Hide loading
             this.hideLoading();
             
@@ -119,6 +130,7 @@ class PharmacieGaherApp {
             
         } catch (error) {
             console.error('❌ Error initializing app:', error);
+            console.error('Error stack:', error.stack);
             this.hideLoading();
             this.showToast('Erreur de chargement de l\'application', 'error');
         }
