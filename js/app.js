@@ -116,8 +116,11 @@ class PharmacieGaherApp {
             if (typeof SEORouter !== 'undefined') {
                 try {
                     console.log('Step 7: Initializing SEO Router...');
-                    window.seoRouter = new SEORouter(this);
-                    console.log('✅ SEO Router initialized successfully');
+                    
+                    // Temporarily disable SEO Router to test
+                    // window.seoRouter = new SEORouter(this);
+                    
+                    console.log('ℹ️  SEO Router temporarily disabled for debugging');
                 } catch (error) {
                     console.log('⚠️  SEO Router initialization failed:', error);
                 }
@@ -125,8 +128,17 @@ class PharmacieGaherApp {
                 console.log('ℹ️  SEO Router not available, continuing without it');
             }
             
-            // Hide loading
+            // Force hide loading and show content
+            console.log('Step 8: Forcing UI to show...');
             this.hideLoading();
+            
+            // Make sure main content is visible
+            const mainContent = document.getElementById('mainContent');
+            if (mainContent) {
+                mainContent.style.display = 'block';
+                mainContent.style.visibility = 'visible';
+                console.log('✅ Main content forced visible');
+            }
             
             console.log('✅ App initialized successfully!');
             console.log('ℹ️  Server may be waking up - products will sync in background');
@@ -2235,6 +2247,10 @@ class PharmacieGaherApp {
         const spinner = document.getElementById('loadingSpinner');
         if (spinner) {
             spinner.classList.add('hidden');
+            spinner.style.display = 'none'; // Force hide
+            console.log('✅ Loading spinner hidden');
+        } else {
+            console.log('⚠️ Loading spinner element not found');
         }
     }
     
