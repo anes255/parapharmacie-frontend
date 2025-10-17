@@ -1,5 +1,5 @@
 // ============================================================================
-// COMPLETE PharmacieGaherApp - FIXED - SEO Compatible Version
+// COMPLETE PharmacieGaherApp - FIXED - Site Starting Issue Resolved
 // ============================================================================
 
 // UTILITY: Generate placeholder image using canvas
@@ -78,100 +78,47 @@ class PharmacieGaherApp {
             console.log('Initializing Shifa Parapharmacie App...');
             
             // Show loading
-            this.showLoading('Chargement de l\'application...');
+            this.showLoading();
             
-            // Check authentication (with timeout, non-blocking)
-            console.log('Step 1: Checking authentication...');
+            // Check authentication
             await this.checkAuth();
-            console.log('✅ Authentication checked');
             
-            // Load products cache (local first, API in background)
-            console.log('Step 2: Loading products...');
-            this.showLoading('Chargement des produits...');
+            // Load products cache
             await this.loadProductsCache();
-            console.log('✅ Products loaded:', this.allProducts.length, 'products');
             
             // Initialize UI
-            console.log('Step 3: Initializing UI...');
             this.initUI();
-            console.log('✅ UI initialized');
             
-            // Update cart UI
-            console.log('Step 4: Updating cart...');
-            this.updateCartUI();
-            console.log('✅ Cart updated');
-            
-            // Initialize search
-            console.log('Step 5: Initializing search...');
-            this.initSearch();
-            console.log('✅ Search initialized');
-            
-            // Load home page first
-            console.log('Step 6: Loading home page...');
-            this.showLoading('Préparation de la page...');
-            await this.loadHomePage();
-            console.log('✅ Home page loaded');
-            
-            // Initialize SEO Router if available (after initial page load)
+            // Initialize SEO Router if available
             if (typeof SEORouter !== 'undefined') {
                 try {
-                    console.log('Step 7: Initializing SEO Router...');
-                    
-                    // Temporarily disable SEO Router to test
-                    // window.seoRouter = new SEORouter(this);
-                    
-                    console.log('ℹ️  SEO Router temporarily disabled for debugging');
+                    window.seoRouter = new SEORouter(this);
+                    console.log('SEO Router initialized');
                 } catch (error) {
-                    console.log('⚠️  SEO Router initialization failed:', error);
+                    console.log('SEO Router initialization failed:', error);
                 }
             } else {
-                console.log('ℹ️  SEO Router not available, continuing without it');
+                console.log('SEO Router not available, continuing without it');
             }
             
-            // Force hide loading and show content
-            console.log('Step 8: Forcing UI to show...');
+            // Update cart UI
+            this.updateCartUI();
+            
+            // Initialize search
+            this.initSearch();
+            
+            // Load home page
+            await this.loadHomePage();
+            
+            // Hide loading
             this.hideLoading();
-            this.hideServerLoadingScreen();
             
-            // Make sure main content is visible
-            const mainContent = document.getElementById('mainContent');
-            if (mainContent) {
-                mainContent.style.display = 'block';
-                mainContent.style.visibility = 'visible';
-                console.log('✅ Main content forced visible');
-            }
-            
-            console.log('✅ App initialized successfully!');
-            console.log('ℹ️  Server may be waking up - products will sync in background');
+            console.log('App initialized successfully!');
             
         } catch (error) {
-            console.error('❌ Error initializing app:', error);
-            console.error('Error stack:', error.stack);
+            console.error('Error initializing app:', error);
             this.hideLoading();
-            this.hideServerLoadingScreen();
-            
-            // Show error but still try to load the page
-            this.showToast('Application chargée avec des données en cache', 'warning');
-            try {
-                await this.loadHomePage();
-            } catch (e) {
-                console.error('Failed to load home page:', e);
-            }
-        }
-    }
-    
-    hideServerLoadingScreen() {
-        const serverLoadingScreen = document.getElementById('serverLoadingScreen');
-        if (serverLoadingScreen) {
-            serverLoadingScreen.style.transition = 'opacity 0.5s ease-out';
-            serverLoadingScreen.style.opacity = '0';
-            setTimeout(() => {
-                serverLoadingScreen.style.display = 'none';
-                serverLoadingScreen.remove();
-                console.log('✅ Server loading screen hidden and removed');
-            }, 500);
-        } else {
-            console.log('⚠️ Server loading screen element not found');
+            this.showToast('Erreur de chargement de l\'application', 'error');
         }
     }
     
@@ -179,16 +126,9 @@ class PharmacieGaherApp {
         const token = localStorage.getItem('token');
         if (token) {
             try {
-                // Don't wait too long for auth check
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-                
                 const response = await fetch('https://parapharmacie-gaher.onrender.com/api/auth/profile', {
-                    headers: { 'x-auth-token': token },
-                    signal: controller.signal
+                    headers: { 'x-auth-token': token }
                 });
-                
-                clearTimeout(timeoutId);
                 
                 if (response.ok) {
                     this.currentUser = await response.json();
@@ -197,7 +137,7 @@ class PharmacieGaherApp {
                     localStorage.removeItem('token');
                 }
             } catch (error) {
-                console.log('Auth check failed (server may be sleeping), continuing as guest');
+                console.log('Auth check failed, continuing as guest');
                 localStorage.removeItem('token');
             }
         }
@@ -285,60 +225,29 @@ class PharmacieGaherApp {
     
     async loadProductsCache() {
         try {
-            // Always load local products first
             let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
             this.allProducts = [...localProducts];
             
-            console.log('Loaded', localProducts.length, 'products from cache');
-            
-            // Try to fetch from API in background (non-blocking)
-            this.fetchProductsFromAPI();
-            
-        } catch (error) {
-            console.log('Error loading products from cache:', error);
-            this.allProducts = [];
-        }
-    }
-    
-    async fetchProductsFromAPI() {
-        try {
-            // Add timeout to prevent long waits
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-            
-            const response = await fetch('https://parapharmacie-gaher.onrender.com/api/products', {
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.products && data.products.length > 0) {
-                    const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-                    const localIds = localProducts.map(p => p._id);
-                    const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
-                    
-                    if (newApiProducts.length > 0) {
-                        this.allProducts = [...localProducts, ...newApiProducts];
-                        localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
-                        console.log('✅ Synced', newApiProducts.length, 'new products from API');
+            try {
+                const response = await fetch('https://parapharmacie-gaher.onrender.com/api/products');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.products && data.products.length > 0) {
+                        const localIds = localProducts.map(p => p._id);
+                        const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
                         
-                        // Refresh UI if we're on a relevant page
-                        if (this.currentPage === 'home') {
-                            this.refreshHomePage();
-                        } else if (this.currentPage === 'products') {
-                            this.showPage('products');
+                        if (newApiProducts.length > 0) {
+                            this.allProducts = [...localProducts, ...newApiProducts];
+                            localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
                         }
                     }
                 }
+            } catch (error) {
+                console.log('API unavailable, using local products only');
             }
+            
         } catch (error) {
-            if (error.name === 'AbortError') {
-                console.log('⏱️ API request timeout (server may be sleeping) - using cached products');
-            } else {
-                console.log('ℹ️ API unavailable - using cached products only');
-            }
+            this.allProducts = [];
         }
     }
     
@@ -448,37 +357,6 @@ class PharmacieGaherApp {
         }
     }
     
-    // SEO COMPATIBLE METHOD - Product Not Found
-    showProductNotFound() {
-        const mainContent = document.getElementById('mainContent');
-        mainContent.innerHTML = `
-            <div class="container mx-auto px-4 py-16">
-                <div class="max-w-2xl mx-auto text-center">
-                    <div class="mb-8">
-                        <i class="fas fa-exclamation-triangle text-8xl text-yellow-500 mb-6"></i>
-                    </div>
-                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Produit non trouvé</h1>
-                    <p class="text-xl text-gray-600 mb-8">
-                        Désolé, ce produit n'existe pas ou n'est plus disponible.
-                    </p>
-                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                        <button onclick="app.showPage('products')" class="btn-primary">
-                            <i class="fas fa-shopping-bag mr-2"></i>
-                            Voir tous les produits
-                        </button>
-                        <button onclick="app.showPage('home')" class="btn-secondary">
-                            <i class="fas fa-home mr-2"></i>
-                            Retour à l'accueil
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Update page title for SEO
-        document.title = 'Produit non trouvé - Shifa Parapharmacie';
-    }
-    
     async loadHomePage() {
         const mainContent = document.getElementById('mainContent');
         mainContent.innerHTML = `
@@ -545,9 +423,6 @@ class PharmacieGaherApp {
         await this.loadCategories();
         await this.loadFeaturedProducts();
         await this.loadPromotionProducts();
-        
-        // Update page title for SEO
-        document.title = 'Shifa - Parapharmacie | Produits de santé et beauté en Algérie';
     }
     
     async loadCategories() {
@@ -669,22 +544,14 @@ class PharmacieGaherApp {
         `;
         
         this.currentFilteredProducts = filteredProducts;
-        
-        // Update page title for SEO
-        if (params.categorie) {
-            document.title = `${params.categorie} - Shifa Parapharmacie`;
-        } else if (params.search) {
-            document.title = `Recherche: ${params.search} - Shifa Parapharmacie`;
-        } else {
-            document.title = 'Produits - Shifa Parapharmacie';
-        }
     }
     
     async loadProductPage(productId) {
         const product = this.allProducts.find(p => p._id === productId);
         
         if (!product) {
-            this.showProductNotFound();
+            this.showToast('Produit non trouvé', 'error');
+            this.showPage('products');
             return;
         }
         
@@ -775,9 +642,6 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
-        
-        // Update page title for SEO
-        document.title = `${product.nom} - ${product.marque || 'Shifa Parapharmacie'}`;
     }
     
     async loadLoginPage() {
@@ -831,9 +695,6 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
-        
-        // Update page title for SEO
-        document.title = 'Connexion - Shifa Parapharmacie';
     }
     
     async loadRegisterPage() {
@@ -913,9 +774,6 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
-        
-        // Update page title for SEO
-        document.title = 'Inscription - Shifa Parapharmacie';
     }
     
     async loadProfilePage() {
@@ -1015,9 +873,6 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
-        
-        // Update page title for SEO
-        document.title = 'Mon Profil - Shifa Parapharmacie';
     }
     
     async loadCheckoutPage() {
@@ -1189,9 +1044,6 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
-        
-        // Update page title for SEO
-        document.title = 'Finaliser la commande - Shifa Parapharmacie';
     }
     
     async processCheckoutOrder() {
@@ -1389,9 +1241,6 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
-        
-        // Update page title for SEO
-        document.title = `Commande Confirmée #${orderNumber} - Shifa Parapharmacie`;
     }
     
     async loadContactPage() {
@@ -1474,9 +1323,6 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
-        
-        // Update page title for SEO
-        document.title = 'Contact - Shifa Parapharmacie';
     }
     
     async loadAdminPage() {
@@ -1531,9 +1377,6 @@ class PharmacieGaherApp {
         `;
         
         await this.loadAdminDashboard();
-        
-        // Update page title for SEO
-        document.title = 'Administration - Shifa Parapharmacie';
     }
     
     async loadAdminDashboard() {
@@ -2248,14 +2091,9 @@ class PharmacieGaherApp {
         }
     }
     
-    showLoading(message = 'Chargement...') {
+    showLoading() {
         const spinner = document.getElementById('loadingSpinner');
         if (spinner) {
-            // Update loading text if there's a message element
-            const loadingText = spinner.querySelector('span');
-            if (loadingText) {
-                loadingText.textContent = message;
-            }
             spinner.classList.remove('hidden');
         }
     }
@@ -2264,10 +2102,6 @@ class PharmacieGaherApp {
         const spinner = document.getElementById('loadingSpinner');
         if (spinner) {
             spinner.classList.add('hidden');
-            spinner.style.display = 'none'; // Force hide
-            console.log('✅ Loading spinner hidden');
-        } else {
-            console.log('⚠️ Loading spinner element not found');
         }
     }
     
@@ -2312,7 +2146,7 @@ class PharmacieGaherApp {
 }
 
 // ============================================================================
-// GLOBAL FUNCTIONS (Complete and identical to original)
+// GLOBAL FUNCTIONS (keeping identical to your original file)
 // ============================================================================
 
 function addToCartFromCard(productId, quantity = 1) {
@@ -3364,7 +3198,7 @@ function filterOrders(status) {
 
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('✅ Initializing Shifa Parapharmacie App - SEO Compatible Version');
+    console.log('Initializing Shifa Parapharmacie App - FIXED VERSION');
     app = new PharmacieGaherApp();
     window.app = app;
-});
+    console.log('App initialized successfully with fixed loading!
