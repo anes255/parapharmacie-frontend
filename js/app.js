@@ -131,6 +131,7 @@ class PharmacieGaherApp {
             // Force hide loading and show content
             console.log('Step 8: Forcing UI to show...');
             this.hideLoading();
+            this.hideServerLoadingScreen();
             
             // Make sure main content is visible
             const mainContent = document.getElementById('mainContent');
@@ -147,6 +148,7 @@ class PharmacieGaherApp {
             console.error('❌ Error initializing app:', error);
             console.error('Error stack:', error.stack);
             this.hideLoading();
+            this.hideServerLoadingScreen();
             
             // Show error but still try to load the page
             this.showToast('Application chargée avec des données en cache', 'warning');
@@ -155,6 +157,21 @@ class PharmacieGaherApp {
             } catch (e) {
                 console.error('Failed to load home page:', e);
             }
+        }
+    }
+    
+    hideServerLoadingScreen() {
+        const serverLoadingScreen = document.getElementById('serverLoadingScreen');
+        if (serverLoadingScreen) {
+            serverLoadingScreen.style.transition = 'opacity 0.5s ease-out';
+            serverLoadingScreen.style.opacity = '0';
+            setTimeout(() => {
+                serverLoadingScreen.style.display = 'none';
+                serverLoadingScreen.remove();
+                console.log('✅ Server loading screen hidden and removed');
+            }, 500);
+        } else {
+            console.log('⚠️ Server loading screen element not found');
         }
     }
     
