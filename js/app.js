@@ -70,6 +70,7 @@ class PharmacieGaherApp {
         this.currentPage = 'home';
         this.backendReady = false;
         this.keepAliveInterval = null;
+        this.currentProductId = null; // Store current product being viewed
         
         this.init();
     }
@@ -813,6 +814,9 @@ class PharmacieGaherApp {
             this.showProductNotFound();
             return;
         }
+        
+        // Store current product ID for cart operations
+        this.currentProductId = productId;
         
         const mainContent = document.getElementById('mainContent');
         const isOutOfStock = product.stock === 0;
@@ -2151,11 +2155,17 @@ class PharmacieGaherApp {
     
     async addToCart(productId, quantity = 1) {
         try {
+            console.log('🛒 Adding to cart - Product ID:', productId, 'Quantity:', quantity);
+            
             const product = this.allProducts.find(p => p._id === productId);
             
             if (!product) {
+                console.error('Product not found:', productId);
+                console.log('Available products:', this.allProducts.map(p => p._id));
                 throw new Error('Produit non trouvé');
             }
+            
+            console.log('✅ Product found:', product.nom);
             
             if (product.stock === 0) {
                 this.showToast('Ce produit est en rupture de stock', 'error');
@@ -2217,9 +2227,10 @@ class PharmacieGaherApp {
             this.saveCart();
             this.updateCartUI();
             this.showToast(`${product.nom} ajouté au panier`, 'success');
+            console.log('✅ Product added to cart successfully');
             
         } catch (error) {
-            console.error('Erreur ajout au panier:', error);
+            console.error('❌ Erreur ajout au panier:', error);
             this.showToast('Erreur lors de l\'ajout au panier', 'error');
         }
     }
@@ -2443,30 +2454,50 @@ class PharmacieGaherApp {
 
 function addToCartFromCard(productId, quantity = 1) {
     if (window.app && typeof window.app.addToCart === 'function') {
+        console.log('🛒 Adding from card:', productId);
         window.app.addToCart(productId, quantity);
+    } else {
+        console.error('App not initialized or addToCart not available');
     }
 }
 
 function updateProductQuantity(change) {
     const input = document.getElementById('productQuantity');
-    if (input) {
-        let newValue = parseInt(input.value) + change;
-        const max = parseInt(input.max);
-        
-        if (newValue < 1) newValue = 1;
-        if (newValue > max) newValue = max;
-        
-        input.value = newValue;
+    if (!input) {
+        console.error('Product quantity input not found');
+        return;
     }
+    
+    let newValue = parseInt(input.value) + change;
+    const max = parseInt(input.max) || 999;
+    const min = parseInt(input.min) || 1;
+    
+    if (newValue < min) newValue = min;
+    if (newValue > max) newValue = max;
+    
+    input.value = newValue;
 }
 
 function addProductToCart() {
-    const productId = window.location.hash.split('/').pop();
-    const quantity = parseInt(document.getElementById('productQuantity').value) || 1;
-    
-    if (window.app) {
-        window.app.addToCart(productId, quantity);
+    if (!window.app) {
+        console.error('App not initialized');
+        return;
     }
+    
+    // Get product ID from app's current product
+    const productId = window.app.currentProductId;
+    
+    if (!productId) {
+        console.error('No product ID found');
+        window.app.showToast('Erreur: Produit introuvable', 'error');
+        return;
+    }
+    
+    const quantityInput = document.getElementById('productQuantity');
+    const quantity = quantityInput ? parseInt(quantityInput.value) || 1 : 1;
+    
+    console.log('Adding to cart:', productId, 'quantity:', quantity);
+    window.app.addToCart(productId, quantity);
 }
 
 function sortProducts(sortBy) {
