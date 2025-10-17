@@ -80,34 +80,38 @@ class PharmacieGaherApp {
             // Show loading
             this.showLoading('Chargement de l\'application...');
             
+            // Ping server to wake it up (non-blocking)
+            console.log('Step 1: Waking up server...');
+            this.wakeUpServer();
+            
             // Check authentication (with timeout, non-blocking)
-            console.log('Step 1: Checking authentication...');
+            console.log('Step 2: Checking authentication...');
             await this.checkAuth();
             console.log('✅ Authentication checked');
             
             // Load products cache (local first, API in background)
-            console.log('Step 2: Loading products...');
+            console.log('Step 3: Loading products...');
             this.showLoading('Chargement des produits...');
             await this.loadProductsCache();
             console.log('✅ Products loaded:', this.allProducts.length, 'products');
             
             // Initialize UI
-            console.log('Step 3: Initializing UI...');
+            console.log('Step 4: Initializing UI...');
             this.initUI();
             console.log('✅ UI initialized');
             
             // Update cart UI
-            console.log('Step 4: Updating cart...');
+            console.log('Step 5: Updating cart...');
             this.updateCartUI();
             console.log('✅ Cart updated');
             
             // Initialize search
-            console.log('Step 5: Initializing search...');
+            console.log('Step 6: Initializing search...');
             this.initSearch();
             console.log('✅ Search initialized');
             
             // Load home page first
-            console.log('Step 6: Loading home page...');
+            console.log('Step 7: Loading home page...');
             this.showLoading('Préparation de la page...');
             await this.loadHomePage();
             console.log('✅ Home page loaded');
@@ -115,7 +119,7 @@ class PharmacieGaherApp {
             // Initialize SEO Router if available (after initial page load)
             if (typeof SEORouter !== 'undefined') {
                 try {
-                    console.log('Step 7: Initializing SEO Router...');
+                    console.log('Step 8: Initializing SEO Router...');
                     
                     // Temporarily disable SEO Router to test
                     // window.seoRouter = new SEORouter(this);
@@ -129,7 +133,7 @@ class PharmacieGaherApp {
             }
             
             // Force hide loading and show content
-            console.log('Step 8: Forcing UI to show...');
+            console.log('Step 9: Forcing UI to show...');
             this.hideLoading();
             this.hideServerLoadingScreen();
             
@@ -160,6 +164,30 @@ class PharmacieGaherApp {
         }
     }
     
+    async wakeUpServer() {
+        try {
+            console.log('🔔 Pinging server to wake it up...');
+            // Don't wait for this - let it happen in background
+            fetch('https://parapharmacie-gaher.onrender.com/api/products', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(response => {
+                if (response.ok) {
+                    console.log('✅ Server is awake and responding');
+                    this.backendReady = true;
+                } else {
+                    console.log('⚠️ Server responded but not ok:', response.status);
+                }
+            }).catch(error => {
+                console.log('⚠️ Server wake-up ping failed:', error.message);
+            });
+        } catch (error) {
+            console.log('Could not ping server:', error.message);
+        }
+    }
+    
     hideServerLoadingScreen() {
         const serverLoadingScreen = document.getElementById('serverLoadingScreen');
         if (serverLoadingScreen) {
@@ -181,24 +209,35 @@ class PharmacieGaherApp {
             try {
                 // Don't wait too long for auth check
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+                const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
                 
+                console.log('Checking auth with server...');
                 const response = await fetch('https://parapharmacie-gaher.onrender.com/api/auth/profile', {
-                    headers: { 'x-auth-token': token },
+                    headers: { 
+                        'x-auth-token': token,
+                        'Content-Type': 'application/json'
+                    },
                     signal: controller.signal
                 });
                 
                 clearTimeout(timeoutId);
                 
+                console.log('Auth response status:', response.status);
+                
                 if (response.ok) {
                     this.currentUser = await response.json();
                     this.updateUserUI();
+                    console.log('✅ User authenticated:', this.currentUser.email);
                 } else {
+                    console.log('Auth failed, removing token');
                     localStorage.removeItem('token');
                 }
             } catch (error) {
-                console.log('Auth check failed (server may be sleeping), continuing as guest');
-                localStorage.removeItem('token');
+                console.log('Auth check failed (server may be sleeping), continuing as guest:', error.message);
+                // Don't remove token on timeout - might be server cold start
+                if (error.name !== 'AbortError') {
+                    localStorage.removeItem('token');
+                }
             }
         }
     }
@@ -302,18 +341,29 @@ class PharmacieGaherApp {
     
     async fetchProductsFromAPI() {
         try {
+            console.log('🔄 Attempting to fetch products from API...');
+            
             // Add timeout to prevent long waits
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout for cold start
             
             const response = await fetch('https://parapharmacie-gaher.onrender.com/api/products', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 signal: controller.signal
             });
             
             clearTimeout(timeoutId);
             
+            console.log('API response status:', response.status);
+            
             if (response.ok) {
                 const data = await response.json();
+                console.log('API response data:', data);
+                
                 if (data && data.products && data.products.length > 0) {
                     const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
                     const localIds = localProducts.map(p => p._id);
@@ -330,14 +380,20 @@ class PharmacieGaherApp {
                         } else if (this.currentPage === 'products') {
                             this.showPage('products');
                         }
+                    } else {
+                        console.log('✅ API connected - no new products to sync');
                     }
+                } else {
+                    console.log('✅ API connected - using local products');
                 }
+            } else {
+                console.log('⚠️ API response not ok:', response.statusText);
             }
         } catch (error) {
             if (error.name === 'AbortError') {
-                console.log('⏱️ API request timeout (server may be sleeping) - using cached products');
+                console.log('⏱️ API request timeout (server may be waking up) - using cached products');
             } else {
-                console.log('ℹ️ API unavailable - using cached products only');
+                console.log('ℹ️ API unavailable:', error.message, '- using cached products only');
             }
         }
     }
