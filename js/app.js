@@ -324,18 +324,38 @@ class PharmacieGaherApp {
     
     async loadProductsCache() {
         try {
-            // Always load local products first
-            let localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            this.allProducts = [...localProducts];
+            // Clear old cache that was causing quota issues
+            try {
+                const oldCache = localStorage.getItem('demoProducts');
+                if (oldCache) {
+                    console.log('🧹 Clearing old product cache...');
+                    localStorage.removeItem('demoProducts');
+                }
+            } catch (e) {
+                console.log('Could not clear old cache');
+            }
             
-            console.log('Loaded', localProducts.length, 'products from cache');
+            // Load lightweight cache (no base64 images)
+            const cachedProducts = localStorage.getItem('productsCache');
+            if (cachedProducts) {
+                try {
+                    const parsed = JSON.parse(cachedProducts);
+                    this.allProducts = parsed;
+                    console.log('Loaded', this.allProducts.length, 'products from cache');
+                } catch (e) {
+                    console.log('Cache corrupted, will fetch fresh data');
+                    localStorage.removeItem('productsCache');
+                }
+            }
             
-            // Try to fetch from API in background (non-blocking)
+            // Always try to fetch fresh data from API (non-blocking)
             this.fetchProductsFromAPI();
             
         } catch (error) {
-            console.log('Error loading products from cache:', error);
+            console.log('Error loading products cache:', error);
             this.allProducts = [];
+            // Still try to fetch from API
+            this.fetchProductsFromAPI();
         }
     }
     
@@ -365,26 +385,51 @@ class PharmacieGaherApp {
                 console.log('API response data:', data);
                 
                 if (data && data.products && data.products.length > 0) {
-                    const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-                    const localIds = localProducts.map(p => p._id);
-                    const newApiProducts = data.products.filter(p => !localIds.includes(p._id));
+                    // Don't store in localStorage - just update memory
+                    // This avoids localStorage quota issues with base64 images
+                    this.allProducts = data.products;
                     
-                    if (newApiProducts.length > 0) {
-                        this.allProducts = [...localProducts, ...newApiProducts];
-                        localStorage.setItem('demoProducts', JSON.stringify(this.allProducts));
-                        console.log('✅ Synced', newApiProducts.length, 'new products from API');
+                    // Store only IDs and essential data (no images) for offline fallback
+                    try {
+                        const lightProducts = data.products.map(p => ({
+                            _id: p._id,
+                            nom: p.nom,
+                            prix: p.prix,
+                            categorie: p.categorie,
+                            stock: p.stock,
+                            description: p.description,
+                            marque: p.marque,
+                            enPromotion: p.enPromotion,
+                            enVedette: p.enVedette,
+                            actif: p.actif,
+                            // Store image URL but not base64 data
+                            imageUrl: p.image && p.image.startsWith('http') ? p.image : null
+                        }));
                         
-                        // Refresh UI if we're on a relevant page
-                        if (this.currentPage === 'home') {
-                            this.refreshHomePage();
-                        } else if (this.currentPage === 'products') {
-                            this.showPage('products');
+                        localStorage.setItem('productsCache', JSON.stringify(lightProducts));
+                        console.log('✅ Cached', lightProducts.length, 'products (lightweight)');
+                    } catch (storageError) {
+                        console.log('⚠️ Could not cache products:', storageError.message);
+                        // Clear old cache if storage is full
+                        try {
+                            localStorage.removeItem('demoProducts');
+                            localStorage.removeItem('productsCache');
+                            console.log('🧹 Cleared old cache');
+                        } catch (e) {
+                            console.log('Could not clear cache');
                         }
-                    } else {
-                        console.log('✅ API connected - no new products to sync');
+                    }
+                    
+                    console.log('✅ Loaded', this.allProducts.length, 'products from API');
+                    
+                    // Refresh UI if we're on a relevant page
+                    if (this.currentPage === 'home') {
+                        this.refreshHomePage();
+                    } else if (this.currentPage === 'products') {
+                        this.showPage('products');
                     }
                 } else {
-                    console.log('✅ API connected - using local products');
+                    console.log('✅ API connected - no products returned');
                 }
             } else {
                 console.log('⚠️ API response not ok:', response.statusText);
@@ -393,20 +438,15 @@ class PharmacieGaherApp {
             if (error.name === 'AbortError') {
                 console.log('⏱️ API request timeout (server may be waking up) - using cached products');
             } else {
-                console.log('ℹ️ API unavailable:', error.message, '- using cached products only');
+                console.log('ℹ️ API error:', error.message);
             }
         }
     }
     
     refreshProductsCache() {
-        const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-        this.allProducts = [...localProducts];
-        
-        if (this.currentPage === 'home') {
-            this.refreshHomePage();
-        } else if (this.currentPage === 'products') {
-            this.showPage('products');
-        }
+        // Just fetch fresh data from API - don't use old localStorage
+        console.log('🔄 Refreshing products from API...');
+        this.fetchProductsFromAPI();
     }
     
     refreshHomePage() {
@@ -3106,17 +3146,11 @@ async function saveProductEdit(event, productId) {
             const data = await response.json();
             console.log('Product updated successfully:', data);
             
-            const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            const productIndex = localProducts.findIndex(p => p._id === productId);
-            if (productIndex > -1) {
-                localProducts[productIndex] = { ...localProducts[productIndex], ...productData };
-                localStorage.setItem('demoProducts', JSON.stringify(localProducts));
-            }
-            
             window.app.showToast('Produit mis à jour avec succès', 'success');
             closeEditProductModal();
             
-            await window.app.loadProductsCache();
+            // Refresh products from API
+            await window.app.fetchProductsFromAPI();
             window.app.loadAdminProducts();
         } else {
             const errorData = await response.json();
@@ -3157,11 +3191,8 @@ async function deleteProduct(productId) {
         if (response.ok) {
             window.app.showToast('Produit supprimé avec succès', 'success');
             
-            const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            const updatedProducts = localProducts.filter(p => p._id !== productId);
-            localStorage.setItem('demoProducts', JSON.stringify(updatedProducts));
-            
-            await window.app.loadProductsCache();
+            // Refresh products from API
+            await window.app.fetchProductsFromAPI();
             window.app.loadAdminProducts();
         } else {
             const errorData = await response.json();
@@ -3391,14 +3422,11 @@ async function saveNewProduct(event) {
             const data = await response.json();
             console.log('Product created successfully:', data);
             
-            const localProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
-            localProducts.push(data.product);
-            localStorage.setItem('demoProducts', JSON.stringify(localProducts));
-            
             window.app.showToast('Produit ajouté avec succès', 'success');
             closeAddProductModal();
             
-            await window.app.loadProductsCache();
+            // Refresh products from API
+            await window.app.fetchProductsFromAPI();
             window.app.loadAdminProducts();
         } else {
             const errorData = await response.json();
