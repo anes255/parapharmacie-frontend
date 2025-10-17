@@ -1387,7 +1387,7 @@ class PharmacieGaherApp {
                     wilaya: wilaya
                 },
                 articles: this.cart.map(item => ({
-                    produit: String(item.id),
+                    productId: String(item.id),  // Backend expects 'productId'
                     nom: item.nom,
                     prix: parseFloat(item.prix),
                     quantite: parseInt(item.quantite)
