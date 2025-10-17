@@ -122,10 +122,10 @@ class PharmacieGaherApp {
                 try {
                     console.log('Step 8: Initializing SEO Router...');
                     
-                    // Temporarily disable SEO Router to test
-                    // window.seoRouter = new SEORouter(this);
+                    // Enable SEO Router
+                    window.seoRouter = new SEORouter(this);
                     
-                    console.log('ℹ️  SEO Router temporarily disabled for debugging');
+                    console.log('✅ SEO Router initialized successfully');
                 } catch (error) {
                     console.log('⚠️  SEO Router initialization failed:', error);
                 }
