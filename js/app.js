@@ -69,6 +69,7 @@ class PharmacieGaherApp {
         };
         this.currentPage = 'home';
         this.backendReady = false;
+        this.keepAliveInterval = null;
         
         this.init();
     }
@@ -168,7 +169,7 @@ class PharmacieGaherApp {
         try {
             console.log('🔔 Pinging server to wake it up...');
             // Don't wait for this - let it happen in background
-            fetch('https://parapharmacie-gaher.onrender.com/api/products', {
+            fetch('https://parapharmacie-gaher.onrender.com/api/health', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -177,15 +178,44 @@ class PharmacieGaherApp {
                 if (response.ok) {
                     console.log('✅ Server is awake and responding');
                     this.backendReady = true;
+                    
+                    // Start keep-alive pings every 5 minutes
+                    this.startKeepAlive();
                 } else {
                     console.log('⚠️ Server responded but not ok:', response.status);
                 }
             }).catch(error => {
                 console.log('⚠️ Server wake-up ping failed:', error.message);
+                // Retry after 10 seconds
+                setTimeout(() => this.wakeUpServer(), 10000);
             });
         } catch (error) {
             console.log('Could not ping server:', error.message);
         }
+    }
+    
+    startKeepAlive() {
+        // Ping server every 5 minutes to keep it awake
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+        }
+        
+        this.keepAliveInterval = setInterval(() => {
+            console.log('🔄 Keep-alive ping...');
+            fetch('https://parapharmacie-gaher.onrender.com/api/health', {
+                method: 'GET'
+            }).then(response => {
+                if (response.ok) {
+                    console.log('✅ Server keep-alive OK');
+                } else {
+                    console.log('⚠️ Server keep-alive failed');
+                }
+            }).catch(error => {
+                console.log('⚠️ Keep-alive error:', error.message);
+            });
+        }, 5 * 60 * 1000); // 5 minutes
+        
+        console.log('✅ Keep-alive started (5min interval)');
     }
     
     hideServerLoadingScreen() {
@@ -1332,7 +1362,7 @@ class PharmacieGaherApp {
             
             console.log('Generated orderNumber:', orderNumber);
             
-            // Prepare order data
+            // Prepare order data - MATCH BACKEND SCHEMA EXACTLY
             const prenom = document.getElementById('checkoutPrenom').value.trim();
             const nom = document.getElementById('checkoutNom').value.trim();
             const telephone = document.getElementById('checkoutTelephone').value.trim();
@@ -1345,30 +1375,29 @@ class PharmacieGaherApp {
             const fraisLivraison = 400;
             const total = cartTotal + fraisLivraison;
             
+            // Backend expects this EXACT structure
             const orderData = {
                 numeroCommande: orderNumber,
-                orderNumber: orderNumber,
                 client: {
-                    prenom,
-                    nom,
+                    prenom: prenom,
+                    nom: nom,
+                    email: this.currentUser?.email || `guest_${Date.now()}@temp.com`,
                     telephone: telephone.replace(/\s+/g, ''),
-                    adresse,
-                    wilaya
+                    adresse: adresse,
+                    wilaya: wilaya
                 },
                 articles: this.cart.map(item => ({
-                    productId: String(item.id),
+                    produit: String(item.id),
                     nom: item.nom,
                     prix: parseFloat(item.prix),
-                    quantite: parseInt(item.quantite),
-                    image: item.image || ''
+                    quantite: parseInt(item.quantite)
                 })),
                 sousTotal: parseFloat(cartTotal),
                 fraisLivraison: parseFloat(fraisLivraison),
                 total: parseFloat(total),
                 statut: 'en-attente',
-                modePaiement,
-                commentaires,
-                dateCommande: new Date().toISOString()
+                modePaiement: modePaiement,
+                commentaires: commentaires
             };
             
             console.log('Order data to submit:', JSON.stringify(orderData, null, 2));
@@ -1377,13 +1406,19 @@ class PharmacieGaherApp {
             let apiSuccess = false;
             try {
                 const token = localStorage.getItem('token');
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                };
+                
+                if (token) {
+                    headers['x-auth-token'] = token;
+                }
+                
+                console.log('Submitting order to API...');
                 const response = await fetch('https://parapharmacie-gaher.onrender.com/api/orders', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        ...(token && { 'x-auth-token': token })
-                    },
+                    headers: headers,
                     body: JSON.stringify(orderData)
                 });
                 
@@ -1393,7 +1428,7 @@ class PharmacieGaherApp {
                 console.log('API Response data:', data);
                 
                 if (response.ok) {
-                    console.log('Order saved to API successfully');
+                    console.log('✅ Order saved to API successfully');
                     apiSuccess = true;
                 } else {
                     console.error('API Error:', data);
@@ -1401,31 +1436,26 @@ class PharmacieGaherApp {
                 }
             } catch (apiError) {
                 console.error('API submission failed:', apiError);
+                this.showToast('Erreur lors de l\'enregistrement: ' + apiError.message, 'error');
+                
+                // Re-enable button on error
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirmer la commande';
+                }
+                return;
             }
             
-            // Save to session storage
-            try {
-                const sessionOrders = JSON.parse(sessionStorage.getItem('pendingOrders') || '[]');
-                sessionOrders.push({
-                    ...orderData,
-                    savedAt: new Date().toISOString()
-                });
-                sessionStorage.setItem('pendingOrders', JSON.stringify(sessionOrders.slice(-10)));
-            } catch (storageError) {
-                console.log('Session storage also full, but order was submitted to API');
+            // Clear cart only if order was saved
+            if (apiSuccess) {
+                this.clearCart();
+                this.showToast('Commande confirmée !', 'success');
+                
+                // Redirect to confirmation
+                setTimeout(() => {
+                    this.showPage('order-confirmation', { orderNumber });
+                }, 500);
             }
-            
-            // Clear cart
-            this.clearCart();
-            
-            // Show success
-            this.showToast(
-                apiSuccess ? 'Commande confirmée !' : 'Commande enregistrée',
-                apiSuccess ? 'success' : 'warning'
-            );
-            
-            // Redirect to confirmation
-            this.showPage('order-confirmation', { orderNumber });
             
         } catch (error) {
             console.error('Checkout error:', error);
