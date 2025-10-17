@@ -168,30 +168,84 @@ class PharmacieGaherApp {
     
     async wakeUpServer() {
         try {
-            console.log('🔔 Pinging server to wake it up...');
-            // Don't wait for this - let it happen in background
-            fetch('https://parapharmacie-gaher.onrender.com/api/health', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            }).then(response => {
+            console.log('🔔 Waking up server...');
+            
+            // Show user-friendly message
+            const loadingMsg = document.getElementById('loadingMessage');
+            if (loadingMsg) {
+                loadingMsg.innerHTML = `
+                    <div class="text-center">
+                        <p class="text-white text-lg font-medium animate-pulse mb-2">
+                            Connexion au serveur...
+                        </p>
+                        <p class="text-white/70 text-sm">
+                            Premier chargement : 10-30 secondes
+                        </p>
+                    </div>
+                `;
+            }
+            
+            const startTime = Date.now();
+            
+            // Ping with longer timeout for cold start
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+            
+            try {
+                const response = await fetch('https://parapharmacie-gaher.onrender.com/api/health', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                
                 if (response.ok) {
-                    console.log('✅ Server is awake and responding');
+                    console.log(`✅ Server awake in ${elapsed}s`);
                     this.backendReady = true;
-                    
-                    // Start keep-alive pings every 5 minutes
                     this.startKeepAlive();
+                    
+                    if (loadingMsg) {
+                        loadingMsg.innerHTML = `
+                            <p class="text-white text-lg font-medium">
+                                ✅ Serveur connecté (${elapsed}s)
+                            </p>
+                        `;
+                    }
                 } else {
-                    console.log('⚠️ Server responded but not ok:', response.status);
+                    throw new Error('Server not responding properly');
                 }
-            }).catch(error => {
-                console.log('⚠️ Server wake-up ping failed:', error.message);
-                // Retry after 10 seconds
-                setTimeout(() => this.wakeUpServer(), 10000);
-            });
+            } catch (error) {
+                clearTimeout(timeoutId);
+                
+                if (error.name === 'AbortError') {
+                    console.log('⏱️ Server wake-up timeout, retrying...');
+                    
+                    if (loadingMsg) {
+                        loadingMsg.innerHTML = `
+                            <p class="text-white text-lg font-medium animate-pulse">
+                                Le serveur met plus de temps que prévu...
+                            </p>
+                            <p class="text-white/70 text-sm mt-2">
+                                Nouvelle tentative...
+                            </p>
+                        `;
+                    }
+                    
+                    // Retry after 5 seconds
+                    setTimeout(() => this.wakeUpServer(), 5000);
+                } else {
+                    console.log('⚠️ Server wake-up failed:', error.message);
+                    
+                    // Try again after 10 seconds
+                    setTimeout(() => this.wakeUpServer(), 10000);
+                }
+            }
         } catch (error) {
             console.log('Could not ping server:', error.message);
+            setTimeout(() => this.wakeUpServer(), 10000);
         }
     }
     
