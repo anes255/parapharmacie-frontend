@@ -162,132 +162,92 @@ class PharmacieGaherApp {
         }
     }
     
-    // NEW: Initialize URL routing with browser history
+    // NEW: Initialize URL routing with hash-based navigation
     initURLRouting() {
-        // Listen for browser back/forward buttons
-        window.addEventListener('popstate', (event) => {
-            console.log('Browser navigation detected:', event.state);
-            if (event.state && event.state.page) {
-                this.loadPageFromState(event.state);
-            } else {
-                this.loadPageFromURL();
-            }
+        // Listen for hash changes (browser back/forward)
+        window.addEventListener('hashchange', () => {
+            console.log('Hash changed:', window.location.hash);
+            this.loadPageFromURL();
         });
         
         // Handle internal link clicks
         document.addEventListener('click', (e) => {
-            const link = e.target.closest('a[href^="/"]');
+            const link = e.target.closest('a[href^="#/"]');
             if (link) {
                 e.preventDefault();
-                const url = link.getAttribute('href');
-                this.navigateToURL(url);
+                const hash = link.getAttribute('href');
+                window.location.hash = hash;
             }
         });
         
         console.log('✅ URL routing listeners attached');
     }
     
-    // NEW: Load page based on current URL
+    // NEW: Load page based on current URL hash
     async loadPageFromURL() {
-        const path = window.location.pathname;
-        const params = new URLSearchParams(window.location.search);
+        const hash = window.location.hash || '#/';
+        const path = hash.substring(1); // Remove the #
+        const [route, ...pathParts] = path.split('/').filter(p => p);
         
-        console.log('Loading page from URL:', path);
+        console.log('Loading page from hash:', hash, 'route:', route, 'parts:', pathParts);
         
         // Parse URL and determine page
-        if (path === '/' || path === '/index.html' || path === '') {
+        if (!route || route === '') {
             await this.loadHomePage();
-        } else if (path.startsWith('/produit/') || path.startsWith('/product/')) {
-            // Extract product ID from URL like /produit/abc123-product-name
-            const urlParts = path.split('/');
-            const productSlug = urlParts[urlParts.length - 1];
-            const productId = productSlug.split('-')[0]; // Get ID before first hyphen
-            
-            console.log('Loading product from URL:', productId);
-            await this.loadProductPage(productId);
-        } else if (path === '/produits' || path === '/products') {
+        } else if (route === 'produit' || route === 'product') {
+            if (pathParts.length > 0) {
+                // Extract product ID from URL like #/produit/abc123-product-name
+                const productSlug = pathParts[0];
+                const productId = productSlug.split('-')[0]; // Get ID before first hyphen
+                
+                console.log('Loading product from URL:', productId);
+                await this.loadProductPage(productId);
+            } else {
+                await this.loadHomePage();
+            }
+        } else if (route === 'produits' || route === 'products') {
+            // Check for query parameters in hash
+            const queryString = path.includes('?') ? path.split('?')[1] : '';
+            const params = new URLSearchParams(queryString);
             const categorie = params.get('categorie');
             const search = params.get('search');
             await this.loadProductsPage({ categorie, search });
-        } else if (path === '/connexion' || path === '/login') {
+        } else if (route === 'connexion' || route === 'login') {
             await this.loadLoginPage();
-        } else if (path === '/inscription' || path === '/register') {
+        } else if (route === 'inscription' || route === 'register') {
             await this.loadRegisterPage();
-        } else if (path === '/profil' || path === '/profile') {
+        } else if (route === 'profil' || route === 'profile') {
             await this.loadProfilePage();
-        } else if (path === '/panier' || path === '/checkout') {
+        } else if (route === 'panier' || route === 'checkout') {
             await this.loadCheckoutPage();
-        } else if (path === '/contact') {
+        } else if (route === 'contact') {
             await this.loadContactPage();
-        } else if (path === '/admin') {
+        } else if (route === 'admin') {
             await this.loadAdminPage();
-        } else if (path.startsWith('/commande/') || path.startsWith('/order/')) {
-            const orderNumber = path.split('/').pop();
-            await this.loadOrderConfirmationPage(orderNumber);
+        } else if (route === 'commande' || route === 'order') {
+            if (pathParts.length > 0) {
+                const orderNumber = pathParts[0];
+                await this.loadOrderConfirmationPage(orderNumber);
+            } else {
+                await this.loadHomePage();
+            }
         } else {
             // 404 - load home page
-            console.log('Unknown path, loading home page');
+            console.log('Unknown route, loading home page');
             await this.loadHomePage();
         }
     }
     
-    // NEW: Load page from browser state
-    async loadPageFromState(state) {
-        console.log('Loading page from state:', state);
-        
-        switch (state.page) {
-            case 'home':
-                await this.loadHomePage();
-                break;
-            case 'products':
-                await this.loadProductsPage(state.params || {});
-                break;
-            case 'product':
-                await this.loadProductPage(state.params.id);
-                break;
-            case 'login':
-                await this.loadLoginPage();
-                break;
-            case 'register':
-                await this.loadRegisterPage();
-                break;
-            case 'profile':
-                await this.loadProfilePage();
-                break;
-            case 'checkout':
-                await this.loadCheckoutPage();
-                break;
-            case 'order-confirmation':
-                await this.loadOrderConfirmationPage(state.params.orderNumber);
-                break;
-            case 'contact':
-                await this.loadContactPage();
-                break;
-            case 'admin':
-                await this.loadAdminPage();
-                break;
-            default:
-                await this.loadHomePage();
-        }
+    // NEW: Update URL hash without reload
+    updateURL(hash) {
+        console.log('Updating URL hash:', hash);
+        window.location.hash = hash;
     }
     
-    // NEW: Navigate to a URL
-    navigateToURL(url) {
-        console.log('Navigating to URL:', url);
-        window.history.pushState({ url }, '', url);
-        this.loadPageFromURL();
-    }
-    
-    // NEW: Update URL without reload
-    updateURL(path, state) {
-        console.log('Updating URL:', path, state);
-        window.history.pushState(state, '', path);
-    }
-    
-    // NEW: Generate product URL
+    // NEW: Generate product URL with hash
     generateProductURL(product) {
         const slug = createSlug(product.nom);
-        return `/produit/${product._id}-${slug}`;
+        return `#/produit/${product._id}-${slug}`;
     }
     
     async wakeUpServer() {
@@ -673,38 +633,37 @@ class PharmacieGaherApp {
             this.showLoading();
             this.currentPage = pageName;
             
-            // Generate URL and update browser history
-            let url = '/';
-            let state = { page: pageName, params };
+            // Generate hash URL
+            let hash = '#/';
             
             switch (pageName) {
                 case 'home':
-                    url = '/';
+                    hash = '#/';
                     await this.loadHomePage();
                     break;
                 case 'products':
                     if (params.categorie) {
-                        url = `/produits?categorie=${encodeURIComponent(params.categorie)}`;
+                        hash = `#/produits?categorie=${encodeURIComponent(params.categorie)}`;
                     } else if (params.search) {
-                        url = `/produits?search=${encodeURIComponent(params.search)}`;
+                        hash = `#/produits?search=${encodeURIComponent(params.search)}`;
                     } else {
-                        url = '/produits';
+                        hash = '#/produits';
                     }
                     await this.loadProductsPage(params);
                     break;
                 case 'product':
                     const product = this.allProducts.find(p => p._id === params.id);
                     if (product) {
-                        url = this.generateProductURL(product);
+                        hash = this.generateProductURL(product);
                     }
                     await this.loadProductPage(params.id);
                     break;
                 case 'login':
-                    url = '/connexion';
+                    hash = '#/connexion';
                     await this.loadLoginPage();
                     break;
                 case 'register':
-                    url = '/inscription';
+                    hash = '#/inscription';
                     await this.loadRegisterPage();
                     break;
                 case 'profile':
@@ -712,19 +671,19 @@ class PharmacieGaherApp {
                         await this.showPage('login');
                         return;
                     }
-                    url = '/profil';
+                    hash = '#/profil';
                     await this.loadProfilePage();
                     break;
                 case 'checkout':
-                    url = '/panier';
+                    hash = '#/panier';
                     await this.loadCheckoutPage();
                     break;
                 case 'order-confirmation':
-                    url = `/commande/${params.orderNumber}`;
+                    hash = `#/commande/${params.orderNumber}`;
                     await this.loadOrderConfirmationPage(params.orderNumber);
                     break;
                 case 'contact':
-                    url = '/contact';
+                    hash = '#/contact';
                     await this.loadContactPage();
                     break;
                 case 'admin':
@@ -733,16 +692,16 @@ class PharmacieGaherApp {
                         await this.showPage('home');
                         return;
                     }
-                    url = '/admin';
+                    hash = '#/admin';
                     await this.loadAdminPage();
                     break;
                 default:
-                    url = '/';
+                    hash = '#/';
                     await this.loadHomePage();
             }
             
-            // Update URL in browser
-            this.updateURL(url, state);
+            // Update URL hash
+            this.updateURL(hash);
             
             this.hideLoading();
         } catch (error) {
