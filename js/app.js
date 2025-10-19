@@ -940,9 +940,29 @@ class PharmacieGaherApp {
     }
     
     async loadProductPage(productId) {
+        // Wait for products to load if they haven't yet
+        if (this.allProducts.length === 0) {
+            console.log('Products not loaded yet, waiting...');
+            this.showLoading('Chargement du produit...');
+            
+            // Wait up to 10 seconds for products to load
+            let attempts = 0;
+            while (this.allProducts.length === 0 && attempts < 50) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+                attempts++;
+            }
+            
+            if (this.allProducts.length === 0) {
+                console.error('Products failed to load after waiting');
+                this.showProductNotFound();
+                return;
+            }
+        }
+        
         const product = this.allProducts.find(p => p._id === productId);
         
         if (!product) {
+            console.error('Product not found:', productId);
             this.showProductNotFound();
             return;
         }
@@ -962,6 +982,8 @@ class PharmacieGaherApp {
             const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
             imageUrl = generatePlaceholder(500, 500, '10b981', 'ffffff', initials);
         }
+        
+        console.log('Product image URL:', imageUrl?.substring(0, 100));
         
         mainContent.innerHTML = `
             <div class="container mx-auto px-4 py-8">
