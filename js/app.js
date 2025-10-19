@@ -533,8 +533,10 @@ class PharmacieGaherApp {
                 console.log('API response data:', data);
                 
                 if (data && data.products && data.products.length > 0) {
+                    // Store full products in memory (with images)
                     this.allProducts = data.products;
                     
+                    // Store only lightweight data in localStorage (without base64 images)
                     try {
                         const lightProducts = data.products.map(p => ({
                             _id: p._id,
@@ -547,7 +549,10 @@ class PharmacieGaherApp {
                             enPromotion: p.enPromotion,
                             enVedette: p.enVedette,
                             actif: p.actif,
-                            imageUrl: p.image && p.image.startsWith('http') ? p.image : null
+                            prixOriginal: p.prixOriginal,
+                            pourcentagePromotion: p.pourcentagePromotion,
+                            // Store image URL (whether http:// or data:image)
+                            imageUrl: p.image || null
                         }));
                         
                         localStorage.setItem('productsCache', JSON.stringify(lightProducts));
@@ -974,16 +979,20 @@ class PharmacieGaherApp {
         const hasPromotion = product.enPromotion && product.prixOriginal;
         
         let imageUrl;
-        if (product.image && product.image.startsWith('http')) {
-            imageUrl = product.image;
-        } else if (product.image && product.image.startsWith('data:image')) {
-            imageUrl = product.image;
+        // Check both 'image' and 'imageUrl' fields (cache uses 'imageUrl')
+        const imageSource = product.image || product.imageUrl;
+        
+        if (imageSource && imageSource.startsWith('http')) {
+            imageUrl = imageSource;
+        } else if (imageSource && imageSource.startsWith('data:image')) {
+            imageUrl = imageSource;
         } else {
             const initials = product.nom.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
             imageUrl = generatePlaceholder(500, 500, '10b981', 'ffffff', initials);
         }
         
         console.log('Product image URL:', imageUrl?.substring(0, 100));
+        console.log('Product has image:', !!product.image, 'imageUrl:', !!product.imageUrl);
         
         mainContent.innerHTML = `
             <div class="container mx-auto px-4 py-8">
@@ -2205,12 +2214,15 @@ class PharmacieGaherApp {
         const hasPromotion = product.enPromotion && product.prixOriginal;
         
         let imageUrl;
-        if (product.image && product.image.startsWith('http')) {
-            imageUrl = product.image;
-        } else if (product.image && product.image.startsWith('data:image')) {
-            imageUrl = product.image;
-        } else if (product.image) {
-            imageUrl = `./images/products/${product.image}`;
+        // Check both 'image' and 'imageUrl' fields (cache uses 'imageUrl')
+        const imageSource = product.image || product.imageUrl;
+        
+        if (imageSource && imageSource.startsWith('http')) {
+            imageUrl = imageSource;
+        } else if (imageSource && imageSource.startsWith('data:image')) {
+            imageUrl = imageSource;
+        } else if (imageSource) {
+            imageUrl = `./images/products/${imageSource}`;
         } else {
             const getCategoryColor = (category) => {
                 const colors = {
