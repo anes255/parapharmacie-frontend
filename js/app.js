@@ -250,6 +250,76 @@ class PharmacieGaherApp {
         return `#/produit/${product._id}-${slug}`;
     }
     
+    // NEW: Update SEO meta tags for current page
+    updateMetaTags(data) {
+        // Update page title
+        document.title = data.title || 'Shifa - Parapharmacie';
+        
+        // Update or create meta description
+        let metaDescription = document.querySelector('meta[name="description"]');
+        if (!metaDescription) {
+            metaDescription = document.createElement('meta');
+            metaDescription.setAttribute('name', 'description');
+            document.head.appendChild(metaDescription);
+        }
+        metaDescription.setAttribute('content', data.description || 'Parapharmacie en ligne en Algérie. Produits de santé, beauté et bien-être.');
+        
+        // Update or create meta keywords
+        let metaKeywords = document.querySelector('meta[name="keywords"]');
+        if (!metaKeywords) {
+            metaKeywords = document.createElement('meta');
+            metaKeywords.setAttribute('name', 'keywords');
+            document.head.appendChild(metaKeywords);
+        }
+        metaKeywords.setAttribute('content', data.keywords || 'parapharmacie, algérie, santé, beauté, bien-être');
+        
+        // Open Graph tags for social sharing
+        this.updateOrCreateMetaTag('property', 'og:title', data.title);
+        this.updateOrCreateMetaTag('property', 'og:description', data.description);
+        this.updateOrCreateMetaTag('property', 'og:type', data.type || 'website');
+        this.updateOrCreateMetaTag('property', 'og:url', window.location.href);
+        if (data.image) {
+            this.updateOrCreateMetaTag('property', 'og:image', data.image);
+        }
+        
+        // Twitter Card tags
+        this.updateOrCreateMetaTag('name', 'twitter:card', 'summary_large_image');
+        this.updateOrCreateMetaTag('name', 'twitter:title', data.title);
+        this.updateOrCreateMetaTag('name', 'twitter:description', data.description);
+        if (data.image) {
+            this.updateOrCreateMetaTag('name', 'twitter:image', data.image);
+        }
+        
+        console.log('✅ Meta tags updated:', data.title);
+    }
+    
+    updateOrCreateMetaTag(attributeName, attributeValue, content) {
+        let meta = document.querySelector(`meta[${attributeName}="${attributeValue}"]`);
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.setAttribute(attributeName, attributeValue);
+            document.head.appendChild(meta);
+        }
+        meta.setAttribute('content', content);
+    }
+    
+    // NEW: Add JSON-LD structured data for products
+    addStructuredData(data) {
+        // Remove existing structured data
+        const existingScript = document.querySelector('script[type="application/ld+json"]');
+        if (existingScript) {
+            existingScript.remove();
+        }
+        
+        // Add new structured data
+        const script = document.createElement('script');
+        script.type = 'application/ld+json';
+        script.text = JSON.stringify(data);
+        document.head.appendChild(script);
+        
+        console.log('✅ Structured data added:', data['@type']);
+    }
+    
     async wakeUpServer() {
         try {
             console.log('🔔 Waking up server...');
@@ -746,6 +816,29 @@ class PharmacieGaherApp {
     }
     
     async loadHomePage() {
+        // Update SEO meta tags for home page
+        this.updateMetaTags({
+            title: 'Shifa - Parapharmacie | Produits de santé et beauté en Algérie',
+            description: 'Parapharmacie en ligne en Algérie. Large gamme de produits de santé, beauté, vitamines, compléments alimentaires. Livraison rapide partout en Algérie.',
+            keywords: 'parapharmacie algérie, produits de santé, beauté, vitamines, compléments alimentaires, livraison algérie',
+            type: 'website'
+        });
+        
+        // Add structured data for Organization
+        this.addStructuredData({
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "Shifa Parapharmacie",
+            "url": window.location.origin,
+            "logo": window.location.origin + "/logo.png",
+            "description": "Parapharmacie en ligne en Algérie",
+            "address": {
+                "@type": "PostalAddress",
+                "addressCountry": "DZ",
+                "addressRegion": "Tipaza"
+            }
+        });
+        
         const mainContent = document.getElementById('mainContent');
         mainContent.innerHTML = `
             <section class="hero-gradient text-white py-24 relative overflow-hidden">
@@ -811,8 +904,6 @@ class PharmacieGaherApp {
         await this.loadCategories();
         await this.loadFeaturedProducts();
         await this.loadPromotionProducts();
-        
-        document.title = 'Shifa - Parapharmacie | Produits de santé et beauté en Algérie';
     }
     
     async loadCategories() {
@@ -887,15 +978,37 @@ class PharmacieGaherApp {
         
         if (params.categorie) {
             filteredProducts = filteredProducts.filter(p => p.categorie === params.categorie);
-        }
-        
-        if (params.search) {
+            
+            // Update SEO for category page
+            this.updateMetaTags({
+                title: `${params.categorie} - Parapharmacie Shifa | Produits ${params.categorie}`,
+                description: `Découvrez notre sélection de produits ${params.categorie}. ${filteredProducts.length} produits disponibles. Livraison rapide en Algérie.`,
+                keywords: `${params.categorie}, parapharmacie algérie, produits ${params.categorie}`,
+                type: 'website'
+            });
+        } else if (params.search) {
             const searchTerm = params.search.toLowerCase();
             filteredProducts = filteredProducts.filter(p => 
                 p.nom.toLowerCase().includes(searchTerm) ||
                 p.description?.toLowerCase().includes(searchTerm) ||
                 p.categorie.toLowerCase().includes(searchTerm)
             );
+            
+            // Update SEO for search results
+            this.updateMetaTags({
+                title: `Recherche: ${params.search} - Shifa Parapharmacie`,
+                description: `Résultats de recherche pour "${params.search}". ${filteredProducts.length} produits trouvés. Parapharmacie en ligne en Algérie.`,
+                keywords: `${params.search}, parapharmacie algérie, recherche produits`,
+                type: 'website'
+            });
+        } else {
+            // Update SEO for all products page
+            this.updateMetaTags({
+                title: 'Tous les produits - Shifa Parapharmacie | Catalogue complet',
+                description: `Découvrez tous nos produits de parapharmacie. ${filteredProducts.length} produits disponibles. Vitamines, compléments, soins, beauté. Livraison en Algérie.`,
+                keywords: 'catalogue parapharmacie, tous les produits, santé beauté algérie',
+                type: 'website'
+            });
         }
         
         mainContent.innerHTML = `
@@ -934,14 +1047,6 @@ class PharmacieGaherApp {
         `;
         
         this.currentFilteredProducts = filteredProducts;
-        
-        if (params.categorie) {
-            document.title = `${params.categorie} - Shifa Parapharmacie`;
-        } else if (params.search) {
-            document.title = `Recherche: ${params.search} - Shifa Parapharmacie`;
-        } else {
-            document.title = 'Produits - Shifa Parapharmacie';
-        }
     }
     
     async loadProductPage(productId) {
@@ -993,6 +1098,41 @@ class PharmacieGaherApp {
         
         console.log('Product image URL:', imageUrl?.substring(0, 100));
         console.log('Product has image:', !!product.image, 'imageUrl:', !!product.imageUrl);
+        
+        // Update SEO meta tags
+        const fullUrl = window.location.origin + window.location.pathname + this.generateProductURL(product);
+        this.updateMetaTags({
+            title: `${product.nom} - ${product.marque || 'Shifa Parapharmacie'} | Achat en ligne`,
+            description: `${product.description || product.nom} - Prix: ${product.prix} DA. ${product.stock > 0 ? 'En stock' : 'Rupture de stock'}. Livraison rapide en Algérie. ${product.marque ? 'Marque: ' + product.marque : ''}`,
+            keywords: `${product.nom}, ${product.categorie}, ${product.marque || ''}, parapharmacie algérie, achat en ligne`,
+            type: 'product',
+            image: imageUrl
+        });
+        
+        // Add structured data (Schema.org Product)
+        this.addStructuredData({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": product.nom,
+            "image": imageUrl,
+            "description": product.description || product.nom,
+            "brand": {
+                "@type": "Brand",
+                "name": product.marque || "Shifa Parapharmacie"
+            },
+            "offers": {
+                "@type": "Offer",
+                "url": fullUrl,
+                "priceCurrency": "DZD",
+                "price": product.prix,
+                "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+                "seller": {
+                    "@type": "Organization",
+                    "name": "Shifa Parapharmacie"
+                }
+            },
+            "category": product.categorie
+        });
         
         mainContent.innerHTML = `
             <div class="container mx-auto px-4 py-8">
@@ -1067,8 +1207,6 @@ class PharmacieGaherApp {
                 </div>
             </div>
         `;
-        
-        document.title = `${product.nom} - ${product.marque || 'Shifa Parapharmacie'}`;
     }
     
     async loadLoginPage() {
