@@ -34,22 +34,30 @@
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://votre-site.com/">
+    <meta property="og:url" content="https://parapharmacieshifa.com/">
     <meta property="og:title" content="Shifa Parapharmacie Tipaza - Santé & Beauté en Algérie">
     <meta property="og:description" content="Votre parapharmacie de confiance à Tipaza. Produits de santé, beauté, vitamines avec livraison rapide en Algérie.">
-    <meta property="og:image" content="https://votre-site.com/images/og-image.jpg">
+    <meta property="og:image" content="https://parapharmacieshifa.com/images/og-image.jpg">
     <meta property="og:site_name" content="Shifa Parapharmacie">
     <meta property="og:locale" content="fr_DZ">
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://votre-site.com/">
+    <meta name="twitter:url" content="https://parapharmacieshifa.com/">
     <meta name="twitter:title" content="Shifa Parapharmacie Tipaza">
     <meta name="twitter:description" content="Produits santé & beauté à Tipaza. Livraison en Algérie.">
-    <meta name="twitter:image" content="https://votre-site.com/images/twitter-image.jpg">
+    <meta name="twitter:image" content="https://parapharmacieshifa.com/images/twitter-image.jpg">
     
     <!-- Canonical URL -->
-    <link rel="canonical" href="https://votre-site.com/">
+    <link rel="canonical" href="https://parapharmacieshifa.com/">
+    
+    <!-- Alternate hreflang for language targeting -->
+    <link rel="alternate" hreflang="fr-DZ" href="https://parapharmacieshifa.com/">
+    <link rel="alternate" hreflang="fr" href="https://parapharmacieshifa.com/">
+    <link rel="alternate" hreflang="ar-DZ" href="https://parapharmacieshifa.com/">
+    
+    <!-- Sitemap -->
+    <link rel="sitemap" type="application/xml" href="https://parapharmacieshifa.com/sitemap.xml">
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='16' fill='%2310b981'/%3E%3Cpath d='M16 8c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 12c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z' fill='white'/%3E%3C/svg%3E">
@@ -82,20 +90,86 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/styles.css">
     
+    <!-- Schema.org Structured Data - WebSite with SearchAction -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://parapharmacieshifa.com/#website",
+      "url": "https://parapharmacieshifa.com",
+      "name": "Shifa Parapharmacie",
+      "description": "Parapharmacie en ligne à Tipaza - Produits de santé, beauté, vitamines et compléments alimentaires avec livraison en Algérie",
+      "inLanguage": "fr-DZ",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://parapharmacieshifa.com/#/products?search={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    
+    <!-- Schema.org Structured Data - Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": "https://parapharmacieshifa.com/#organization",
+      "name": "Shifa Parapharmacie",
+      "alternateName": ["Parapharmacie Shifa", "Shifa Tipaza"],
+      "url": "https://parapharmacieshifa.com",
+      "logo": "https://parapharmacieshifa.com/images/logo-shifa.jpg",
+      "image": "https://parapharmacieshifa.com/images/logo-shifa.jpg",
+      "description": "Parapharmacie de confiance à Tipaza offrant des produits de santé, beauté, vitamines et compléments alimentaires avec livraison rapide partout en Algérie",
+      "email": "parapharmacieshifa@gmail.com",
+      "telephone": "+213661201294",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Tipaza",
+        "addressRegion": "Tipaza",
+        "postalCode": "42000",
+        "addressCountry": "DZ"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "36.5893",
+        "longitude": "2.4453"
+      },
+      "areaServed": {
+        "@type": "Country",
+        "name": "Algérie"
+      },
+      "sameAs": [
+        "https://www.facebook.com/pharmaciegaher",
+        "https://www.instagram.com/pharmaciegaher/"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+213661201294",
+        "contactType": "customer service",
+        "email": "parapharmacieshifa@gmail.com",
+        "areaServed": "DZ",
+        "availableLanguage": ["French", "Arabic"]
+      }
+    }
+    </script>
+    
     <!-- Schema.org Structured Data for Local Business -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "LocalBusiness",
-      "@id": "https://votre-site.com/#business",
+      "@id": "https://parapharmacieshifa.com/#business",
       "name": "Shifa Parapharmacie",
       "alternateName": "Parapharmacie Shifa Tipaza",
       "description": "Parapharmacie à Tipaza offrant des produits de santé, beauté, vitamines, compléments alimentaires et soins pour toute la famille avec livraison rapide en Algérie",
-      "url": "https://votre-site.com",
+      "url": "https://parapharmacieshifa.com",
       "telephone": "+213661201294",
       "email": "parapharmacieshifa@gmail.com",
-      "image": "https://votre-site.com/images/logo-shifa.jpg",
-      "logo": "https://votre-site.com/images/logo-shifa.jpg",
+      "image": "https://parapharmacieshifa.com/images/logo-shifa.jpg",
+      "logo": "https://parapharmacieshifa.com/images/logo-shifa.jpg",
       "priceRange": "$$",
       "currenciesAccepted": "DZD",
       "paymentAccepted": "Cash, Paiement à la livraison",
@@ -155,188 +229,165 @@
           {
             "@type": "OfferCatalog",
             "name": "Vitalité & Vitamines",
-            "description": "Compléments alimentaires et vitamines pour renforcer votre énergie"
+            "description": "Compléments alimentaires et vitamines pour renforcer votre énergie",
+            "url": "https://parapharmacieshifa.com/#/products?categorie=Vitalité"
           },
           {
             "@type": "OfferCatalog",
             "name": "Soins du Visage",
-            "description": "Crèmes, sérums et soins pour une peau éclatante"
+            "description": "Crèmes, sérums et soins pour une peau éclatante",
+            "url": "https://parapharmacieshifa.com/#/products?categorie=Visage"
           },
           {
             "@type": "OfferCatalog",
-            "name": "Soins Capillaires",
-            "description": "Shampoings, masques et traitements pour cheveux"
+            "name": "Soins des Cheveux",
+            "description": "Shampooings, après-shampooings et traitements capillaires",
+            "url": "https://parapharmacieshifa.com/#/products?categorie=Cheveux"
+          },
+          {
+            "@type": "OfferCatalog",
+            "name": "Protection Solaire",
+            "description": "Crèmes solaires et après-soleil pour toute la famille",
+            "url": "https://parapharmacieshifa.com/#/products?categorie=Solaire"
           },
           {
             "@type": "OfferCatalog",
             "name": "Produits Bébé",
-            "description": "Soins doux et adaptés pour bébés"
+            "description": "Soins doux et adaptés pour les bébés",
+            "url": "https://parapharmacieshifa.com/#/products?categorie=Bébé"
+          },
+          {
+            "@type": "OfferCatalog",
+            "name": "Nutrition Sportive",
+            "description": "Compléments et produits pour sportifs",
+            "url": "https://parapharmacieshifa.com/#/products?categorie=Sport"
+          },
+          {
+            "@type": "OfferCatalog",
+            "name": "Hygiène Dentaire",
+            "description": "Soins bucco-dentaires et produits d'hygiène",
+            "url": "https://parapharmacieshifa.com/#/products?categorie=Dentaire"
+          },
+          {
+            "@type": "OfferCatalog",
+            "name": "Soins Corporels",
+            "description": "Gels douche, laits corporels et soins du corps",
+            "url": "https://parapharmacieshifa.com/#/products?categorie=Soins"
+          },
+          {
+            "@type": "OfferCatalog",
+            "name": "Hygiène Intime",
+            "description": "Produits d'hygiène intime délicats",
+            "url": "https://parapharmacieshifa.com/#/products?categorie=Intime"
+          },
+          {
+            "@type": "OfferCatalog",
+            "name": "Soins Homme",
+            "description": "Produits de soins spécialement conçus pour les hommes",
+            "url": "https://parapharmacieshifa.com/#/products?categorie=Homme"
           }
         ]
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "reviewCount": "127",
+        "bestRating": "5",
+        "worstRating": "1"
       }
     }
     </script>
     
-    <!-- Schema.org for Website -->
+    <!-- Breadcrumb Schema -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebSite",
-      "@id": "https://votre-site.com/#website",
-      "url": "https://votre-site.com",
-      "name": "Shifa Parapharmacie",
-      "description": "Parapharmacie en ligne à Tipaza, Algérie",
-      "publisher": {
-        "@type": "Organization",
-        "@id": "https://votre-site.com/#organization"
-      },
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://votre-site.com/#/products?search={search_term_string}",
-        "query-input": "required name=search_term_string"
-      }
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Accueil",
+          "item": "https://parapharmacieshifa.com/"
+        }
+      ]
     }
     </script>
 </head>
-<body class="bg-gradient-to-br from-emerald-50 to-green-100">
-    
-    <!-- SERVER LOADING SCREEN -->
-    <div id="serverLoadingScreen" class="fixed inset-0 bg-gradient-to-br from-emerald-500 via-green-600 to-teal-700 flex items-center justify-center z-[9999]">
-        <div class="text-center">
-            <div class="relative mb-8">
-                <div class="w-32 h-32 mx-auto">
-                    <div class="absolute inset-0 bg-white/30 rounded-full animate-ping"></div>
-                    <div class="relative w-32 h-32 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-4 border-white/40 shadow-2xl">
-                        <i class="fas fa-seedling text-6xl text-white animate-pulse"></i>
-                    </div>
-                </div>
-            </div>
-            
-            <h2 class="text-4xl font-bold text-white mb-4 drop-shadow-lg">Shifa</h2>
-            <p class="text-xl text-white/90 mb-8">Parapharmacie</p>
-            
-            <div class="flex justify-center mb-6">
-                <div class="w-48 h-1.5 bg-white/30 rounded-full overflow-hidden">
-                    <div class="h-full bg-white rounded-full animate-loading-bar"></div>
-                </div>
-            </div>
-            
-            <p id="loadingMessage" class="text-white text-lg font-medium animate-pulse">
-                Réveil du serveur en cours...
-            </p>
-        </div>
-    </div>
-
+<body class="bg-gradient-to-br from-green-50 to-emerald-100 min-h-screen">
     <!-- Navigation -->
-    <nav class="bg-gradient-to-r from-emerald-600 to-green-700 shadow-xl sticky top-0 z-50" role="navigation" aria-label="Navigation principale">
-        <div class="container mx-auto px-4">
-            <div class="flex justify-between items-center py-4">
+    <nav class="bg-gradient-to-r from-emerald-600 to-green-700 text-white shadow-2xl sticky top-0 z-40 border-b border-emerald-500/50" role="navigation" aria-label="Navigation principale">
+        <div class="container mx-auto">
+            <div class="flex items-center justify-between px-4 py-4">
                 <!-- Logo -->
-                <div class="logo-container cursor-pointer flex items-center" onclick="event.preventDefault(); showPage('home')">
-                    <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mr-4 border-2 border-white/30 shadow-lg hover:bg-white/30 transition-all duration-300 hover:scale-105">
-                        <i class="fas fa-seedling text-white text-2xl drop-shadow-md" aria-hidden="true"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-2xl font-bold text-white drop-shadow-md">Shifa</h1>
-                        <p class="text-sm text-emerald-100">Parapharmacie</p>
-                    </div>
-                </div>
-                
-                <!-- Navigation Links -->
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="javascript:void(0)" onclick="showPage('home')" class="nav-link text-white hover:text-emerald-200 transition-all duration-300 font-medium relative group">
-                        <i class="fas fa-home mr-2" aria-hidden="true"></i>Accueil
-                        <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-200 transition-all duration-300 group-hover:w-full"></span>
-                    </a>
-                    
-                    <div class="relative group">
-                        <button class="nav-link text-white hover:text-emerald-200 transition-all duration-300 flex items-center font-medium relative" aria-haspopup="true" aria-expanded="false">
-                            <i class="fas fa-th-large mr-2" aria-hidden="true"></i>Catégories 
-                            <i class="fas fa-chevron-down ml-2 transition-transform duration-300 group-hover:rotate-180" aria-hidden="true"></i>
-                        </button>
-                        <div class="absolute top-full left-0 bg-white shadow-xl rounded-xl py-3 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform group-hover:translate-y-2 border border-emerald-100" role="menu">
-                            <div class="px-4 py-2 text-xs font-semibold text-emerald-600 uppercase tracking-wide">Nos spécialités</div>
-                            <a href="javascript:void(0)" onclick="filterByCategory('Vitalité')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors font-medium" role="menuitem">
-                                <i class="fas fa-seedling mr-3 text-emerald-500" aria-hidden="true"></i>Vitalité & Énergie
-                            </a>
-                            <a href="javascript:void(0)" onclick="filterByCategory('Sport')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors" role="menuitem">
-                                <i class="fas fa-dumbbell mr-3 text-emerald-500" aria-hidden="true"></i>Sport
-                            </a>
-                            <a href="javascript:void(0)" onclick="filterByCategory('Cheveux')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors" role="menuitem">
-                                <i class="fas fa-cut mr-3 text-emerald-500" aria-hidden="true"></i>Cheveux
-                            </a>
-                            <a href="javascript:void(0)" onclick="filterByCategory('Visage')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors" role="menuitem">
-                                <i class="fas fa-smile mr-3 text-emerald-500" aria-hidden="true"></i>Visage
-                            </a>
-                            <a href="javascript:void(0)" onclick="filterByCategory('Intime')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors" role="menuitem">
-                                <i class="fas fa-heart mr-3 text-emerald-500" aria-hidden="true"></i>Intime
-                            </a>
-                            <a href="javascript:void(0)" onclick="filterByCategory('Solaire')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors" role="menuitem">
-                                <i class="fas fa-sun mr-3 text-emerald-500" aria-hidden="true"></i>Solaire
-                            </a>
-                            <a href="javascript:void(0)" onclick="filterByCategory('Soins')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors" role="menuitem">
-                                <i class="fas fa-spa mr-3 text-emerald-500" aria-hidden="true"></i>Soins
-                            </a>
-                            <a href="javascript:void(0)" onclick="filterByCategory('Bébé')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors" role="menuitem">
-                                <i class="fas fa-baby-carriage mr-3 text-emerald-500" aria-hidden="true"></i>Bébé
-                            </a>
-                            <a href="javascript:void(0)" onclick="filterByCategory('Homme')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors" role="menuitem">
-                                <i class="fas fa-user-tie mr-3 text-emerald-500" aria-hidden="true"></i>Homme
-                            </a>
-                            <a href="javascript:void(0)" onclick="filterByCategory('Dentaire')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors" role="menuitem">
-                                <i class="fas fa-tooth mr-3 text-emerald-500" aria-hidden="true"></i>Dentaire
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <a href="javascript:void(0)" onclick="showPage('products')" class="nav-link text-white hover:text-emerald-200 transition-all duration-300 font-medium relative group">
-                        <i class="fas fa-pills mr-2" aria-hidden="true"></i>Produits
-                        <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-200 transition-all duration-300 group-hover:w-full"></span>
-                    </a>
-                    
-                    <a href="javascript:void(0)" onclick="showPage('contact')" class="nav-link text-white hover:text-emerald-200 transition-all duration-300 font-medium relative group">
-                        <i class="fas fa-phone mr-2" aria-hidden="true"></i>Contact
-                        <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-200 transition-all duration-300 group-hover:w-full"></span>
-                    </a>
-                </div>
-                
-                <!-- User Actions -->
                 <div class="flex items-center space-x-4">
-                    <!-- Search -->
-                    <div class="relative hidden lg:block">
-                        <input type="text" id="searchInput" placeholder="Rechercher un produit..." 
-                               aria-label="Rechercher un produit"
-                               class="pl-10 pr-4 py-3 bg-white/20 backdrop-blur-sm border-2 border-white/30 rounded-xl focus:ring-4 focus:ring-white/30 focus:border-white/50 text-white placeholder-emerald-200 transition-all duration-300">
-                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-200" aria-hidden="true"></i>
+                    <a href="javascript:void(0)" onclick="showPage('home')" class="flex items-center space-x-3 group" aria-label="Retour à l'accueil">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/30 group-hover:bg-white/30 transition-all">
+                            <i class="fas fa-seedling text-white text-xl" aria-hidden="true"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl font-bold">Shifa</h1>
+                            <p class="text-xs text-emerald-200">Parapharmacie</p>
+                        </div>
+                    </a>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="hidden md:block flex-1 max-w-2xl mx-8" role="search">
+                    <div class="relative">
+                        <input type="search" 
+                               id="searchInput" 
+                               placeholder="Rechercher un produit..." 
+                               class="w-full px-6 py-3 rounded-xl bg-white/95 backdrop-blur-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50 shadow-lg border border-white/20"
+                               aria-label="Rechercher des produits">
+                        <button class="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-600 hover:text-emerald-700 transition-colors" aria-label="Rechercher">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                        </button>
                     </div>
+                </div>
+                
+                <!-- Desktop Menu -->
+                <div class="hidden md:flex items-center space-x-6">
+                    <a href="javascript:void(0)" onclick="showPage('home')" class="nav-link">
+                        <i class="fas fa-home mr-2" aria-hidden="true"></i>Accueil
+                    </a>
+                    <a href="javascript:void(0)" onclick="showPage('products')" class="nav-link">
+                        <i class="fas fa-pills mr-2" aria-hidden="true"></i>Produits
+                    </a>
+                    <a href="javascript:void(0)" onclick="showPage('contact')" class="nav-link">
+                        <i class="fas fa-phone mr-2" aria-hidden="true"></i>Contact
+                    </a>
                     
-                    <!-- Cart -->
-                    <button onclick="toggleCart()" class="relative text-white hover:text-emerald-200 transition-all duration-300 p-2 hover:bg-white/10 rounded-lg" aria-label="Panier">
+                    <!-- Cart Icon -->
+                    <button onclick="toggleCart()" class="relative p-3 bg-white/20 rounded-xl hover:bg-white/30 transition-all backdrop-blur-sm border border-white/30 shadow-lg" aria-label="Panier d'achats">
                         <i class="fas fa-shopping-cart text-xl" aria-hidden="true"></i>
-                        <span id="cartCount" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg">0</span>
+                        <span id="cartCount" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">0</span>
                     </button>
                     
                     <!-- User Menu -->
-                    <div class="relative group" id="userMenu">
-                        <button class="text-white hover:text-emerald-200 transition-all duration-300 p-2 hover:bg-white/10 rounded-lg" aria-label="Menu utilisateur">
+                    <div class="relative" id="guestMenu">
+                        <a href="javascript:void(0)" onclick="showPage('login')" class="flex items-center space-x-2 p-3 bg-white/20 rounded-xl hover:bg-white/30 transition-all backdrop-blur-sm border border-white/30 shadow-lg" aria-label="Se connecter">
                             <i class="fas fa-user text-xl" aria-hidden="true"></i>
+                            <span class="hidden lg:inline">Connexion</span>
+                        </a>
+                    </div>
+                    
+                    <div class="relative" id="userLoggedMenu" style="display: none;">
+                        <button onclick="toggleUserMenu()" class="flex items-center space-x-2 p-3 bg-white/20 rounded-xl hover:bg-white/30 transition-all backdrop-blur-sm border border-white/30 shadow-lg" aria-label="Menu utilisateur" aria-expanded="false">
+                            <i class="fas fa-user-circle text-xl" aria-hidden="true"></i>
+                            <i class="fas fa-chevron-down text-sm" aria-hidden="true"></i>
                         </button>
-                        <div class="absolute top-full right-0 bg-white shadow-xl rounded-xl py-3 w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform group-hover:translate-y-2 border border-emerald-100">
-                            <div id="guestMenu">
-                                <div class="px-4 py-2 text-xs font-semibold text-emerald-600 uppercase tracking-wide">Mon compte</div>
-                                <a href="javascript:void(0)" onclick="showPage('login')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors font-medium">
-                                    <i class="fas fa-sign-in-alt mr-3 text-emerald-500" aria-hidden="true"></i>Connexion
-                                </a>
-                                <a href="javascript:void(0)" onclick="showPage('register')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors font-medium">
-                                    <i class="fas fa-user-plus mr-3 text-emerald-500" aria-hidden="true"></i>Inscription
-                                </a>
+                        <div id="userMenuDropdown" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-emerald-200 overflow-hidden z-50">
+                            <div class="p-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+                                <p class="text-sm text-emerald-100">Connecté en tant que</p>
+                                <p class="font-bold" id="userName">Utilisateur</p>
                             </div>
-                            <div id="userLoggedMenu" class="hidden">
-                                <a href="javascript:void(0)" onclick="showPage('profile')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors font-medium">
+                            <div class="p-2">
+                                <a href="javascript:void(0)" onclick="showPage('profile')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 transition-colors font-medium rounded-lg">
                                     <i class="fas fa-user mr-3 text-emerald-500" aria-hidden="true"></i>Mon Profil
                                 </a>
-                                <div id="adminMenuLink" class="hidden">
-                                    <a href="javascript:void(0)" onclick="showPage('admin')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors font-medium">
+                                <div id="adminMenuLink" style="display: none;">
+                                    <a href="javascript:void(0)" onclick="showPage('admin')" class="block px-4 py-3 text-emerald-700 hover:bg-emerald-50 transition-colors font-medium rounded-lg">
                                         <i class="fas fa-cog mr-3 text-emerald-500" aria-hidden="true"></i>Administration
                                     </a>
                                 </div>
