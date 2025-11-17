@@ -21,6 +21,7 @@
     <!-- Robots -->
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <meta name="googlebot" content="index, follow">
+    <meta name="bingbot" content="index, follow">
     
     <!-- Geographic Location -->
     <meta name="geo.region" content="DZ-42">
@@ -32,24 +33,27 @@
     <meta http-equiv="content-language" content="fr-DZ">
     <meta name="language" content="French">
     
-    <!-- Open Graph / Facebook -->
+    <!-- IMPORTANT: Replace YOUR-ACTUAL-DOMAIN.com with your real domain (e.g., parapharmacieshifa.onrender.com) -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://votre-site.com/">
+    <meta property="og:url" content="https://parapharmacie-gaher.onrender.com/">
     <meta property="og:title" content="Shifa Parapharmacie Tipaza - Santé & Beauté en Algérie">
     <meta property="og:description" content="Votre parapharmacie de confiance à Tipaza. Produits de santé, beauté, vitamines avec livraison rapide en Algérie.">
-    <meta property="og:image" content="https://votre-site.com/images/og-image.jpg">
+    <meta property="og:image" content="https://parapharmacie-gaher.onrender.com/images/og-image.jpg">
     <meta property="og:site_name" content="Shifa Parapharmacie">
     <meta property="og:locale" content="fr_DZ">
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://votre-site.com/">
+    <meta name="twitter:url" content="https://parapharmacie-gaher.onrender.com/">
     <meta name="twitter:title" content="Shifa Parapharmacie Tipaza">
     <meta name="twitter:description" content="Produits santé & beauté à Tipaza. Livraison en Algérie.">
-    <meta name="twitter:image" content="https://votre-site.com/images/twitter-image.jpg">
+    <meta name="twitter:image" content="https://parapharmacie-gaher.onrender.com/images/twitter-image.jpg">
     
-    <!-- Canonical URL -->
-    <link rel="canonical" href="https://votre-site.com/">
+    <!-- Canonical URL - CRITICAL FOR SEO -->
+    <link rel="canonical" href="https://parapharmacie-gaher.onrender.com/">
+    
+    <!-- Sitemap -->
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='16' fill='%2310b981'/%3E%3Cpath d='M16 8c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 12c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z' fill='white'/%3E%3C/svg%3E">
@@ -87,15 +91,15 @@
     {
       "@context": "https://schema.org",
       "@type": "LocalBusiness",
-      "@id": "https://votre-site.com/#business",
+      "@id": "https://parapharmacie-gaher.onrender.com/#business",
       "name": "Shifa Parapharmacie",
       "alternateName": "Parapharmacie Shifa Tipaza",
       "description": "Parapharmacie à Tipaza offrant des produits de santé, beauté, vitamines, compléments alimentaires et soins pour toute la famille avec livraison rapide en Algérie",
-      "url": "https://votre-site.com",
+      "url": "https://parapharmacie-gaher.onrender.com",
       "telephone": "+213661201294",
       "email": "parapharmacieshifa@gmail.com",
-      "image": "https://votre-site.com/images/logo-shifa.jpg",
-      "logo": "https://votre-site.com/images/logo-shifa.jpg",
+      "image": "https://parapharmacie-gaher.onrender.com/images/logo-shifa.jpg",
+      "logo": "https://parapharmacie-gaher.onrender.com/images/logo-shifa.jpg",
       "priceRange": "$$",
       "currenciesAccepted": "DZD",
       "paymentAccepted": "Cash, Paiement à la livraison",
@@ -182,19 +186,33 @@
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      "@id": "https://votre-site.com/#website",
-      "url": "https://votre-site.com",
+      "@id": "https://parapharmacie-gaher.onrender.com/#website",
+      "url": "https://parapharmacie-gaher.onrender.com",
       "name": "Shifa Parapharmacie",
       "description": "Parapharmacie en ligne à Tipaza, Algérie",
       "publisher": {
         "@type": "Organization",
-        "@id": "https://votre-site.com/#organization"
+        "@id": "https://parapharmacie-gaher.onrender.com/#organization"
       },
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://votre-site.com/#/products?search={search_term_string}",
+        "target": "https://parapharmacie-gaher.onrender.com/#/products?search={search_term_string}",
         "query-input": "required name=search_term_string"
       }
+    }
+    </script>
+    
+    <!-- Breadcrumb Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Accueil",
+        "item": "https://parapharmacie-gaher.onrender.com"
+      }]
     }
     </script>
 </head>
