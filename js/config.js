@@ -205,3 +205,25 @@ window.apiCall = apiCall;
 window.testBackendConnection = testBackendConnection;
 
 console.log('✅ Config loaded - Backend URL:', API_CONFIG.BASE_URL);
+
+// 🚀 WAKE UP SERVER IMMEDIATELY
+// This runs as soon as config.js loads, waking the Render server from sleep
+// so it's ready when the user starts browsing products
+(function wakeUpServer() {
+    console.log('🚀 Waking up server immediately...');
+    
+    // Fire wake-up call right now without waiting
+    fetch(API_CONFIG.BASE_URL + '/health', {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        mode: 'cors'
+    }).then(response => {
+        if (response.ok) {
+            console.log('✅ Server is awake and ready!');
+        } else {
+            console.log('⏰ Server starting up (HTTP ' + response.status + ')');
+        }
+    }).catch(error => {
+        console.log('⏰ Server cold start initiated - will be ready soon');
+    });
+})();
