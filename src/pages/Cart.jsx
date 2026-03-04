@@ -20,9 +20,7 @@ export default function Cart() {
             <FiShoppingBag size={64} style={{ color: 'var(--gray-300)' }} />
             <h2>Votre Panier est Vide</h2>
             <p>Découvrez nos produits et commencez vos achats</p>
-            <Link to="/products" className="btn btn-primary btn-lg">
-              Voir les Produits <FiArrowRight />
-            </Link>
+            <Link to="/products" className="btn btn-primary btn-lg">Voir les Produits <FiArrowRight /></Link>
           </motion.div>
         </div>
       </div>
@@ -35,22 +33,14 @@ export default function Cart() {
         <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="cart-title">
           Mon Panier <span>({items.length} articles)</span>
         </motion.h1>
-
         <div className="cart-layout">
           <div className="cart-items">
             <AnimatePresence>
               {items.map((item) => (
-                <motion.div
-                  key={item.id}
-                  className="cart-item"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20, height: 0 }}
-                  layout
-                >
+                <motion.div key={item.id} className="cart-item" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20, height: 0 }} layout>
                   <div className="cart-item-img">
-                    {item.image ? (
-                      <img src={item.image} alt={item.name} />
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.name} />
                     ) : (
                       <div className="cart-item-placeholder">🌿</div>
                     )}
@@ -65,38 +55,20 @@ export default function Cart() {
                     <span>{item.quantity}</span>
                     <button onClick={() => updateQuantity(item.id, item.quantity + 1)}><FiPlus size={14} /></button>
                   </div>
-                  <div className="cart-item-total">
-                    {(Number(item.price) * item.quantity).toLocaleString()} DA
-                  </div>
-                  <button className="cart-item-remove" onClick={() => removeItem(item.id)}>
-                    <FiTrash2 size={16} />
-                  </button>
+                  <div className="cart-item-total">{(Number(item.price) * item.quantity).toLocaleString()} DA</div>
+                  <button className="cart-item-remove" onClick={() => removeItem(item.id)}><FiTrash2 size={16} /></button>
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
-
           <motion.div className="cart-summary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h3>Résumé</h3>
-            <div className="summary-row">
-              <span>Sous-total</span>
-              <span>{getTotal().toLocaleString()} DA</span>
-            </div>
-            <div className="summary-row">
-              <span>Livraison</span>
-              <span style={{ color: 'var(--success)', fontWeight: 600 }}>Gratuite</span>
-            </div>
+            <div className="summary-row"><span>Sous-total</span><span>{getTotal().toLocaleString()} DA</span></div>
+            <div className="summary-row"><span>Livraison</span><span style={{ color: 'var(--success)', fontWeight: 600 }}>Gratuite</span></div>
             <div className="summary-divider"></div>
-            <div className="summary-row summary-total">
-              <span>Total</span>
-              <span>{getTotal().toLocaleString()} DA</span>
-            </div>
-            <Link to="/checkout" className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 16 }}>
-              Passer la Commande <FiArrowRight />
-            </Link>
-            <button onClick={clearCart} style={{ width: '100%', marginTop: 12, padding: 12, background: 'none', color: 'var(--danger)', fontSize: '0.88rem', fontWeight: 600 }}>
-              Vider le panier
-            </button>
+            <div className="summary-row summary-total"><span>Total</span><span>{getTotal().toLocaleString()} DA</span></div>
+            <Link to="/checkout" className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 16 }}>Passer la Commande <FiArrowRight /></Link>
+            <button onClick={clearCart} style={{ width: '100%', marginTop: 12, padding: 12, background: 'none', color: 'var(--danger)', fontSize: '0.88rem', fontWeight: 600 }}>Vider le panier</button>
           </motion.div>
         </div>
       </div>
