@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiTrash2, FiMinus, FiPlus, FiShoppingBag, FiArrowRight } from 'react-icons/fi';
 import { useCartStore } from '../store';
-import { BACKEND_URL } from '../api';
 import './Cart.css';
 
 export default function Cart() {
@@ -51,7 +50,7 @@ export default function Cart() {
                 >
                   <div className="cart-item-img">
                     {item.image ? (
-                      <img src={`${BACKEND_URL}${item.image}`} alt={item.name} />
+                      <img src={item.image} alt={item.name} />
                     ) : (
                       <div className="cart-item-placeholder">🌿</div>
                     )}
