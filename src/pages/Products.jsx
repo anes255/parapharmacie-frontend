@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiSearch, FiShoppingCart, FiFilter } from 'react-icons/fi';
+import { FiSearch, FiShoppingCart } from 'react-icons/fi';
 import { useCartStore } from '../store';
 import api from '../api';
 import toast from 'react-hot-toast';
@@ -45,27 +45,14 @@ export default function Products() {
           </motion.h1>
           <div className="search-bar">
             <FiSearch size={18} />
-            <input
-              type="text"
-              placeholder="Rechercher un produit..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <input type="text" placeholder="Rechercher un produit..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
 
         <div className="filter-bar">
-          <button className={`filter-chip ${!activeCategory ? 'active' : ''}`} onClick={() => setActiveCategory('')}>
-            Tous
-          </button>
+          <button className={`filter-chip ${!activeCategory ? 'active' : ''}`} onClick={() => setActiveCategory('')}>Tous</button>
           {allCategories.map(cat => (
-            <button
-              key={cat}
-              className={`filter-chip ${activeCategory === cat ? 'active' : ''}`}
-              onClick={() => setActiveCategory(activeCategory === cat ? '' : cat)}
-            >
-              {cat}
-            </button>
+            <button key={cat} className={`filter-chip ${activeCategory === cat ? 'active' : ''}`} onClick={() => setActiveCategory(activeCategory === cat ? '' : cat)}>{cat}</button>
           ))}
         </div>
 
@@ -80,35 +67,23 @@ export default function Products() {
         ) : (
           <motion.div className="products-grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
             {products.map((product, i) => (
-              <motion.div
-                key={product.id}
-                className="product-card card"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-              >
+              <motion.div key={product.id} className="product-card card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                 <div className="product-img-wrap">
-                  {product.image ? (
-                    <img src={product.image} alt={product.name} />
+                  {product.image_url ? (
+                    <img src={product.image_url} alt={product.name} />
                   ) : (
                     <div className="product-placeholder"><span>🌿</span></div>
                   )}
                   {product.is_promo && <span className="promo-badge">Promo</span>}
-                  <button className="quick-add" onClick={() => handleAdd(product)}>
-                    <FiShoppingCart size={16} />
-                  </button>
+                  <button className="quick-add" onClick={() => handleAdd(product)}><FiShoppingCart size={16} /></button>
                 </div>
                 <div className="product-info">
                   <span className="product-cat">{product.category}</span>
-                  <Link to={`/product/${product.id}`}>
-                    <h3 className="product-name">{product.name}</h3>
-                  </Link>
+                  <Link to={`/product/${product.id}`}><h3 className="product-name">{product.name}</h3></Link>
                   {product.brand && <span className="product-brand">{product.brand}</span>}
                   <div className="product-bottom">
                     <span className="product-price">{Number(product.price).toLocaleString()} DA</span>
-                    <button className="btn btn-primary btn-sm" onClick={() => handleAdd(product)}>
-                      Ajouter
-                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={() => handleAdd(product)}>Ajouter</button>
                   </div>
                 </div>
               </motion.div>
