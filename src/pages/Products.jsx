@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiSearch, FiShoppingCart, FiFilter } from 'react-icons/fi';
 import { useCartStore } from '../store';
-import api, { BACKEND_URL } from '../api';
+import api from '../api';
 import toast from 'react-hot-toast';
 import './Products.css';
 
@@ -19,6 +19,7 @@ export default function Products() {
   const addItem = useCartStore(s => s.addItem);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     setActiveCategory(category || '');
   }, [category]);
 
@@ -88,7 +89,7 @@ export default function Products() {
               >
                 <div className="product-img-wrap">
                   {product.image ? (
-                    <img src={`${BACKEND_URL}${product.image}`} alt={product.name} />
+                    <img src={product.image} alt={product.name} />
                   ) : (
                     <div className="product-placeholder"><span>🌿</span></div>
                   )}
