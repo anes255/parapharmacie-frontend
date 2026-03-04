@@ -27,11 +27,8 @@ const fadeUp = {
 function ProductScroller({ products, title, tag, addItem }) {
   const scrollRef = useRef(null);
   const scroll = (dir) => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollBy({ left: dir * 300, behavior: 'smooth' });
-    }
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: dir * 300, behavior: 'smooth' });
   };
-
   if (!products || products.length === 0) return null;
 
   return (
@@ -50,12 +47,10 @@ function ProductScroller({ products, title, tag, addItem }) {
         {products.map((product) => (
           <div key={product.id} className="product-scroll-card card">
             <div className="product-img-wrap">
-              {product.image ? (
-                <img src={product.image} alt={product.name} />
+              {product.image_url ? (
+                <img src={product.image_url} alt={product.name} />
               ) : (
-                <div className="product-placeholder">
-                  <span>🌿</span>
-                </div>
+                <div className="product-placeholder"><span>🌿</span></div>
               )}
               {product.is_promo && <span className="promo-badge">Promo</span>}
               <button className="quick-add" onClick={() => { addItem(product); toast.success(`${product.name} ajouté au panier`); }}>
@@ -70,9 +65,7 @@ function ProductScroller({ products, title, tag, addItem }) {
               {product.brand && <span className="product-brand">{product.brand}</span>}
               <div className="product-bottom">
                 <span className="product-price">{Number(product.price).toLocaleString()} DA</span>
-                <button className="btn btn-primary btn-sm" onClick={() => { addItem(product); toast.success(`${product.name} ajouté`); }}>
-                  Ajouter
-                </button>
+                <button className="btn btn-primary btn-sm" onClick={() => { addItem(product); toast.success(`${product.name} ajouté`); }}>Ajouter</button>
               </div>
             </div>
           </div>
@@ -95,7 +88,6 @@ export default function Home() {
     api.get('/products?promo=true').then(r => setPromo(r.data)).catch(() => {});
   }, []);
 
-  // Group products by category
   const productsByCategory = {};
   categories.forEach(cat => {
     const prods = allProducts.filter(p => p.category === cat.name);
@@ -104,7 +96,6 @@ export default function Home() {
 
   return (
     <div className="home">
-      {/* Floating nature elements */}
       <div className="nature-bg">
         <div className="leaf leaf-1">🍃</div>
         <div className="leaf leaf-2">🌿</div>
@@ -116,31 +107,16 @@ export default function Home() {
         <div className="circle-deco c3"></div>
       </div>
 
-      {/* Hero */}
       <section className="hero">
         <div className="container hero-container">
-          <motion.div
-            className="hero-content"
-            initial={{ opacity: 0, x: -60 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <motion.span className="hero-badge" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>
-              🌿 Santé & Bien-être Naturel
-            </motion.span>
+          <motion.div className="hero-content" initial={{ opacity: 0, x: -60 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}>
+            <motion.span className="hero-badge" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>🌿 Santé & Bien-être Naturel</motion.span>
             <h1 className="hero-title">{settings.hero_title || 'Parapharmacie Shifa'}</h1>
             <p className="hero-subtitle">{settings.hero_subtitle || 'Votre santé, notre priorité'}</p>
-            <p className="hero-desc">
-              Découvrez notre sélection premium de produits de santé, beauté et bien-être. 
-              Qualité garantie, livraison rapide partout en Algérie.
-            </p>
+            <p className="hero-desc">Découvrez notre sélection premium de produits de santé, beauté et bien-être. Qualité garantie, livraison rapide partout en Algérie.</p>
             <div className="hero-actions">
-              <Link to="/products" className="btn btn-primary btn-lg hero-btn">
-                Découvrir <FiArrowRight />
-              </Link>
-              <Link to="/products/Vitalité" className="btn btn-outline btn-lg">
-                Vitalité & Énergie
-              </Link>
+              <Link to="/products" className="btn btn-primary btn-lg hero-btn">Découvrir <FiArrowRight /></Link>
+              <Link to="/products/Vitalité" className="btn btn-outline btn-lg">Vitalité & Énergie</Link>
             </div>
             <div className="hero-stats">
               <div className="hero-stat"><strong>500+</strong><span>Produits</span></div>
@@ -154,12 +130,7 @@ export default function Home() {
             <div className="hero-circle">
               <div className="hero-circle-inner">
                 <svg viewBox="0 0 200 200" className="hero-svg">
-                  <defs>
-                    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="var(--primary)" />
-                      <stop offset="100%" stopColor="var(--accent)" />
-                    </linearGradient>
-                  </defs>
+                  <defs><linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="var(--primary)" /><stop offset="100%" stopColor="var(--accent)" /></linearGradient></defs>
                   <circle cx="100" cy="100" r="90" fill="url(#leafGrad)" opacity="0.1"/>
                   <path d="M100 30C100 30 60 70 60 110C60 132 78 150 100 150C122 150 140 132 140 110C140 70 100 30 100 30Z" fill="url(#leafGrad)" opacity="0.4"/>
                   <path d="M100 50C100 50 75 80 75 105C75 119 86 130 100 130C114 130 125 119 125 105C125 80 100 50 100 50Z" fill="var(--primary)" opacity="0.6"/>
@@ -176,7 +147,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Categories + Products right below each */}
       <section className="section categories-section">
         <div className="container">
           <motion.div className="section-header" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp} custom={0}>
@@ -188,32 +158,21 @@ export default function Home() {
             {categories.map((cat, i) => (
               <motion.div key={cat.name} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i}>
                 <Link to={`/products/${cat.name}`} className="category-card">
-                  <div className="cat-icon-wrap" style={{ background: `${cat.color}15` }}>
-                    <span className="cat-icon">{cat.icon}</span>
-                  </div>
+                  <div className="cat-icon-wrap" style={{ background: `${cat.color}15` }}><span className="cat-icon">{cat.icon}</span></div>
                   <span className="cat-name">{cat.label}</span>
                   <FiArrowRight className="cat-arrow" />
                 </Link>
               </motion.div>
             ))}
           </div>
-
-          {/* Products per category - horizontal scroll */}
           <div className="category-products-list">
             {categories.map(cat => (
-              <ProductScroller
-                key={cat.name}
-                products={productsByCategory[cat.name]}
-                title={cat.label}
-                tag={cat.icon}
-                addItem={addItem}
-              />
+              <ProductScroller key={cat.name} products={productsByCategory[cat.name]} title={cat.label} tag={cat.icon} addItem={addItem} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* Features */}
       <section className="section features-section">
         <div className="container">
           <div className="features-grid">
@@ -233,21 +192,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Products horizontal scroll */}
       {featured.length > 0 && (
         <section className="section">
           <div className="container">
             <ProductScroller products={featured} title="Produits en Vedette" tag="⭐ Vedettes" addItem={addItem} />
             <div className="text-center mt-4">
-              <Link to="/products" className="btn btn-outline btn-lg">
-                Voir Tous les Produits <FiArrowRight />
-              </Link>
+              <Link to="/products" className="btn btn-outline btn-lg">Voir Tous les Produits <FiArrowRight /></Link>
             </div>
           </div>
         </section>
       )}
 
-      {/* Promo Products horizontal scroll */}
       {promo.length > 0 && (
         <section className="section promo-section">
           <div className="container">
@@ -256,7 +211,6 @@ export default function Home() {
         </section>
       )}
 
-      {/* CTA */}
       <section className="section cta-section">
         <div className="container">
           <motion.div className="cta-card" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0}>
