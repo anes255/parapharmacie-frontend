@@ -36,8 +36,8 @@ export default function ProductDetail() {
         </Link>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, alignItems: 'start' }} className="product-detail-grid">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--gray-50)', aspectRatio: '1' }}>
-            {product.image ? (
-              <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {product.image_url ? (
+              <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '5rem' }}>🌿</div>
             )}
@@ -53,20 +53,16 @@ export default function ProductDetail() {
             <p style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: 700, color: 'var(--primary)', marginBottom: 24 }}>{Number(product.price).toLocaleString()} DA</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: '0.9rem' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: inStock ? 'var(--success)' : 'var(--danger)' }}></span>
-              <span style={{ color: inStock ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
-                {inStock ? `En stock (${product.stock})` : 'Rupture de stock'}
-              </span>
+              <span style={{ color: inStock ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>{inStock ? `En stock (${product.stock})` : 'Rupture de stock'}</span>
             </div>
             <p style={{ color: 'var(--gray-500)', lineHeight: 1.8, marginBottom: 32, fontSize: '0.95rem' }}>{product.description}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', border: '2px solid var(--gray-200)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-                <button style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gray-50)', color: 'var(--text)', fontSize: '1.1rem', border: 'none', cursor: 'pointer' }} onClick={() => setQty(Math.max(1, qty - 1))}><FiMinus /></button>
-                <span style={{ width: 50, textAlign: 'center', fontWeight: 700, fontSize: '1rem' }}>{qty}</span>
-                <button style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gray-50)', color: 'var(--text)', fontSize: '1.1rem', border: 'none', cursor: 'pointer' }} onClick={() => setQty(qty + 1)}><FiPlus /></button>
+                <button style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gray-50)', color: 'var(--text)', border: 'none', cursor: 'pointer' }} onClick={() => setQty(Math.max(1, qty - 1))}><FiMinus /></button>
+                <span style={{ width: 50, textAlign: 'center', fontWeight: 700 }}>{qty}</span>
+                <button style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gray-50)', color: 'var(--text)', border: 'none', cursor: 'pointer' }} onClick={() => setQty(qty + 1)}><FiPlus /></button>
               </div>
-              <button className="btn btn-primary btn-lg" onClick={handleAdd} disabled={!inStock} style={{ flex: 1 }}>
-                <FiShoppingCart /> Ajouter au Panier
-              </button>
+              <button className="btn btn-primary btn-lg" onClick={handleAdd} disabled={!inStock} style={{ flex: 1 }}><FiShoppingCart /> Ajouter au Panier</button>
             </div>
           </motion.div>
         </div>
