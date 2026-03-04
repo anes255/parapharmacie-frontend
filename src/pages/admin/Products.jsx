@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiPlus, FiEdit2, FiTrash2, FiGrid, FiBox, FiList, FiUsers, FiSettings, FiImage } from 'react-icons/fi';
-import api, { BACKEND_URL } from '../../api';
+import api from '../../api';
 import toast from 'react-hot-toast';
 import './Admin.css';
 
@@ -84,7 +84,7 @@ export default function AdminProducts() {
                   <tr key={p.id}>
                     <td>
                       <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: 'var(--gray-50)' }}>
-                        {p.image ? <img src={`${BACKEND_URL}${p.image}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>🌿</div>}
+                        {p.image ? <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>🌿</div>}
                       </div>
                     </td>
                     <td><strong>{p.name}</strong>{p.brand && <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--gray-400)' }}>{p.brand}</span>}</td>
