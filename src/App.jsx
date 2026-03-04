@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore, useSettingsStore } from './store';
 import api from './api';
@@ -30,6 +30,12 @@ function AdminRoute({ children }) {
   return user?.role === 'admin' ? children : <Navigate to="/" />;
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
 function App() {
   const setSettings = useSettingsStore(s => s.setSettings);
 
@@ -55,6 +61,7 @@ function App() {
 
   return (
     <Router>
+      <ScrollToTop />
       <Toaster position="top-center" toastOptions={{ duration: 3000, style: { borderRadius: '12px', background: '#1b4332', color: '#fff', fontFamily: 'var(--font-body)' } }} />
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <Navbar />
