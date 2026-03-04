@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 import './Admin.css';
 
 const cats = ['Vitalité', 'Sport', 'Visage', 'Cheveux', 'Solaire', 'Intime', 'Soins', 'Homme', 'Dentaire'];
-
 const emptyProduct = { name: '', category: '', brand: '', price: '', stock: '', description: '', is_promo: false, is_featured: false, is_active: true };
 
 export default function AdminProducts() {
@@ -20,9 +19,7 @@ export default function AdminProducts() {
   const [saving, setSaving] = useState(false);
   const location = useLocation();
 
-  const load = () => {
-    api.get('/products/admin/all').then(r => { setProducts(r.data); setLoading(false); }).catch(() => setLoading(false));
-  };
+  const load = () => { api.get('/products/admin/all').then(r => { setProducts(r.data); setLoading(false); }).catch(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
 
   const openCreate = () => { setForm({ ...emptyProduct }); setEditId(null); setImage(null); setModal(true); };
@@ -43,11 +40,8 @@ export default function AdminProducts() {
         await api.post('/products', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
         toast.success('Produit créé');
       }
-      setModal(false);
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Erreur');
-    }
+      setModal(false); load();
+    } catch (err) { toast.error(err.response?.data?.error || 'Erreur'); }
     setSaving(false);
   };
 
@@ -74,17 +68,13 @@ export default function AdminProducts() {
         {loading ? <div className="loader"><div className="spinner"></div></div> : (
           <div className="admin-table-wrap">
             <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Image</th><th>Nom</th><th>Catégorie</th><th>Prix</th><th>Stock</th><th>Statut</th><th>Actions</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Image</th><th>Nom</th><th>Catégorie</th><th>Prix</th><th>Stock</th><th>Statut</th><th>Actions</th></tr></thead>
               <tbody>
                 {products.map(p => (
                   <tr key={p.id}>
                     <td>
                       <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: 'var(--gray-50)' }}>
-                        {p.image ? <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>🌿</div>}
+                        {p.image_url ? <img src={p.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>🌿</div>}
                       </div>
                     </td>
                     <td><strong>{p.name}</strong>{p.brand && <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--gray-400)' }}>{p.brand}</span>}</td>
@@ -128,44 +118,19 @@ export default function AdminProducts() {
                       <span style={{ fontSize: '0.78rem', color: 'var(--gray-400)' }}>JPG, PNG (Max 2MB)</span>
                     </div>
                   </div>
-                  <div className="form-group">
-                    <label>Nom du produit *</label>
-                    <input className="form-control" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+                  <div className="form-group"><label>Nom du produit *</label><input className="form-control" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required /></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="form-group"><label>Catégorie *</label><select className="form-control" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} required><option value="">Sélectionner...</option>{cats.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                    <div className="form-group"><label>Marque</label><input className="form-control" value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} /></div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <div className="form-group">
-                      <label>Catégorie *</label>
-                      <select className="form-control" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} required>
-                        <option value="">Sélectionner...</option>
-                        {cats.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Marque</label>
-                      <input className="form-control" value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} />
-                    </div>
+                    <div className="form-group"><label>Prix (DA) *</label><input className="form-control" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required /></div>
+                    <div className="form-group"><label>Stock *</label><input className="form-control" type="number" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} required /></div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <div className="form-group">
-                      <label>Prix (DA) *</label>
-                      <input className="form-control" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
-                    </div>
-                    <div className="form-group">
-                      <label>Stock *</label>
-                      <input className="form-control" type="number" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} required />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>Description *</label>
-                    <textarea className="form-control" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required />
-                  </div>
+                  <div className="form-group"><label>Description *</label><textarea className="form-control" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required /></div>
                   <div style={{ marginBottom: 20 }}>
                     <label style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: 8, display: 'block' }}>Options</label>
-                    {[
-                      { key: 'is_promo', label: 'En promotion' },
-                      { key: 'is_featured', label: 'En vedette' },
-                      { key: 'is_active', label: 'Actif' },
-                    ].map(opt => (
+                    {[{ key: 'is_promo', label: 'En promotion' }, { key: 'is_featured', label: 'En vedette' }, { key: 'is_active', label: 'Actif' }].map(opt => (
                       <div className="toggle-row" key={opt.key}>
                         <div className={`toggle-switch ${form[opt.key] ? 'active' : ''}`} onClick={() => setForm({ ...form, [opt.key]: !form[opt.key] })}></div>
                         <span style={{ fontSize: '0.9rem' }}>{opt.label}</span>
@@ -174,9 +139,7 @@ export default function AdminProducts() {
                   </div>
                   <div style={{ display: 'flex', gap: 12 }}>
                     <button className="btn btn-outline" type="button" onClick={() => setModal(false)}>Annuler</button>
-                    <button className="btn btn-primary" type="submit" disabled={saving} style={{ flex: 1 }}>
-                      {saving ? 'Enregistrement...' : editId ? 'Modifier le produit' : 'Ajouter le produit'}
-                    </button>
+                    <button className="btn btn-primary" type="submit" disabled={saving} style={{ flex: 1 }}>{saving ? 'Enregistrement...' : editId ? 'Modifier le produit' : 'Ajouter le produit'}</button>
                   </div>
                 </form>
               </motion.div>
